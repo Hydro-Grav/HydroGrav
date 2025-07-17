@@ -1,5 +1,6 @@
 // PhaseTransition.cpp
 #include <string>
+#include <cstring>
 #include <cmath>
 #include <iostream>
 #include <iomanip>
@@ -85,9 +86,11 @@ PTParams::PTParams(double vw, double alpha, double beta, double dtau, double wN,
       }
       
       // defaults to bag model if input model is not in valid_models
-      // write something that indicates other ctor should be called for Veff
-      static const std::unordered_set<const char*> valid_models = {"bag"};//, "improved bag"};
-      if (valid_models.count(model)) {
+      // write something that indicates other ctor should be called for Veff      
+      const char* allowed_models[] = {"bag"};
+      const auto n = sizeof(allowed_models) / sizeof(allowed_models[0]); // crude, but it works
+      
+      if (is_valid_model(model, allowed_models, n)) {
         model_ = model;
       } else {
         std::cout << "Warning: Invalid model '" << model << "' for equation of state. Using default model (" << dflt_PTParams::model << ")\n";
@@ -95,8 +98,10 @@ PTParams::PTParams(double vw, double alpha, double beta, double dtau, double wN,
       }
 
       // check valid bubble nucleation type
-      static const std::unordered_set<const char*> valid_nuc = {"exp", "sim"};
-      if (valid_nuc.count(nuc_type)) {
+      const char* allowed_nuc[] = {"exp", "sim"};
+      const auto m = sizeof(allowed_nuc) / sizeof(allowed_nuc[0]);
+
+      if (is_valid_model(nuc_type, allowed_nuc, m)) {
         nuc_type_ = nuc_type;
       } else {
         std::cout << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
@@ -160,16 +165,15 @@ void PTParams::print() const {
     std::cout << *this;
 }
 
-/* Bag model: */
-/*
-p+ = (1/3) * a+ * T+^4 - eps
-e+ = a+ * T+^4 + eps
-p- = (1/3) * a- * T-^4
-e- = a- * T-^4
-
-csq = dp/de -> cpsq = cmsq = 1/3
-alpha = eps / (a+ * T+^4)
-*/
+// Private
+bool PTParams::is_valid_model(const char* model, const char* allowed_models[], const int n) {
+  for (int i = 0; i < n; i++) {
+    if (std::strcmp(model, allowed_models[i]) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /********************/
 

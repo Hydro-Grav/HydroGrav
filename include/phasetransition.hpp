@@ -109,6 +109,8 @@ struct dflt_PTParams {
       double vw_, alpha_, beta_, Rs_, tau_s_, tau_fin_, dtau_, cpsq_, cmsq_, vcj_, wN_;
       const char *model_, *nuc_type_;
       std::string wall_type_;
+
+      bool is_valid_model(const char* model, const char* allowed_models[], const int n);
 };
 
 } // namespace PhaseTransition
