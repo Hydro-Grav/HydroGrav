@@ -28,6 +28,15 @@ struct dflt_universe {
   static constexpr double gs = 100.0;
 };
 
+// add unuits in class desc for universe/ptparams
+// Hs = (a_*/a0) H_* (conformal Hubble factor)
+
+/*
+units:
+[T] = 1/s
+[H] = 1/s
+[g] = dimensionless
+*/
 /**
  * @class Universe
  * @brief Class representing the universe parameters used in the phase transition calculations.
@@ -67,6 +76,15 @@ struct dflt_PTParams {
   static constexpr double dtau = 10.0;            // PT duration
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
+
+
+/* 
+units:
+[vw] = dimensionless (0 < vw < 1)
+[alN] = dimensionless (alN > 0)
+[beta] = 1/s
+[dtau] = s
+*/
 
   /**
  * @class PTParams
