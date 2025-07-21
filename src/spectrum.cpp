@@ -138,26 +138,27 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const auto Rs = params.Rs();
     const auto Rs_inv = 1.0 / Rs;
 
-    const auto z_vals = linspace(-1.0, 1.0, 1000); // logspace gives nan over this domain
-    // const auto z_vals = linspace(-1.0, 1.0, 200);
-    const auto nz = z_vals.size();
-
-    const auto pRs_vals = logspace(1e-2, 1e+3, 1000); // P = p*Rs
-    // const auto pRs_vals = logspace(1e-2, 1e+3, 200);
-    const auto np = pRs_vals.size();
-
-    std::vector<double> pRs2_vals; // keep here otherwise have to calculate for each k
-    std::vector<double> p_vals; 
-    for (const auto pRs : pRs_vals) {
-        pRs2_vals.push_back(pRs * pRs);
-        p_vals.push_back(pRs * Rs_inv);
-    }
+    const auto nk = kRs_vals.size();
 
     // can probably get rid of this by modifying dlt to take in kRs and pRs rather than k and p
-    std::vector<double> k_vals;
-    for (const auto kRs : kRs_vals) {
-        k_vals.push_back(kRs * Rs_inv);
+    std::vector<double> k_vals(nk);
+    for (int i = 0; i < nk; i++) {
+        const auto kRs = kRs_vals[i];
+        k_vals[i] = kRs * Rs_inv;
     }
+
+    const auto pRs_vals = logspace(1e-2, 1e+3, 1000); // P = p*Rs
+    const auto np = pRs_vals.size();
+
+    std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
+    for (int i = 0; i < np; i++) {
+        const auto pRs = pRs_vals[i];
+        pRs2_vals[i] = pRs * pRs;
+        p_vals[i] = pRs * Rs_inv;
+    }
+
+    const auto z_vals = linspace(-1.0, 1.0, 1000); // logspace gives nan over this domain
+    const auto nz = z_vals.size();    
 
     /********** precompute normalised kinetic spectrum **********/
     // NOTE: this is currently a bit buggy and domain of interpolating function requires fine tuning depending on range of k,p,z
@@ -187,28 +188,51 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
     // precompute dlt
-    const auto delta = dlt_SSM(k_vals, p_vals, z_vals, params);
-
-    const auto nk = kRs_vals.size();
+    // const auto delta = dlt_SSM(k_vals, p_vals, z_vals, params);
+    const auto delta = dlt_SSM2(k_vals, p_vals, z_vals, params);
     std::vector<double> GW_P_vals(nk);
 
+    std::cout << "writing pt to file\n";
+    std::ofstream file("pt_vals.csv");;
+    file << "kRs,pRs,z,ptRs\n";
+
+    for (size_t kk = 0; kk < nk; kk++ ) {
+        const auto kRs = kRs_vals[kk];
+        const auto k = kRs * Rs_inv;
+
+        for (size_t pp = 0; pp < np; pp++) {
+            const auto pRs = pRs_vals[pp];
+            const auto p = pRs * Rs_inv;
+
+            for (size_t zz = 0; zz < nz; zz++) {
+                const auto z = z_vals[zz];
+                const auto pt = ptilde(k, p, z);
+                const auto ptRs = pt * Rs;
+
+                file << kRs << "," << pRs << "," << z << "," << ptRs << "\n";
+            }
+        }
+    }
+    file.close();
+    std::cout << "finished\n";
+
     #pragma omp parallel for
-    for (size_t m = 0; m < nk; m++ ) {
-        const auto kRs = kRs_vals[m];
+    for (size_t kk = 0; kk < nk; kk++ ) {
+        const auto kRs = kRs_vals[kk];
         const auto k = kRs * Rs_inv;
 
         const auto kRs3 = kRs * kRs * kRs;
 
         std::vector<std::vector<double>> integrand(np, std::vector<double>(nz));
-        for (size_t i = 0; i < np; i++) {
-            const auto p = p_vals[i];
-            // const auto pRs = pRs_vals[i];
-            const auto pRs2 = pRs2_vals[i];
+        for (size_t pp = 0; pp < np; pp++) {
+            const auto p = p_vals[pp];
+            // const auto pRs = pRs_vals[pp];
+            const auto pRs2 = pRs2_vals[pp];
 
-            const auto zk_pRs_fac = kRs3 * zk_pRs_vals[i] * pRs2; // kRs^3 * zetaKin(pRs) * pRs^2
+            const auto zk_pRs_fac = kRs3 * zk_pRs_vals[pp] * pRs2; // kRs^3 * zetaKin(pRs) * pRs^2
 
-            for (size_t j = 0; j < nz; j++) {
-                const auto z = z_vals[j];
+            for (size_t zz = 0; zz < nz; zz++) {
+                const auto z = z_vals[zz];
                 const auto pt = ptilde(k, p, z);
                 const auto ptRs = pt * Rs;
 
@@ -216,14 +240,18 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
                 const auto z_fac = 1.0 - z;
                 const auto z_fac2 = z_fac * z_fac;
 
-                // prevents out of bounds spline
+                // const auto dlt = delta[kk][pp][zz];
+                const auto dlt = delta[kk * np * nz + pp * nz + zz];
+
                 // careful! need to check this converges properly for pt=0!
-                integrand[i][j] = (ptRs != 0.0) ? z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_interp(ptRs) * delta[m][i][j] : 0.0;
+                integrand[pp][zz] = (ptRs != 0.0) ? z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_interp(ptRs) * dlt : 0.0;
             }
         }
 
-        GW_P_vals[m] = simpson_2d_integrate(pRs_vals, z_vals, integrand);
+        GW_P_vals[kk] = simpson_2d_integrate(pRs_vals, z_vals, integrand);
     }
+
+    
 
     std::cout << "Gravitational power spectrum constructed!\n";
 
@@ -369,7 +397,8 @@ std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vecto
     return result;
 }
 
-std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
+// same as dlt_SSM but with flattened index
+std::vector<double> dlt_SSM2(const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
     /***************************** CLOCK ******************************/
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
@@ -382,25 +411,74 @@ std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>&
     const auto np = p_vals.size();
     const auto nz = z_vals.size();
 
-    // interpolation function for Si, Ci
-    // const auto n = 10000;
-    // const auto x_vals = linspace(-5e+4, 5e+4, n); // better way for choosing bounds here
-    // std::vector<double> Si_vals(n), Ci_vals(n);
+    // reserve memory for integration
+    std::vector<double> result(nk * np * nz);
+    constexpr std::array<double,2> sum_vals = {-1.0, 1.0};
 
-    // // // could make this bit faster by moving spline interp and Si(x), Ci(x) 
-    // // // calculation into one function (collapse loops)
-    // #pragma omp parallel for
-    // for (int i = 0; i < x_vals.size(); i++) {
-    //     const auto x = x_vals[i];
+    #pragma omp parallel
+    {
+        #pragma omp for collapse(3) schedule(static)
+        for (size_t kk = 0; kk < nk; kk++)
+        for (size_t pp = 0; pp < np; pp++)
+        for (size_t zz = 0; zz < nz; zz++) {
+            const auto k = k_vals[kk];
+            const auto p = p_vals[pp];
+            const auto z = z_vals[zz];
 
-    //     const auto [Si, Ci] = SiCi(x, n);
-    //     Si_vals[i] = Si;
-    //     Ci_vals[i] = Ci;
-    // }
+            const auto pt = ptilde(k, p, z);
+            // const auto pt = std::sqrt(k*k - 2.0 * k * p * z + p*p);
+            auto dlt_temp = 0.0;
 
-    // const auto Si_interp = CubicSpline(x_vals, Si_vals);
-    // const auto Ci_interp = CubicSpline(x_vals, Ci_vals);
+            // regular for loop
+            for (int i = 0; i < 2; i++) { // loop over m
+                const auto m = sum_vals[i];
+                const auto pmn_1 = (p + m * pt) * cs;
+                for (int j = 0; j < 2; j++) { // loop over n
+                    const auto n = sum_vals[j];
+                    const auto pmn = pmn_1 + n * k;
 
+                    const auto x1 = pmn * tau_fin;
+                    const auto x2 = pmn * tau_s;
+
+                    double Si_x1, Ci_x1, Si_x2, Ci_x2;
+                    alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
+                    alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
+
+                    // Im(Si(x))=0 for real x
+                    // Im(Ci(x))=pi (x<0), 0 (x>0)
+                    // Taking difference dCi -> imaginary part cancels since sign of x1, x2 always the same
+                    const auto dSi = Si_x1 - Si_x2;
+                    const auto dCi = Ci_x1 - Ci_x2;
+
+                    dlt_temp += 0.25 * (dCi * dCi + dSi * dSi);
+                }
+            }
+
+            result[kk * np * nz + pp * nz + zz] = dlt_temp;
+        }
+    }
+
+    /***************************** CLOCK ******************************/
+    const auto tf = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = tf - ti;
+    std::cout << "Timer (dlt_SSM): " << duration.count() << " s" << std::endl;
+    /******************************************************************/
+
+    return result;
+}
+
+std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
+    /***************************** CLOCK ******************************/
+    const auto ti = std::chrono::high_resolution_clock::now();
+    /******************************************************************/
+
+    const auto cs = std::sqrt(params.cpsq());
+    const auto tau_s = params.tau_s();
+    const auto tau_fin = params.tau_fin();
+
+    const auto nk = k_vals.size();
+    const auto np = p_vals.size();
+    const auto nz = z_vals.size();
 
     // reserve memory for integration
     std::vector<std::vector<std::vector<double>>> result(nk, std::vector<std::vector<double>>(np, std::vector<double>(nz)));
@@ -417,6 +495,7 @@ std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>&
             const auto z = z_vals[zz];
 
             const auto pt = ptilde(k, p, z);
+            // const auto pt = std::sqrt(k*k - 2.0 * k * p * z + p*p);
             auto dlt_temp = 0.0;
 
             // regular for loop
