@@ -58,12 +58,12 @@ const Universe& default_universe() {
 // make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
-    : PTParams(dflt_PTParams::vw, dflt_PTParams::alpha, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::wN, dflt_PTParams::model, dflt_PTParams::nuc_type, default_universe()) {}
+    : PTParams(dflt_PTParams::vw, dflt_PTParams::alpha, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe()) {}
 
-PTParams::PTParams(double vw, double alpha, double beta, double dtau, double wN, const char* model, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alpha, double beta, double dtau, const char* nuc_type, const Universe& un)
     : universe_(un),
       vw_(vw),
-      alpha_(alpha),
+      alN_(alpha),
       beta_(beta),
       Rs_(),
       tau_s_(),
@@ -71,11 +71,7 @@ PTParams::PTParams(double vw, double alpha, double beta, double dtau, double wN,
       dtau_(dtau),
       cpsq_(),
       cmsq_(),
-      vcj_(),
-      wN_(wN),
-      model_(),
-      nuc_type_(),
-      wall_type_()
+      nuc_type_()
     {
       // check vw
       if (vw < 0.0 ) {
@@ -83,18 +79,6 @@ PTParams::PTParams(double vw, double alpha, double beta, double dtau, double wN,
         vw_ = std::abs(vw);
       } else if (vw == 0.0 || vw >= 1.0) {
         throw std::invalid_argument("Unphysical wall velocity passed into PTParams. Must have 0 < vw < 1.");
-      }
-      
-      // defaults to bag model if input model is not in valid_models
-      // write something that indicates other ctor should be called for Veff      
-      const char* allowed_models[] = {"bag"};
-      const auto n = sizeof(allowed_models) / sizeof(allowed_models[0]); // crude, but it works
-      
-      if (is_valid_model(model, allowed_models, n)) {
-        model_ = model;
-      } else {
-        std::cout << "Warning: Invalid model '" << model << "' for equation of state. Using default model (" << dflt_PTParams::model << ")\n";
-        model_ = dflt_PTParams::model;
       }
 
       // check valid bubble nucleation type
@@ -117,40 +101,24 @@ PTParams::PTParams(double vw, double alpha, double beta, double dtau, double wN,
       tau_fin_ = tau_s_ + dtau_;
 
       /***** calc model-dependent quantities *****/
-      if (std::string(model) == "bag") {
+      // if (std::string(model) == "bag") {
         cpsq_ = 1.0 / 3.0;
         cmsq_ = cpsq_;
-      } else {
-          throw std::invalid_argument("Only Bag model has been implemented so far");
-      }
+      // } else {
+      //     throw std::invalid_argument("Only Bag model has been implemented so far");
+      // }
 
       Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
-      vcj_ = (1.0 / std::sqrt(3.0)) * (1.0 + std::sqrt(alpha_ + 3.0 * alpha_ * alpha_)) / (1.0 + alpha_);
-      /*******************************************/
-
-      /************** set wall type **************/
-      const auto vcjsq = vcj_ * vcj_;
-      const auto vwsq = vw_ * vw_;
-      assert(vcjsq > cpsq_); // does this always hold?
-
-      if (vwsq <= cpsq_) {
-        wall_type_ = "deflagration";
-      } else if (vwsq > cpsq_ && vwsq < vcjsq) {
-        wall_type_ = "hybrid";
-      } else {
-        wall_type_ = "detonation";
-      }
       /*******************************************/
     }
 
 std::ostream& operator<<(std::ostream& os, const PTParams& params) {
     os << "********** Phase Transition parameters **********\n"
        << std::left
-       << std::setw(35) << "Equation of state:" << params.model_ << "\n"
+      //  << std::setw(35) << "Equation of state:" << params.model_ << "\n"
        << std::setw(35) << "Nucleation type:" << params.nuc_type_ << "\n"
-       << std::setw(35) << "Wall type:" << params.wall_type_ << "\n"
        << std::setw(35) << "Wall velocity:" << "vw=" << params.vw_ << "\n"
-       << std::setw(35) << "PT strength parameter:" << "alpha=" << params.alpha_ << "\n"
+       << std::setw(35) << "PT strength parameter:" << "alN=" << params.alN_ << "\n"
        << std::setw(35) << "Transition rate parameter:" << "beta=" << params.beta_ << "\n"
        << std::setw(35) << "PT duration" << "dtau=" << params.dtau_ << "\n"
        << std::setw(35) << "Speed of sound (broken phase):" << "cpsq=" << params.cpsq_ << "\n"

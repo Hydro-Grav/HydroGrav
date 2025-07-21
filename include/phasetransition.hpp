@@ -65,9 +65,7 @@ struct dflt_PTParams {
   static constexpr double alpha = 0.1;           // PT strength 
   static constexpr double beta = 1.0;            // Transition rate param
   static constexpr double dtau = 10.0;            // PT duration
-  static constexpr const char* model = "bag";    // equation of state
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
-  static constexpr double wN = 1.71;             // enthalpy at nuc temp
 };
 
   /**
@@ -81,24 +79,20 @@ struct dflt_PTParams {
   public:
     // ctors
     PTParams();
-    PTParams(double vw, double alpha, double beta, double dtau, double wN, const char* model, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alpha, double beta, double dtau, const char* nuc_type, const Universe& un);
 
     double cpsq() const { return cpsq_; } // speed of sound squared (symmetric phase)
     double cmsq() const { return cmsq_; } // speed of sound squared (broken phase)
     double csq() const { return cmsq_; } // keep this? - applies to bag model only
     double vw() const { return vw_; } // wall velocity
-    double vcj() const { return vcj_; } // Chapman-Jouget speed
-    double alphaN() const { return alpha_; } // strength parameter at nuc temp (alpha_N)
+    double alN() const { return alN_; } // strength parameter at nuc temp (alN_N)
     double beta() const { return beta_; } // inverse PT duration
     double Rs() const { return Rs_; } // characteristic length scale R_*
     double tau_s() const { return tau_s_; } // start time of PT
     double tau_fin() const { return tau_fin_; } // end time of PT
     double dtau() const { return dtau_; } // PT duration
-    double wN() const { return wN_; } // enthalpy at nuc temp
 
-    const char* model() const { return model_; } // equation of state model
     const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
-    std::string wall_type() const { return wall_type_; } // deflagration, hybrid, or detonation
 
     // print params
     void print() const;
@@ -106,9 +100,8 @@ struct dflt_PTParams {
   
   private:
       const Universe universe_;
-      double vw_, alpha_, beta_, Rs_, tau_s_, tau_fin_, dtau_, cpsq_, cmsq_, vcj_, wN_;
-      const char *model_, *nuc_type_;
-      std::string wall_type_;
+      double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, cpsq_, cmsq_;
+      const char *nuc_type_;
 
       bool is_valid_model(const char* model, const char* allowed_models[], const int n);
 };
