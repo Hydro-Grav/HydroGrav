@@ -132,7 +132,7 @@ std::pair<std::vector<double>, std::vector<double>> prof_ints_fl(const std::vect
 
 // |A_+|^2
 std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfile& prof) {
-    const auto csq = prof.params().csq();
+    const auto csq = prof.params().cpsq();
     const auto [fd_int, l_int] = prof_ints_fl(chi_vals, prof);
     const auto m = chi_vals.size();
 
