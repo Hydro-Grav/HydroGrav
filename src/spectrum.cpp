@@ -75,7 +75,7 @@ void PowerSpec::plot(const std::string& filename) const {
 
     plt::figure_size(800, 600);
     plt::loglog(K(), P(), "k-");
-    plt::suptitle("vw = " + to_string_with_precision(params_.vw()) + ", alN = " + to_string_with_precision(params_.alphaN()));
+    plt::suptitle("vw = " + to_string_with_precision(params_.vw()) + ", alN = " + to_string_with_precision(params_.alN()));
     plt::xlabel("K=kRs");
     plt::ylabel("Omega_GW(K)");
     plt::xlim(K().front(), K().back());
@@ -139,9 +139,11 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const auto Rs_inv = 1.0 / Rs;
 
     const auto z_vals = linspace(-1.0, 1.0, 1000); // logspace gives nan over this domain
+    // const auto z_vals = linspace(-1.0, 1.0, 200);
     const auto nz = z_vals.size();
 
     const auto pRs_vals = logspace(1e-2, 1e+3, 1000); // P = p*Rs
+    // const auto pRs_vals = logspace(1e-2, 1e+3, 200);
     const auto np = pRs_vals.size();
 
     std::vector<double> pRs2_vals; // keep here otherwise have to calculate for each k
@@ -185,8 +187,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
     // precompute dlt
-    // const int nt = 50;
-    // const auto delta = dlt(nt, k_vals, p_vals, z_vals, params);
     const auto delta = dlt_SSM(k_vals, p_vals, z_vals, params);
 
     const auto nk = kRs_vals.size();
@@ -234,7 +234,12 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 /*** dlt spectrum ***/
 double ptilde(double k, double p, double z) {
     const auto arg = k*k - 2.0 * k * p * z + p*p;
-    return std::sqrt(std::max(arg, 0.0)); // gives 0 for large k,p (FIND BETTER FIX. THIS IS BAD IN CASE ARG <0 FROM BAD K,P)
+    // return std::sqrt(std::max(arg, 0.0)); // gives 0 for large k,p (FIND BETTER FIX. THIS IS BAD IN CASE ARG <0 FROM BAD K,P)
+    if (arg < 0.0) {
+        std::cerr << "ptilde: negative argument for sqrt! k=" << k << ", p=" << p << ", z=" << z << "\n";
+        throw std::invalid_argument("ptilde: negative argument for sqrt!");
+    }
+    return std::sqrt(arg);
 }
 
 double ff(double tau_m, double kcs) {
@@ -255,7 +260,7 @@ std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vecto
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
 
-    const auto cs = std::sqrt(params.csq());
+    const auto cs = std::sqrt(params.cpsq());
 
     const auto tau_s = params.tau_s();
     const auto tau_fin = params.tau_fin();
@@ -369,8 +374,7 @@ std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>&
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
 
-    const auto cs = std::sqrt(params.csq());
-
+    const auto cs = std::sqrt(params.cpsq());
     const auto tau_s = params.tau_s();
     const auto tau_fin = params.tau_fin();
 
@@ -400,16 +404,11 @@ std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>&
 
     // reserve memory for integration
     std::vector<std::vector<std::vector<double>>> result(nk, std::vector<std::vector<double>>(np, std::vector<double>(nz)));
-    const std::vector<double> sum_vals = {-1.0, 1.0};
+    constexpr std::array<double,2> sum_vals = {-1.0, 1.0};
 
     #pragma omp parallel
     {
-        const auto num_threads = omp_get_num_threads();
-        // const auto thread_id = omp_get_thread_num();
-
-        std::vector<double> dlt_temp(num_threads, 0.0);
-
-        #pragma omp for collapse(3) schedule(dynamic)
+        #pragma omp for collapse(3) schedule(static)
         for (size_t kk = 0; kk < nk; kk++)
         for (size_t pp = 0; pp < np; pp++)
         for (size_t zz = 0; zz < nz; zz++) {
@@ -420,24 +419,24 @@ std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>&
             const auto pt = ptilde(k, p, z);
             auto dlt_temp = 0.0;
 
-            for (const auto m : sum_vals) { // fill pmn, dlt
+            // regular for loop
+            for (int i = 0; i < 2; i++) { // loop over m
+                const auto m = sum_vals[i];
                 const auto pmn_1 = (p + m * pt) * cs;
-                for (const auto n : sum_vals) {
+                for (int j = 0; j < 2; j++) { // loop over n
+                    const auto n = sum_vals[j];
                     const auto pmn = pmn_1 + n * k;
+
                     const auto x1 = pmn * tau_fin;
                     const auto x2 = pmn * tau_s;
 
-                    // Im(Si(x))=0 for real x
-                    // Im(Ci(x))=pi (x<0), 0 (x>0)
-                    // Taking difference dCi -> imaginary part cancels since sign of x1, x2 always the same
-                    // const auto dSi = Si_interp(x1) - Si_interp(x2);
-                    // const auto dCi = Ci_interp(x1) - Ci_interp(x2);
-
-                    // tmp fix for SiCi calculation
                     double Si_x1, Ci_x1, Si_x2, Ci_x2;
                     alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
                     alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
 
+                    // Im(Si(x))=0 for real x
+                    // Im(Ci(x))=pi (x<0), 0 (x>0)
+                    // Taking difference dCi -> imaginary part cancels since sign of x1, x2 always the same
                     const auto dSi = Si_x1 - Si_x2;
                     const auto dCi = Ci_x1 - Ci_x2;
 
@@ -467,7 +466,6 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const PhaseTransition::PTPar
 }
 
 PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof) {
-    // const auto csq = prof.params().csq();
     const auto beta = prof.params().beta();
     const auto Rs = prof.params().Rs();
     const auto nuc_type = prof.params().nuc_type();
