@@ -58,28 +58,50 @@ const Universe& default_universe() {
 // make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
-    : PTParams(dflt_PTParams::vw, dflt_PTParams::alpha, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe()) {}
+    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe()) {}
 
-PTParams::PTParams(double vw, double alpha, double beta, double dtau, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double beta, double dtau, const char* nuc_type, const Universe& un)
     : universe_(un),
       vw_(vw),
-      alN_(alpha),
+      alN_(alN),
       beta_(beta),
       Rs_(),
       tau_s_(),
       tau_fin_(),
       dtau_(dtau),
+      eos_model_(),
       cpsq_(),
       cmsq_(),
       nuc_type_()
     {
-      // check vw
+
+      // check valid vw
       if (vw < 0.0 ) {
         std::cout << "Warning: vw < 0. Taking |vw| as input instead.";
         vw_ = std::abs(vw);
       } else if (vw == 0.0 || vw >= 1.0) {
         throw std::invalid_argument("Unphysical wall velocity passed into PTParams. Must have 0 < vw < 1.");
       }
+
+      // check valid alN
+      if (alN_ <= 0.0) {
+        throw std::invalid_argument("Unphysical strength parameter passed into PTParams. Must have alN > 0.");
+      }
+
+      // Check valid beta
+      if (beta <= 0.0) {
+        throw std::invalid_argument("Unphysical transition rate parameter passed into PTParams. Must have beta > 0.");
+      }
+
+      // check valid PT duration
+      if (dtau < 0.0) {
+        std::cout << "Warning: dtau < 0. Taking |dtau| as input instead.";
+        dtau_ = std::abs(dtau);
+      } else if (dtau == 0.0) {
+        throw std::invalid_argument("Unphysical PT duration passed into PTParams. Must have dtau > 0.");
+      }
+      tau_s_ = 1.0 / universe_.Hs();
+      tau_fin_ = tau_s_ + dtau_;
 
       // check valid bubble nucleation type
       const char* allowed_nuc[] = {"exp", "sim"};
@@ -92,24 +114,23 @@ PTParams::PTParams(double vw, double alpha, double beta, double dtau, const char
         nuc_type_ = dflt_PTParams::nuc_type;
       }
 
-      // check valid PT duration
-      if (dtau < 0.0) {
-        std::cout << "Warning: Invalid PT duration (dtau < 0). Using default value dtau=" << dflt_PTParams::dtau << "\n";
-        dtau_ = dflt_PTParams::dtau;
-      }
-      tau_s_ = 1.0 / universe_.Hs();
-      tau_fin_ = tau_s_ + dtau_;
 
-      /***** calc model-dependent quantities *****/
-      // if (std::string(model) == "bag") {
+      // define PT model
+      eos_model_ = "bag"; // placeholder (change once Veff supported)
+
+      if (eos_model_ == "bag") {
         cpsq_ = 1.0 / 3.0;
         cmsq_ = cpsq_;
-      // } else {
-      //     throw std::invalid_argument("Only Bag model has been implemented so far");
-      // }
+      } else {
+          throw std::invalid_argument("Only Bag model has been implemented so far");
+      }
+
+      // check valid speed of sound (should cp or cm be larger for non-bag??)
+      if (!is_valid_csq(cpsq_) || !is_valid_csq(cmsq_)) {
+        throw std::invalid_argument("Unphysical speed of sound passed into PTParams. Must have 0 < cs < 1.");
+      }
 
       Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
-      /*******************************************/
     }
 
 std::ostream& operator<<(std::ostream& os, const PTParams& params) {
@@ -134,13 +155,17 @@ void PTParams::print() const {
 }
 
 // Private
-bool PTParams::is_valid_model(const char* model, const char* allowed_models[], const int n) {
+bool PTParams::is_valid_model(const char* model, const char* allowed_models[], const int n) const {
   for (int i = 0; i < n; i++) {
     if (std::strcmp(model, allowed_models[i]) == 0) {
       return true;
     }
   }
   return false;
+}
+
+bool PTParams::is_valid_csq(double csq) const {
+  return (csq > 0.0 && csq < 1.0);
 }
 
 /********************/

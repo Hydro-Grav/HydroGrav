@@ -62,7 +62,7 @@ const Universe& default_universe();
 
 struct dflt_PTParams {
   static constexpr double vw = 0.8;              // Wall velocity
-  static constexpr double alpha = 0.1;           // PT strength 
+  static constexpr double alN = 0.1;           // PT strength 
   static constexpr double beta = 1.0;            // Transition rate param
   static constexpr double dtau = 10.0;            // PT duration
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
@@ -79,11 +79,10 @@ struct dflt_PTParams {
   public:
     // ctors
     PTParams();
-    PTParams(double vw, double alpha, double beta, double dtau, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double beta, double dtau, const char* nuc_type, const Universe& un);
 
     double cpsq() const { return cpsq_; } // speed of sound squared (symmetric phase)
     double cmsq() const { return cmsq_; } // speed of sound squared (broken phase)
-    double csq() const { return cmsq_; } // keep this? - applies to bag model only
     double vw() const { return vw_; } // wall velocity
     double alN() const { return alN_; } // strength parameter at nuc temp (alN_N)
     double beta() const { return beta_; } // inverse PT duration
@@ -92,6 +91,7 @@ struct dflt_PTParams {
     double tau_fin() const { return tau_fin_; } // end time of PT
     double dtau() const { return dtau_; } // PT duration
 
+    const std::string eos_model() const { return eos_model_; } // equation of state model (bag or Veff)
     const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
 
     // print params
@@ -101,10 +101,13 @@ struct dflt_PTParams {
   private:
       const Universe universe_;
       double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, cpsq_, cmsq_;
+      std::string eos_model_; // equation of state model (bag or Veff)
       const char *nuc_type_;
 
-      bool is_valid_model(const char* model, const char* allowed_models[], const int n);
-};
+      void check_valid_params() const;
+      bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
+      bool is_valid_csq(double csq) const;
+    };
 
 } // namespace PhaseTransition
 
