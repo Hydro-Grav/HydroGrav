@@ -20,52 +20,6 @@
 
 #include "ap.h"
 
-// get rid of this
-/**
- * @brief A custom vector class supporting arithmetic operations and linear algebra utilities.
- * 
- * @tparam T Type of the vector elements (typically double).
- */
-template<typename T>
-class vec {
-public:
-    // Constructors
-    vec() = default;
-    vec(size_t size) : data_(size, T{}) {}
-    vec(std::initializer_list<T> list) : data_(list) {}
-
-    // Returns size of vector
-    size_t size() const { return data_.size(); }
-
-    // Accesses the i-th element (modifiable & read-only).
-    T& operator[](size_t i) { return data_[i]; }
-    const T& operator[](size_t i) const { return data_[i]; }
-
-    // Vector Arithmetic
-    vec<T> operator+(const vec<T>& other) const;
-    vec<T> operator-(const vec<T>& other) const;
-    vec<T> operator*(T scalar) const;
-    vec<T> operator/(T scalar) const;
-
-    vec<T>& operator+=(const vec<T>& other);
-    vec<T>& operator-=(const vec<T>& other);
-    vec<T>& operator*=(T scalar);
-    vec<T>& operator/=(T scalar);
-
-    // Dot product
-    T dot(const vec<T>& other) const;
-
-    // Norm
-    T norm() const;
-
-    // Output
-    void print() const;
-
-private:
-    std::vector<T> data_;
-};
-#include "vector.tpp"
-
 /**
  * @brief Cubic spline interpolation class.
  * 
@@ -78,7 +32,6 @@ class CubicSpline {
   public:
     CubicSpline();  // Default constructor
     CubicSpline(const std::vector<T>& x, const std::vector<T>& y);  // Construct and compute spline
-    CubicSpline(const vec<T>& x, const vec<T>& y); // for custom vector type
 
     void build(const std::vector<T>& x, const std::vector<T>& y); // Build splines
     bool is_initialised() const {return initialised_; } // check if spline is initialised

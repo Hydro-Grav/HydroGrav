@@ -9,12 +9,6 @@
 template <typename T>
 CubicSpline<T>::CubicSpline() : initialised_(false) {}
 
-// might not be the best implementation for passing custom vector type
-template <typename T>
-CubicSpline<T>::CubicSpline(const vec<T>& x, const vec<T>& y) {
-    CubicSpline(x, y);
-}
-
 template <typename T>
 CubicSpline<T>::CubicSpline(const std::vector<T>& x, const std::vector<T>& y) {
     build(x, y);

@@ -73,7 +73,6 @@ set(HEADERS
   include/profile.hpp
   include/spectrum.hpp
   include/tests.hpp
-  include/vector.tpp
 )
 
 # --------------------------
