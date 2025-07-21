@@ -138,18 +138,10 @@ std::vector<double> logspace(double start, double stop, std::size_t num=100);
  */
 double power(double x, int exp);
 
-/**
- * @brief Computes x^6
- * 
- * @param x Base value.
- * 
- * @return double Result of x^6.
- */
-double power6(double x);
-
-double power3(double x);
-
 std::string to_string_with_precision(double value, int precision = 2);
+
+double simpson_integrate(const std::vector<double>& x, const std::vector<double>& y);
+double simpson_2d_integrate(const std::vector<double>& x, const std::vector<double>& y, const std::vector<std::vector<double>>& f);
 
 struct SimpsonWeights2D {
     std::vector<std::vector<double>> Ax_weights; // size: (nx-2) x 3
@@ -158,10 +150,10 @@ struct SimpsonWeights2D {
     std::vector<double> dy;  // size: ny-2
 };
 
-// static void precompute_1d_weights(
-//     const std::vector<double>& coords,
-//     std::vector<std::vector<double>>& weights,
-//     std::vector<double>& intervals);
+void precompute_1d_weights(
+    const std::vector<double>& coords,
+    std::vector<std::vector<double>>& weights,
+    std::vector<double>& intervals);
 
 SimpsonWeights2D precompute_simpson_weights_2d(
     const std::vector<double>& x,
@@ -177,33 +169,9 @@ double simpson_2d_nonuniform_flat_weighted(
     const std::vector<double>& dy                        // size (ny-2)/2
 );
 
-double simpson_integrate(const std::vector<double>& x, const std::vector<double>& y);
-double simpson_nonuniform(const std::vector<double>& x, const std::vector<double>& y);
-double simpson_2d_integrate(const std::vector<double>& x, const std::vector<double>& y, const std::vector<std::vector<double>>& f);
-double simpson_2d_integrate_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat);
-double simpson_2d_nonuniform_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat);
-
-double adaptive_simpson_recursive(const std::function<double(double)>& f,
-                                  double a, double b,
-                                  double fa, double fb, double fm,
-                                  double eps, int depth, int max_depth);
-
-double adaptive_simpson(const std::function<double(double)>& f,
-                        double a, double b,
-                        double eps = 1e-8, int max_depth = 20);
-
-double adaptive_simpson_2d(const std::function<double(double, double)>& f2d,
-                           double x0, double x1, double y0, double y1,
-                           double eps = 1e-8, int max_depth = 20);
-
 double Si(double x);
 double Ci(double x);
 std::pair<double, double> SiCi(double x, const size_t n=1000);
-
-void read_sici_csv(const std::string& filename,
-                   std::vector<double>& x_vals,
-                   std::vector<double>& Si_vals,
-                   std::vector<double>& Ci_vals);
 
 using state_type = std::vector<double>;
 using deriv_func = std::function<state_type(double, const state_type&)>;

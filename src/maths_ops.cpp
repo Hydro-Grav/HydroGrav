@@ -73,17 +73,6 @@ double power(double x, int exp) {
     return (exp > 0) ? result : 1.0 / result;  // Handle negative exponents
 }
 
-// for x^6 (Ekin slowed down a lot by std::pow)
-double power6(double x) {
-    double x2 = x * x;
-    double x4 = x2 * x2;
-    return x4 * x2;
-}
-
-double power3(double x) {
-    return x * x * x;
-}
-
 std::string to_string_with_precision(double value, int precision) {
     std::ostringstream out;
     out << std::fixed << std::setprecision(precision) << value;
@@ -129,107 +118,6 @@ double simpson_integrate(const std::vector<double>& x, const std::vector<double>
     return integral;
 }
 
-double simpson_nonuniform(const std::vector<double>& x, const std::vector<double>& y) {
-    const size_t n = x.size();
-    double integral = 0.0;
-
-    size_t i = 0;
-    while (i + 2 < n) {
-        const double x0 = x[i],     x1 = x[i+1],     x2 = x[i+2];
-        const double y0 = y[i],     y1 = y[i+1],     y2 = y[i+2];
-        const double h0 = x1 - x0,  h1 = x2 - x1;
-
-        // Use Simpson-like Lagrange formula
-        const double denom = h0 * h1 * (h0 + h1);
-        const double A = -h1 * h1 / denom;
-        const double B = (h1 * h1 - h0 * h0) / denom;
-        const double C = h0 * h0 / denom;
-        integral += (A * y0 + B * y1 + C * y2) * (x2 - x0) / 2.0;
-
-        i += 2; // advance in steps of 2
-    }
-
-    // Fallback for remaining points using trapezoid
-    if (i + 1 < n) {
-        integral += 0.5 * (x[i + 1] - x[i]) * (y[i] + y[i + 1]);
-    }
-
-    return integral;
-}
-
-// can't just use a wrapper for 2d vector simpson since it slows down dlt a lot
-double simpson_2d_integrate_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat) {
-    const size_t nx = x.size();
-    const size_t ny = y.size();
-
-    if (f_flat.size() != ny * nx) {
-        throw std::invalid_argument("Size of f_flat must be y.size() * x.size()");
-    }
-
-    auto f = [&](size_t j, size_t i) -> double {
-        return f_flat[j * nx + i];
-    };
-
-    double total = 0.0;
-
-    size_t nx_lim = (nx % 2 == 0) ? nx - 1 : nx;
-    size_t ny_lim = (ny % 2 == 0) ? ny - 1 : ny;
-
-    for (size_t j = 0; j + 2 < ny_lim; j += 2) {
-        double hy1 = y[j + 1] - y[j];
-        double hy2 = y[j + 2] - y[j + 1];
-        double hy = y[j + 2] - y[j];
-
-        for (size_t i = 0; i + 2 < nx_lim; i += 2) {
-            double hx1 = x[i + 1] - x[i];
-            double hx2 = x[i + 2] - x[i + 1];
-            double hx = x[i + 2] - x[i];
-
-            if (std::abs(hx1 - hx2) > 1e-8 || std::abs(hy1 - hy2) > 1e-8) {
-                double area =
-                    0.25 * (x[i + 1] - x[i]) * (y[j + 1] - y[j]) * (f(j, i) + f(j + 1, i) + f(j, i + 1) + f(j + 1, i + 1)) +
-                    0.25 * (x[i + 2] - x[i + 1]) * (y[j + 1] - y[j]) * (f(j, i + 1) + f(j + 1, i + 1) + f(j, i + 2) + f(j + 1, i + 2)) +
-                    0.25 * (x[i + 1] - x[i]) * (y[j + 2] - y[j + 1]) * (f(j + 1, i) + f(j + 2, i) + f(j + 1, i + 1) + f(j + 2, i + 1)) +
-                    0.25 * (x[i + 2] - x[i + 1]) * (y[j + 2] - y[j + 1]) * (f(j + 1, i + 1) + f(j + 2, i + 1) + f(j + 1, i + 2) + f(j + 2, i + 2));
-                total += area;
-            } else {
-                total += (hx * hy / 36.0) * (
-                    f(j, i) + 4 * f(j, i + 1) + f(j, i + 2) +
-                    4 * (f(j + 1, i) + 4 * f(j + 1, i + 1) + f(j + 1, i + 2)) +
-                    f(j + 2, i) + 4 * f(j + 2, i + 1) + f(j + 2, i + 2)
-                );
-            }
-        }
-    }
-
-    // Handle remaining strip in x if nx is even
-    if (nx % 2 == 0) {
-        for (size_t j = 0; j + 1 < ny; ++j) {
-            double hy = y[j + 1] - y[j];
-            double hx = x[nx - 1] - x[nx - 2];
-            total += 0.25 * hx * hy * (
-                f(j, nx - 2) + f(j + 1, nx - 2) +
-                f(j, nx - 1) + f(j + 1, nx - 1)
-            );
-        }
-    }
-
-    // Handle remaining strip in y if ny is even
-    if (ny % 2 == 0) {
-        for (size_t i = 0; i + 1 < nx; ++i) {
-            double hx = x[i + 1] - x[i];
-            double hy = y[ny - 1] - y[ny - 2];
-            total += 0.25 * hx * hy * (
-                f(ny - 2, i) + f(ny - 2, i + 1) +
-                f(ny - 1, i) + f(ny - 1, i + 1)
-            );
-        }
-    }
-
-    return total;
-}
-
-// unused
 double simpson_2d_integrate(const std::vector<double>& x, const std::vector<double>& y, const std::vector<std::vector<double>>& f) {
     const size_t nx = x.size();
     const size_t ny = y.size();
@@ -297,13 +185,7 @@ double simpson_2d_integrate(const std::vector<double>& x, const std::vector<doub
     return total;
 }
 
-// Helper to compute weights along one dimension for non-uniform points
-// Inputs:
-//   coords: vector of coordinates (x or y)
-// Outputs:
-//   weights: vector of vectors of 3 weights per interval
-//   intervals: vector of interval sizes (x2 - x0)
-static void precompute_1d_weights(
+void precompute_1d_weights(
     const std::vector<double>& coords,
     std::vector<std::vector<double>>& weights,
     std::vector<double>& intervals)
@@ -346,92 +228,6 @@ SimpsonWeights2D precompute_simpson_weights_2d(
     precompute_1d_weights(y, w.Ay_weights, w.dy);
 
     return w;
-}
-
-// assumes log-spaced grid
-double simpson_2d_nonuniform_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat) {
-    const size_t nx = x.size();
-    const size_t ny = y.size();
-
-    if (f_flat.size() != nx * ny) {
-        throw std::invalid_argument("Size of f_flat must be x.size() * y.size()");
-    }
-
-    double total = 0.0;
-
-    size_t i = 0;
-    while (i + 2 < nx) {
-        size_t j = 0;
-        while (j + 2 < ny) {
-            const double x0 = x[i], x1 = x[i+1], x2 = x[i+2];
-            const double y0 = y[j], y1 = y[j+1], y2 = y[j+2];
-
-            const double hx0 = x1 - x0, hx1 = x2 - x1;
-            const double hy0 = y1 - y0, hy1 = y2 - y1;
-
-            const double denom_x = hx0 * hx1 * (hx0 + hx1);
-            const double Ax0 = -hx1 * hx1 / denom_x;
-            const double Ax1 = (hx1 * hx1 - hx0 * hx0) / denom_x;
-            const double Ax2 = hx0 * hx0 / denom_x;
-            const double dx = x2 - x0;
-
-            const double denom_y = hy0 * hy1 * (hy0 + hy1);
-            const double Ay0 = -hy1 * hy1 / denom_y;
-            const double Ay1 = (hy1 * hy1 - hy0 * hy0) / denom_y;
-            const double Ay2 = hy0 * hy0 / denom_y;
-            const double dy = y2 - y0;
-
-            const size_t row0 = j * nx;
-            const size_t row1 = (j+1) * nx;
-            const size_t row2 = (j+2) * nx;
-
-            double local = 0.0;
-            local += Ax0 * Ay0 * f_flat[row0 + i];
-            local += Ax1 * Ay0 * f_flat[row0 + i+1];
-            local += Ax2 * Ay0 * f_flat[row0 + i+2];
-
-            local += Ax0 * Ay1 * f_flat[row1 + i];
-            local += Ax1 * Ay1 * f_flat[row1 + i+1];
-            local += Ax2 * Ay1 * f_flat[row1 + i+2];
-
-            local += Ax0 * Ay2 * f_flat[row2 + i];
-            local += Ax1 * Ay2 * f_flat[row2 + i+1];
-            local += Ax2 * Ay2 * f_flat[row2 + i+2];
-
-            total += dx * dy * local / 4.0;
-            j += 2;
-        }
-
-        // Trapezoidal rule for last row if ny is even
-        if (ny % 2 == 0) {
-            const double hy = y[ny - 1] - y[ny - 2];
-            const size_t row0 = (ny - 2) * nx;
-            const size_t row1 = (ny - 1) * nx;
-            for (size_t ii = 0; ii + 1 < 3; ++ii) {
-                const double hx = x[i + ii + 1] - x[i + ii];
-                total += 0.25 * hx * hy * (
-                    f_flat[row0 + i + ii] + f_flat[row1 + i + ii] +
-                    f_flat[row0 + i + ii + 1] + f_flat[row1 + i + ii + 1]);
-            }
-        }
-
-        i += 2;
-    }
-
-    // Trapezoidal rule for last column if nx is even
-    if (nx % 2 == 0) {
-        const double hx = x[nx - 1] - x[nx - 2];
-        for (size_t j = 0; j + 1 < ny; ++j) {
-            const double hy = y[j + 1] - y[j];
-            const size_t row0 = j * nx;
-            const size_t row1 = (j+1) * nx;
-            total += 0.25 * hx * hy * (
-                f_flat[row0 + nx - 2] + f_flat[row1 + nx - 2] +
-                f_flat[row0 + nx - 1] + f_flat[row1 + nx - 1]);
-        }
-    }
-
-    return total;
 }
 
 double simpson_2d_nonuniform_flat_weighted(
@@ -504,53 +300,6 @@ double simpson_2d_nonuniform_flat_weighted(
     return total;
 }
 
-double adaptive_simpson_recursive(const std::function<double(double)>& f,
-                                  double a, double b,
-                                  double fa, double fb, double fm,
-                                  double eps, int depth, int max_depth) {
-    double h = b - a;
-    double c = (a + b) / 2.0;
-    double fd = f((a + c) / 2.0);
-    double fe = f((c + b) / 2.0);
-
-    double Sleft  = (h / 12.0) * (fa + 4.0 * fd + fm);
-    double Sright = (h / 12.0) * (fm + 4.0 * fe + fb);
-    double S2 = Sleft + Sright;
-
-    double S = (h / 6.0) * (fa + 4.0 * fm + fb); // coarse Simpson
-    if (depth >= max_depth || std::abs(S2 - S) < 15.0 * eps) {
-        return S2 + (S2 - S) / 15.0; // Richardson extrapolation
-    } else {
-        return adaptive_simpson_recursive(f, a, c, fa, fm, fd, eps / 2.0, depth + 1, max_depth)
-             + adaptive_simpson_recursive(f, c, b, fm, fb, fe, eps / 2.0, depth + 1, max_depth);
-    }
-}
-
-double adaptive_simpson(const std::function<double(double)>& f,
-                        double a, double b, double eps,
-                        int max_depth) {
-    if (a == b) return 0.0;
-
-    double fa = f(a);
-    double fb = f(b);
-    double fm = f((a + b) / 2.0);
-
-    return adaptive_simpson_recursive(f, a, b, fa, fb, fm, eps, 0, max_depth);
-}
-
-double adaptive_simpson_2d(const std::function<double(double, double)>& f2d,
-                           double x0, double x1,double y0, double y1,
-                           double eps, int max_depth) {
-    auto outer_integrand = [&](double x) {
-        auto inner_integrand = [&](double y) {
-            return f2d(x, y);
-        };
-        return adaptive_simpson(inner_integrand, y0, y1, eps / 2.0, max_depth);
-    };
-
-    return adaptive_simpson(outer_integrand, x0, x1, eps / 2.0, max_depth);
-}
-
 // Im(Si(x))=0 for real x
 // Im(Ci(x))=pi for x<0 (0 otherwise)
 double Si(double x) {
@@ -619,78 +368,6 @@ std::pair<double, double> SiCi(double x, const size_t n) {
 
     return {sin_int, cos_int};
 }
-
-void read_sici_csv(const std::string& filename,
-                   std::vector<double>& x_vals,
-                   std::vector<double>& Si_vals,
-                   std::vector<double>& Ci_vals)
-{
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        throw std::runtime_error("Could not open file: " + filename);
-    }
-
-    std::string line;
-    
-    // Skip header
-    std::getline(file, line);
-
-    while (std::getline(file, line)) {
-        std::istringstream ss(line);
-        std::string x_str, si_str, ci_str;
-
-        if (!std::getline(ss, x_str, ',')) continue;
-        if (!std::getline(ss, si_str, ',')) continue;
-        if (!std::getline(ss, ci_str, ',')) continue;
-
-        try {
-            double x = std::stod(x_str);
-            double si = std::stod(si_str);
-            double ci = std::stod(ci_str);
-
-            x_vals.push_back(x);
-            Si_vals.push_back(si);
-            Ci_vals.push_back(ci);
-        } catch (const std::exception& e) {
-            std::cerr << "Warning: skipped invalid line: " << line << "\n";
-        }
-    }
-
-    file.close();
-    std::cout << "Read " << x_vals.size() << " rows from " << filename << "\n";
-}
-
-// std::pair<std::vector<double>, std::vector<double>> runge_kutta_ODE_solver(ODE_System system, const double t0, const double tf, const double y0, const size_t n) {
-//     // write check for if tf < t0 -> do something to integrate backwards
-//     const auto h = (tf - t0) / n; // step size
-
-//     const auto N = syst.size();
-
-//     // define solution vectors
-//     std::vector<double> t_vals(n);
-//     std::vector<double> y_vals(n);
-
-//     // set initial conditions
-//     t_vals[0] = t0;
-//     y_vals[0] = y0;
-
-//     for (int i = 0; i < n-1; i++) {
-//         const auto t = t_vals[i]; // t_i
-//         const auto y = y_vals[i]; // y_i
-
-//         for (int j =0; j < N; j++) { // iterate over all ODEs
-//             const auto k1 = dydx[j](t, y); // current step
-//             const auto k2 = dydx[j](t + h / 2.0, y + h * k1 / 2.0);
-//             const auto k3 = dydx[j](t + h / 2.0, y + h * k2 / 2.0);
-//             const auto k4 = dydx[j](t + h, y + h * k3); // full step
-
-//             y_vals[j][i+1] = y + (h / 6.0) * (k1 + 2.0 * (k2 + k3) + k4); // y_{i+1}
-//         }
-//         t_vals[i+1] = t + h; // t_{i+1}
-//     }
-
-//     return {t_vals, y_vals};
-// }
 
 // write my own/make this better
 // make it suitable to pass in just dvdxi (rather than only {dvdxi, dwdxi})
@@ -785,51 +462,8 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
         }
     }
 
-    // std::cout << "Bisection method failed, finding minimum of residual instead.\n";
-    // return find_minimum(f, a, b);
-    throw std::runtime_error("Bisection method did not converge.");
-}
-
-double root_finder2(std::function<double(double)> f, double a, double b, double tol, int max_iter) {
-    double fa = f(a);
-    double fb = f(b);
-
-    if (fa * fb > 0.0) {
-        throw std::runtime_error("Bisection method interval not bracketed!");
-    }
-
-    if (!std::isfinite(fa) || !std::isfinite(fb)) {
-        throw std::runtime_error("f(a) or f(b) is not finite.");
-    }
-
-    for (int i = 0; i < max_iter; ++i) {
-        double c = 0.5 * (a + b);
-        double fc = f(c);
-
-        if (!std::isfinite(fc)) {
-            // throw std::runtime_error("f(c) is not finite during bisection.");
-        }
-
-        // Check convergence
-        // since interval is not necessarily bracketed, need to remove second condition
-        // otherwise it thinks it successfully found the root once it has gone through 
-        // the entire interval
-        if (std::abs(fc) < tol) {
-            return c;
-        }
-
-        if (fa * fc < 0.0) {
-        // if (fc > 0.0) {
-            b = c;
-            fb = fc;
-        } else {
-            a = c;
-            fa = fc;
-        }
-    }
-
-    // std::cout << "Bisection method failed, finding minimum of residual instead.\n";
-    // return find_minimum(f, a, b);
+    // std::cout << "Bisection method failed, using smallest root algorithm.\n";
+    // return find_smallest_root(f, a, b);
     throw std::runtime_error("Bisection method did not converge.");
 }
 
