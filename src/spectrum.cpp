@@ -142,7 +142,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     // can probably get rid of this by modifying dlt to take in kRs and pRs rather than k and p
     std::vector<double> k_vals(nk);
-    for (int i = 0; i < nk; i++) {
+    for (size_t i = 0; i < nk; i++) {
         const auto kRs = kRs_vals[i];
         k_vals[i] = kRs * Rs_inv;
     }
@@ -151,7 +151,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const auto np = pRs_vals.size();
 
     std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
-    for (int i = 0; i < np; i++) {
+    for (size_t i = 0; i < np; i++) {
         const auto pRs = pRs_vals[i];
         pRs2_vals[i] = pRs * pRs;
         p_vals[i] = pRs * Rs_inv;

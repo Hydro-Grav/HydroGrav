@@ -20,15 +20,15 @@ namespace PhaseTransition {
 
 // move universe class somewhere else?
 struct dflt_universe {
-  static constexpr double T0 = 2.725;
+  static constexpr double T0 = 2.35e-13; // GeV
   static constexpr double Ts = 100.0;
-  static constexpr double H0 = 67.8;
+  static constexpr double H0 = 67.8; // make 100 eventually
   static constexpr double Hs = 1.0;
   static constexpr double g0 = 3.91;
-  static constexpr double gs = 100.0;
+  static constexpr double gs = 106.75;
 };
 
-// add unuits in class desc for universe/ptparams
+// add units in class desc for universe/ptparams
 // Hs = (a_*/a0) H_* (conformal Hubble factor)
 
 /*
@@ -43,12 +43,17 @@ units:
  * 
  * This class holds the current temperature, Hubble constant, and degrees of freedom of the universe.
  */
+
 class Universe {
   public:
     // ctors
-    Universe();
-    Universe(double T0, double Ts, double H0, double Hs, double g0, double gs);
-    
+    Universe()
+      : Universe(dflt_universe::T0, dflt_universe::Ts, dflt_universe::H0, dflt_universe::Hs, dflt_universe::g0, dflt_universe::gs) {}
+    Universe(double Ts, double Hs, double gs)
+      : T0_(dflt_universe::T0), Ts_(Ts), H0_(dflt_universe::H0), Hs_(Hs), g0_(dflt_universe::g0), gs_(gs) {}
+    Universe(double T0, double Ts, double H0, double Hs, double g0, double gs)
+      : T0_(T0), Ts_(Ts), H0_(H0), Hs_(Hs), g0_(g0), gs_(gs) {}
+
     // params today (0) and at start of PT (s)
     double T0() const { return T0_; } // temperature of universe
     double Ts() const { return Ts_; }
