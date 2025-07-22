@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
 
     // Kinetic power spectrum
     Spectrum::PowerSpec Ek = Spectrum::Ekin(kRs_vals, profile);
-    Spectrum::PowerSpec Eks = Spectrum::zetaKin(Ek); // Normalised spectrum
+    Spectrum::PowerSpec Eks = Spectrum::norm_spec(Ek); // Normalised spectrum
 
     Eks.write("kinetic_spectrum.csv");
 

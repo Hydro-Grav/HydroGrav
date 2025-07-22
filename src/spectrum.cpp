@@ -573,17 +573,17 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     return PowerSpec(kRs_vals, P_vals, prof.params());
 }
 
-PowerSpec zetaKin(const PowerSpec& Ekin) {
-    const auto Ekin_max = Ekin.max();
-    if (Ekin_max == 0.0) {
-        throw std::runtime_error("Division by zero in zetaKin from Ekin.max() = 0");
-    } else if (isnan(Ekin_max)) {
-        throw std::runtime_error("In zetaKin: Ekin.max() = nan");
+PowerSpec norm_spec(const PowerSpec& spec) {
+    const auto spec_max = spec.max();
+    if (spec_max == 0.0) {
+        throw std::runtime_error("Division by zero in norm_spec from spec.max() = 0");
+    } else if (isnan(spec_max)) {
+        throw std::runtime_error("In norm_spec: spec.max() = nan");
     }
 
-    const auto zk = Ekin / Ekin_max;
+    const auto zk = spec / spec_max;
     if (abs(zk.max() - 1.0) > 1e-15) {
-        throw std::runtime_error("In zetaKin: Power spectrum failed normalisation test");
+        throw std::runtime_error("In norm_spec: Power spectrum failed normalisation test");
     }
 
     return zk;
@@ -591,12 +591,12 @@ PowerSpec zetaKin(const PowerSpec& Ekin) {
 
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
     const auto Ek = Ekin(kRs_vals, params);
-    return zetaKin(Ek);
+    return norm_spec(Ek);
 }
 
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof) {
     const auto Ek = Ekin(kRs_vals, prof);
-    return zetaKin(Ek);
+    return norm_spec(Ek);
 }
 /***************************/
 

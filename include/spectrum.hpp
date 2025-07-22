@@ -98,7 +98,7 @@ PowerSpec Ekin(const std::vector<double>& k_vec, const PhaseTransition::PTParams
  *
  * @return Normalised kinetic power spectrum
  */
-PowerSpec zetaKin(const PowerSpec& Ekin);
+PowerSpec norm_spec(const PowerSpec& spec);
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof);
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
 
