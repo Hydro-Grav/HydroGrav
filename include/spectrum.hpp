@@ -115,7 +115,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
  *
  * @return Constant prefactor of eq (93) in arXiv:2308.12943
  */
-double prefac(double csq, double T0, double H0, double g0, double gs);
+double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double Ts, double H0, double Hs, double g0, double gs);
 
 /**
  * @brief Calculates prefactor for GW power spectrum $\Omega_{GW}$
@@ -125,7 +125,7 @@ double prefac(double csq, double T0, double H0, double g0, double gs);
  *
  * @return Constant prefactor of eq (93) in arXiv:2308.12943
  */
-double prefac(double csq, const PhaseTransition::Universe &u);
+double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile);
 
 } // namespace Spectrum
 

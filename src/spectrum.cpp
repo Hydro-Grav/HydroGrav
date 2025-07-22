@@ -176,7 +176,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     // profile.write();
     // profile.plot();
 
-    std::cout << "Constructing kinetic power spectrum...\n";
+    const auto prefac = gw_prefac(kRs_vals, profile);
 
     const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
     const auto zk_pRs_vals = zk_pRs_spec.P(); // store zetaKin(pRs) vals (quicker than calling interpolator)
@@ -191,30 +191,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     // const auto delta = dlt_SSM(k_vals, p_vals, z_vals, params);
     const auto delta = dlt_SSM2(k_vals, p_vals, z_vals, params);
     std::vector<double> GW_P_vals(nk);
-
-    std::cout << "writing pt to file\n";
-    std::ofstream file("pt_vals.csv");;
-    file << "kRs,pRs,z,ptRs\n";
-
-    for (size_t kk = 0; kk < nk; kk++ ) {
-        const auto kRs = kRs_vals[kk];
-        const auto k = kRs * Rs_inv;
-
-        for (size_t pp = 0; pp < np; pp++) {
-            const auto pRs = pRs_vals[pp];
-            const auto p = pRs * Rs_inv;
-
-            for (size_t zz = 0; zz < nz; zz++) {
-                const auto z = z_vals[zz];
-                const auto pt = ptilde(k, p, z);
-                const auto ptRs = pt * Rs;
-
-                file << kRs << "," << pRs << "," << z << "," << ptRs << "\n";
-            }
-        }
-    }
-    file.close();
-    std::cout << "finished\n";
 
     #pragma omp parallel for
     for (size_t kk = 0; kk < nk; kk++ ) {
@@ -248,7 +224,8 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
             }
         }
 
-        GW_P_vals[kk] = simpson_2d_integrate(pRs_vals, z_vals, integrand);
+        GW_P_vals[kk] = prefac * simpson_2d_integrate(pRs_vals, z_vals, integrand);
+        // GW_P_vals[kk] = simpson_2d_integrate(pRs_vals, z_vals, integrand);
     }
 
     
@@ -624,19 +601,30 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
 /***************************/
 
 // not finished
-double prefac(double csq, double T0, double H0, double g0, double gs) {
-    // Gamma = w/e = 1+p/e (ratio of enthalpy to energy density)
-    const auto Gamma = 1 + csq; // for bag model
+double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double Ts, double H0, double Hs, double g0, double gs) {
+    // const auto TGW_dflt = 1.0;
+    // const auto OmegaK_KK_dflt = 1e-4;
+    // return 3.0 * wNeN_rat * wNeN_rat * TGW_dflt * OmegaK_KK_dflt * OmegaK_KK_dflt;
 
-    // these are vals used in paper - include actual calculation here
-    const auto TGW = 1.0; // Transfer function (eq 13)
-    const auto OmegaK_KK = 1e-4; // Omega_K / KK (eq 42)
+    // Transfer function (redshift of spectrum - eq 13 arXiv:2308.12943)
+    const auto g0gs_rat = g0 / gs;
+    const auto TH_rat = (T0 * T0 / H0) / (Ts * Ts / Hs);
+    const auto TGW = std::pow(g0gs_rat, 4./3.) * TH_rat * TH_rat;
 
-    return 3 * std::pow(Gamma,2) * TGW * std::pow(OmegaK_KK,2) + 0*(T0 + H0 + g0 + gs); // 0*() to avoid unused variable warning
+    // Normalised kinetic energy density OmegaK / KK (eq 42 arXiv:2308.12943)
+    // OmegaK = total kinetic energy density, KK = critical energy density
+    const auto OmegaK_KK = Ekin_max / Rs;
+    
+    return 3.0 * wNeN_rat * wNeN_rat * TGW * OmegaK_KK * OmegaK_KK;
 }
 
-double prefac(double csq, const PhaseTransition::Universe &u) {
-    return prefac(csq, u.T0(), u.H0(), u.g0(), u.gs());
+double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile) {
+    const auto params = profile.params();
+    const auto un = params.un();
+
+    const auto Ek = Ekin(kRs_vals, profile);
+
+    return gw_prefac(Ek.max(), params.Rs(), params.wNeN_rat(), un.T0(), un.Ts(), un.H0(), un.Hs(), un.g0(), un.gs());
 }
 
 } // namespace Spectrum
