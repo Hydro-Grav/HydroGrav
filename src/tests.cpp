@@ -25,7 +25,7 @@
 TO DO:
 - create separate executable for tests (or maybe just run all at the start of main?)
 - define size() for splines (or find other way to compare their size - probably easier)
-- might not need GSL test, remove if not (and unlink in cmake)
+
 - make more test_power robust - input x and exp and check if exp=6 to use power6
 - update test_FluidProfile to test it for deflag, hybrid and detonation (i.e. repeat same tests for different PTParams input vals)
 - update test_FluidProfile to take in input file to compare v,w,la profiles to xiao's code once ODE solver is working properly

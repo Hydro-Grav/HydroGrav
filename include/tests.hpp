@@ -37,20 +37,19 @@ void test_vec();
 void test_FluidProfile();
 
 /**
- * @brief Example test function to integrate with GSL library.
+ 
  * 
  * @param x Input value.
  * @param params Pointer to parameters needed for the function.
  * 
  * @return Computed value.
 */
-double test_func_gsl(double x, void* params);
+
 
 /// @brief Tests numerical integration using Boost.Math.
 void test_boostmath();
 
-/// @brief Tests numerical integration using GSL.
-void test_gsl_integration();
+
 
 /**
  * @brief Tests the 1D interpolator with a specified type.
