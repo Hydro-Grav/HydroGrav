@@ -112,7 +112,7 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
 FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t n)
     : params_(params),
       cpsq_(params.cpsq()), cmsq_(params.cmsq()),
-      vw_(params.vw()), alN_(params.alphaN()),
+      vw_(params.vw()), alN_(params.alN()),
       mode_(),
       xi0_(), xif_(),
       y0_(),
