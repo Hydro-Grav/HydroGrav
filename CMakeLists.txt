@@ -71,7 +71,6 @@ set(HEADERS
   include/physics.hpp
   include/profile.hpp
   include/spectrum.hpp
-  include/tests.hpp
 )
 
 # --------------------------
