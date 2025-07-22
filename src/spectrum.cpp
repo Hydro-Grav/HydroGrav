@@ -239,11 +239,10 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 /*** dlt spectrum ***/
 double ptilde(double k, double p, double z) {
     const auto arg = k*k - 2.0 * k * p * z + p*p;
-    // return std::sqrt(std::max(arg, 0.0)); // gives 0 for large k,p (FIND BETTER FIX. THIS IS BAD IN CASE ARG <0 FROM BAD K,P)
-    if (arg < 0.0) {
-        std::cerr << "ptilde: negative argument for sqrt! k=" << k << ", p=" << p << ", z=" << z << "\n";
-        throw std::invalid_argument("ptilde: negative argument for sqrt!");
-    }
+    
+    if (std::abs(arg) < 1e-10)
+        return 0.0; // avoids numerical precision issues giving arg < 0
+
     return std::sqrt(arg);
 }
 
@@ -602,10 +601,6 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
 
 // not finished
 double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double Ts, double H0, double Hs, double g0, double gs) {
-    // const auto TGW_dflt = 1.0;
-    // const auto OmegaK_KK_dflt = 1e-4;
-    // return 3.0 * wNeN_rat * wNeN_rat * TGW_dflt * OmegaK_KK_dflt * OmegaK_KK_dflt;
-
     // Transfer function (redshift of spectrum - eq 13 arXiv:2308.12943)
     const auto g0gs_rat = g0 / gs;
     const auto TH_rat = (T0 * T0 / H0) / (Ts * Ts / Hs);
