@@ -1,6 +1,6 @@
 #include "deepphase.hpp"
 
-int main() {
+int main(int argc, char* argv[]) {
     // Create default universe parameters (temperature, Hubble and DoF today and at PT)
     const PhaseTransition::Universe un;
 

@@ -19,10 +19,6 @@ TO DO:
 
 namespace PhaseTransition {
 
-// Static member definitions for dflt_PTParams
-const std::string dflt_PTParams::model = "bag";
-const std::string dflt_PTParams::nuc_type = "exp";
-
 // Universe
 Universe::Universe()
     : Universe(dflt_universe::T0, dflt_universe::Ts, dflt_universe::H0, dflt_universe::Hs, dflt_universe::g0, dflt_universe::gs) {}
