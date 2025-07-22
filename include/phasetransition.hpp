@@ -33,8 +33,8 @@ struct dflt_universe {
 
 /*
 units:
-[T] = 1/s
-[H] = 1/s
+[T] = GeV
+[H] = GeV
 [g] = dimensionless
 */
 /**
@@ -79,6 +79,7 @@ struct dflt_PTParams {
   static constexpr double alN = 0.1;           // PT strength 
   static constexpr double beta = 1.0;            // Transition rate param
   static constexpr double dtau = 10.0;            // PT duration
+  static constexpr double wNeN_rat = 1.0 + 1./3.;       // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
 
@@ -87,8 +88,8 @@ struct dflt_PTParams {
 units:
 [vw] = dimensionless (0 < vw < 1)
 [alN] = dimensionless (alN > 0)
-[beta] = 1/s
-[dtau] = s
+[beta] = GeV
+[dtau] = 1/GeV
 */
 
   /**
@@ -102,7 +103,9 @@ units:
   public:
     // ctors
     PTParams();
-    PTParams(double vw, double alN, double beta, double dtau, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double beta, double dtau, double wNeN_rat, const char* nuc_type, const Universe& un);
+
+    Universe un() const { return universe_; } // universe parameters
 
     double cpsq() const { return cpsq_; } // speed of sound squared (symmetric phase)
     double cmsq() const { return cmsq_; } // speed of sound squared (broken phase)
@@ -113,6 +116,7 @@ units:
     double tau_s() const { return tau_s_; } // start time of PT
     double tau_fin() const { return tau_fin_; } // end time of PT
     double dtau() const { return dtau_; } // PT duration
+    double wNeN_rat() const { return wNeN_rat_; } // ratio of enthalpy to energy density (wN/eN)
 
     const std::string eos_model() const { return eos_model_; } // equation of state model (bag or Veff)
     const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
@@ -123,7 +127,7 @@ units:
   
   private:
       const Universe universe_;
-      double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, cpsq_, cmsq_;
+      double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, wNeN_rat_, cpsq_, cmsq_;
       std::string eos_model_; // equation of state model (bag or Veff)
       const char *nuc_type_;
 

@@ -46,9 +46,9 @@ const Universe& default_universe() {
 // make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
-    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe()) {}
+    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::wNeN_rat, dflt_PTParams::nuc_type, default_universe()) {}
 
-PTParams::PTParams(double vw, double alN, double beta, double dtau, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double beta, double dtau, double wNeN_rat, const char* nuc_type, const Universe& un)
     : universe_(un),
       vw_(vw),
       alN_(alN),
@@ -57,6 +57,7 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, const char* 
       tau_s_(),
       tau_fin_(),
       dtau_(dtau),
+      wNeN_rat_(wNeN_rat),
       eos_model_(),
       cpsq_(),
       cmsq_(),
@@ -88,7 +89,11 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, const char* 
       } else if (dtau == 0.0) {
         throw std::invalid_argument("Unphysical PT duration passed into PTParams. Must have dtau > 0.");
       }
-      tau_s_ = 1.0 / universe_.Hs();
+
+      const auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
+      const auto Hs_conformal = asa0_rat * universe_.Hs();
+      
+      tau_s_ = 1.0 / Hs_conformal;
       tau_fin_ = tau_s_ + dtau_;
 
       // check valid bubble nucleation type
