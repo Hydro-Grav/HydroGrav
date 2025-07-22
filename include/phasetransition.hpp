@@ -28,13 +28,10 @@ struct dflt_universe {
   static constexpr double gs = 100.0;
 };
 
-// add unuits in class desc for universe/ptparams
-// Hs = (a_*/a0) H_* (conformal Hubble factor)
-
 /*
 units:
-[T] = 1/s
-[H] = 1/s
+[T] = GeV
+[H] = GeV
 [g] = dimensionless
 */
 /**
@@ -83,8 +80,8 @@ struct dflt_PTParams {
 units:
 [vw] = dimensionless (0 < vw < 1)
 [alN] = dimensionless (alN > 0)
-[beta] = 1/s
-[dtau] = s
+[beta] = GeV
+[dtau] = 1/GeV
 */
 
   /**
@@ -101,7 +98,7 @@ units:
     PTParams(double vw, double alN, double beta, double dtau, double wNeN_rat, const char* nuc_type, const Universe& un);
 
     Universe un() const { return universe_; } // universe parameters
-    
+
     double cpsq() const { return cpsq_; } // speed of sound squared (symmetric phase)
     double cmsq() const { return cmsq_; } // speed of sound squared (broken phase)
     double vw() const { return vw_; } // wall velocity

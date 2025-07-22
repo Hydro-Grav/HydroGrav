@@ -101,7 +101,11 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double wNeN_
       } else if (dtau == 0.0) {
         throw std::invalid_argument("Unphysical PT duration passed into PTParams. Must have dtau > 0.");
       }
-      tau_s_ = 1.0 / universe_.Hs();
+
+      const auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
+      const auto Hs_conformal = asa0_rat * universe_.Hs();
+      
+      tau_s_ = 1.0 / Hs_conformal;
       tau_fin_ = tau_s_ + dtau_;
 
       // check valid bubble nucleation type
