@@ -20,23 +20,14 @@ namespace PhaseTransition {
 
 // move universe class somewhere else?
 struct dflt_universe {
-  static constexpr double T0 = 2.35e-13; // GeV
-  static constexpr double Ts = 100.0;
-  static constexpr double H0 = 67.8; // make 100 eventually
-  static constexpr double Hs = 1.0;
+  static constexpr double T0 = 2.41e-13; // GeV
+  static constexpr double Ts = 100.0; // GeV
+  static constexpr double H0 = 1.45e-42; // GeV
+  static constexpr double Hs = 1.41e-14; // GeV
   static constexpr double g0 = 3.91;
   static constexpr double gs = 106.75;
 };
 
-// add units in class desc for universe/ptparams
-// Hs = (a_*/a0) H_* (conformal Hubble factor)
-
-/*
-units:
-[T] = GeV
-[H] = GeV
-[g] = dimensionless
-*/
 /**
  * @class Universe
  * @brief Class representing the universe parameters used in the phase transition calculations.
