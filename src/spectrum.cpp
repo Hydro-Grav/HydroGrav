@@ -221,14 +221,14 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 /***************************/
 
 /*** dlt spectrum ***/
-double ptilde(double k, double p, double z) {
-    const auto arg = k*k - 2.0 * k * p * z + p*p;
+// double ptilde(double k, double p, double z) {
+//     const auto arg = k*k - 2.0 * k * p * z + p*p;
 
-    if (std::abs(arg) < 1e-10)
-        return 0.0; // avoids numerical precision issues giving arg < 0
+//     if (std::abs(arg) < 1e-10)
+//         return 0.0; // avoids numerical precision issues giving arg < 0
 
-    return std::sqrt(arg);
-}
+//     return std::sqrt(arg);
+// }
 
 double ff(double tau_m, double kcs) {
     // kcs = k*cs -> ff called this way to make dlt faster
