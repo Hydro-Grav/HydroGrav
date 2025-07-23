@@ -71,6 +71,8 @@ set(HEADERS
   include/physics.hpp
   include/profile.hpp
   include/spectrum.hpp
+  include/sici.hpp
+  include/sici_arrays.hpp
 )
 
 # --------------------------

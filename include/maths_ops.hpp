@@ -125,6 +125,7 @@ double simpson_2d_nonuniform_flat_weighted(
 double Si(double x);
 double Ci(double x);
 std::pair<double, double> SiCi(double x, const size_t n=1000);
+std::vector<double> dSiCi(double x, double y, const size_t n);
 
 using state_type = std::vector<double>;
 using deriv_func = std::function<state_type(double, const state_type&)>;
