@@ -4,6 +4,7 @@
 #include <vector>
 #include <iomanip>
 #include <string>
+#include <cassert>
 #include <chrono>
 #include <gperftools/profiler.h>
 
@@ -19,9 +20,11 @@
 #include "ap.h"
 #include "interpolation.h"
 #include "specialfunctions.h"
-#include "matplotlibcpp.h"
 
+#ifdef ENABLE_MATPLOTLIB
+#include "matplotlibcpp.h"
 namespace plt = matplotlibcpp;
+#endif
 
 // tests program across a large parameter space
 void test_FluidProfile_params() {
@@ -122,7 +125,9 @@ void example_GW_Spec(const std::string& filename) {
     
     // Write/plot to disk
     // OmegaGW.write(filename + ".csv");
+    #ifdef ENABLE_MATPLOTLIB
     OmegaGW.plot(filename + ".png");
+    #endif
 
     return;
 }
