@@ -145,7 +145,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const auto np = pRs_vals.size();
 
     std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
-    for (int i = 0; i < np; i++) {
+    for (size_t i = 0; i < np; i++) {
         const auto pRs = pRs_vals[i];
         pRs2_vals[i] = pRs * pRs;
     }
