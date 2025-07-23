@@ -19,18 +19,6 @@ TO DO:
 
 namespace PhaseTransition {
 
-// Universe
-Universe::Universe()
-    : Universe(dflt_universe::T0, dflt_universe::Ts, dflt_universe::H0, dflt_universe::Hs, dflt_universe::g0, dflt_universe::gs) {}
-
-Universe::Universe(double T0, double Ts, double H0, double Hs, double g0, double gs)
-    : T0_(T0),
-      Ts_(Ts), 
-      H0_(H0), 
-      Hs_(Hs), 
-      g0_(g0), 
-      gs_(gs) {}
-
 std::ostream& operator<<(std::ostream& os, const Universe& un) {
     os << "************** Universe parameters **************\n"
        << std::left
