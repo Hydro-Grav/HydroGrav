@@ -369,6 +369,31 @@ std::pair<double, double> SiCi(double x, const size_t n) {
     return {sin_int, cos_int};
 }
 
+std::vector<double> dSiCi(double x, double y, const size_t n) {
+    // calculates dSi = Si(x) - Si(y) and dCi = Ci(x) - Ci(y)
+    auto sin_integrand = [] (double t) {
+        return std::sin(t) / t;
+    };
+    auto cos_integrand = [] (double t) {
+        return (std::cos(t) - 1.0) / t;
+    };
+
+    // fill integrand vals
+    const std::vector<double> t_vals = linspace(y, x, n);
+    std::vector<double> sin_integrand_vals(n), cos_integrand_vals(n);
+    for (size_t i = 0; i < n; i++) {
+        const auto t = t_vals[i];
+        sin_integrand_vals[i] = sin_integrand(t);
+        cos_integrand_vals[i] = cos_integrand(t);
+    }
+
+    // integrate
+    const auto dSi = simpson_integrate(t_vals, sin_integrand_vals);
+    const auto dCi = std::log(x/y) + simpson_integrate(t_vals, cos_integrand_vals);
+
+    return {dSi, dCi};
+}
+
 // write my own/make this better
 // make it suitable to pass in just dvdxi (rather than only {dvdxi, dwdxi})
 std::pair<std::vector<double>, std::vector<state_type>> rk4_solver(

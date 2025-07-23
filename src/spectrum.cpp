@@ -19,6 +19,7 @@
 #include "hydrodynamics.hpp"
 #include "spectrum.hpp"
 #include "physics.hpp"
+#include "sici.hpp"
 
 #ifdef ENABLE_MATPLOTLIB
 #include "matplotlibcpp.h"
@@ -135,17 +136,10 @@ PowerSpec& PowerSpec::operator/=(double scalar) {
 /*** GW power spectrum ***/
 // add option for inputing pRs_vals, Ttilde_vals and z_vals?
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
-    const auto Rs = params.Rs();
-    const auto Rs_inv = 1.0 / Rs;
+    const Hydrodynamics::FluidProfile profile(params); // generate fluid profile
+    const auto prefac = gw_prefac(kRs_vals, profile); // prefactor
 
     const auto nk = kRs_vals.size();
-
-    // can probably get rid of this by modifying dlt to take in kRs and pRs rather than k and p
-    std::vector<double> k_vals(nk);
-    for (size_t i = 0; i < nk; i++) {
-        const auto kRs = kRs_vals[i];
-        k_vals[i] = kRs * Rs_inv;
-    }
 
     const auto pRs_vals = logspace(1e-2, 1e+3, 1000); // P = p*Rs
     const auto np = pRs_vals.size();
@@ -154,7 +148,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     for (size_t i = 0; i < np; i++) {
         const auto pRs = pRs_vals[i];
         pRs2_vals[i] = pRs * pRs;
-        p_vals[i] = pRs * Rs_inv;
     }
 
     const auto z_vals = linspace(-1.0, 1.0, 1000); // logspace gives nan over this domain
@@ -172,12 +165,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2.0*np);
 
-    const Hydrodynamics::FluidProfile profile(params); // generate fluid profile
-    // profile.write();
-    // profile.plot();
-
-    const auto prefac = gw_prefac(kRs_vals, profile);
-
     const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
     const auto zk_pRs_vals = zk_pRs_spec.P(); // store zetaKin(pRs) vals (quicker than calling interpolator)
 
@@ -189,46 +176,43 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     // precompute dlt
     // const auto delta = dlt_SSM(k_vals, p_vals, z_vals, params);
-    const auto delta = dlt_SSM2(k_vals, p_vals, z_vals, params);
+    const auto delta = dlt_SSM2(kRs_vals, pRs_vals, z_vals, params);
     std::vector<double> GW_P_vals(nk);
 
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(static)
     for (size_t kk = 0; kk < nk; kk++ ) {
         const auto kRs = kRs_vals[kk];
-        const auto k = kRs * Rs_inv;
-
         const auto kRs3 = kRs * kRs * kRs;
 
         std::vector<std::vector<double>> integrand(np, std::vector<double>(nz));
         for (size_t pp = 0; pp < np; pp++) {
-            const auto p = p_vals[pp];
-            // const auto pRs = pRs_vals[pp];
-            const auto pRs2 = pRs2_vals[pp];
-
-            const auto zk_pRs_fac = kRs3 * zk_pRs_vals[pp] * pRs2; // kRs^3 * zetaKin(pRs) * pRs^2
+            const auto pRs = pRs_vals[pp];
+            const auto zk_pRs_fac = kRs3 * zk_pRs_vals[pp] * pRs2_vals[pp]; // kRs^3 * zetaKin(pRs) * pRs^2
 
             for (size_t zz = 0; zz < nz; zz++) {
                 const auto z = z_vals[zz];
-                const auto pt = ptilde(k, p, z);
-                const auto ptRs = pt * Rs;
+                const auto ptRs = ptilde(kRs, pRs, z);
 
-                const auto ptRs4_inv = 1.0 / (ptRs * ptRs * ptRs * ptRs);
+                if (ptRs == 0.0) { // careful! need to check this converges properly for pt=0!
+                    integrand[pp][zz] = 0.0;
+                    continue;
+                }
+
                 const auto z_fac = 1.0 - z;
                 const auto z_fac2 = z_fac * z_fac;
-
+                const auto ptRs4_inv = 1.0 / (ptRs * ptRs * ptRs * ptRs);
+                
                 // const auto dlt = delta[kk][pp][zz];
                 const auto dlt = delta[kk * np * nz + pp * nz + zz];
 
-                // careful! need to check this converges properly for pt=0!
-                integrand[pp][zz] = (ptRs != 0.0) ? z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_interp(ptRs) * dlt : 0.0;
+                // integrand[pp][zz] = (ptRs != 0.0) ? z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_interp(ptRs) * dlt : 0.0;
+                integrand[pp][zz] = z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_interp(ptRs) * dlt;
             }
         }
 
         GW_P_vals[kk] = prefac * simpson_2d_integrate(pRs_vals, z_vals, integrand);
         // GW_P_vals[kk] = simpson_2d_integrate(pRs_vals, z_vals, integrand);
     }
-
-    
 
     std::cout << "Gravitational power spectrum constructed!\n";
 
@@ -239,7 +223,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 /*** dlt spectrum ***/
 double ptilde(double k, double p, double z) {
     const auto arg = k*k - 2.0 * k * p * z + p*p;
-    
+
     if (std::abs(arg) < 1e-10)
         return 0.0; // avoids numerical precision issues giving arg < 0
 
@@ -374,7 +358,7 @@ std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vecto
 }
 
 // same as dlt_SSM but with flattened index
-std::vector<double> dlt_SSM2(const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
+std::vector<double> dlt_SSM2(const std::vector<double>& kRs_vals, const std::vector<double>& pRs_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
     /***************************** CLOCK ******************************/
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
@@ -382,9 +366,10 @@ std::vector<double> dlt_SSM2(const std::vector<double>& k_vals, const std::vecto
     const auto cs = std::sqrt(params.cpsq());
     const auto tau_s = params.tau_s();
     const auto tau_fin = params.tau_fin();
+    const auto Rs_inv = 1.0 / params.Rs();
 
-    const auto nk = k_vals.size();
-    const auto np = p_vals.size();
+    const auto nk = kRs_vals.size();
+    const auto np = pRs_vals.size();
     const auto nz = z_vals.size();
 
     // reserve memory for integration
@@ -397,8 +382,8 @@ std::vector<double> dlt_SSM2(const std::vector<double>& k_vals, const std::vecto
         for (size_t kk = 0; kk < nk; kk++)
         for (size_t pp = 0; pp < np; pp++)
         for (size_t zz = 0; zz < nz; zz++) {
-            const auto k = k_vals[kk];
-            const auto p = p_vals[pp];
+            const auto k = kRs_vals[kk] * Rs_inv;
+            const auto p = pRs_vals[pp] * Rs_inv;
             const auto z = z_vals[zz];
 
             const auto pt = ptilde(k, p, z);
@@ -417,14 +402,19 @@ std::vector<double> dlt_SSM2(const std::vector<double>& k_vals, const std::vecto
                     const auto x2 = pmn * tau_s;
 
                     double Si_x1, Ci_x1, Si_x2, Ci_x2;
-                    alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
-                    alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
+                    sici(x1, Si_x1, Ci_x1);
+                    sici(x2, Si_x2, Ci_x2);
+                    // alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
+                    // alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
 
                     // Im(Si(x))=0 for real x
                     // Im(Ci(x))=pi (x<0), 0 (x>0)
                     // Taking difference dCi -> imaginary part cancels since sign of x1, x2 always the same
                     const auto dSi = Si_x1 - Si_x2;
                     const auto dCi = Ci_x1 - Ci_x2;
+                    // const auto dSi_dCi = dSiCi(x1, x2, 1000);
+                    // const auto dSi = dSi_dCi[0];
+                    // const auto dCi = dSi_dCi[1];
 
                     dlt_temp += 0.25 * (dCi * dCi + dSi * dSi);
                 }
