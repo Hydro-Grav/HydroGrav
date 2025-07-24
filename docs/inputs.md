@@ -1,12 +1,15 @@
-# Fluid Profile Inputs
+# Input Options
+
+## Fluid Profile Inputs
+
 * `vw` : The bubble wall velocity, with the default value `0.8`.
-* `alN` : The $\alpha$ strength parameter of the phase transition, with default value `alN = 0.1`.
-* `beta` : The inverse time scale $\beta$ of the phase transition in GeV, with default value `1.0`.
-* `dtau` : The duration of the phase transition in GeV$^{-1}$, with default value $10.0$. Typically taken to be $\beta^{-1}$.
+* `alN` : The $\alpha$ strength parameter of the phase transition, with default value `0.1`.
+* `betaH` : The normalised transition rate $\beta/H$ of the phase transition, with default value `100.0`.
 * `wNeN_rat` : The enthalpy density to energy density ratio of the phase transition, with default value `4./3.` determined from the bag model.
 * `nuc_type` : The nucleation type, which currently only supports the option `"exp"`.
 
-# Universe Inputs
+## Universe Inputs
+
 * `T0` : Current temperature of the universe in GeV. The default value of `T0 = 2.41e-13` corresponds to $T_0 = 2.725$ K.
 * `H0` : Hubble rate measured today. The default value of `H0 = 1.45e-42` corresponds to the known value $H_0 = 100h$ km/s/Mpc, where we take $h = 0.678$ (Planck 2018).
 * `g0` : Current relativistic degrees of freedom, with the default value `g0 = 3.91`.
