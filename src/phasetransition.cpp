@@ -90,11 +90,15 @@ PTParams::PTParams(double vw, double alN, double beta, double dt, double wNeN_ra
         throw std::invalid_argument("Unphysical PT duration passed into PTParams. Must have dt > 0.");
       }
 
-      const auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
+      auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
+      // asa0_rat = 1;
       const auto Hs_conformal = asa0_rat * universe_.Hs();
-      
+
+      beta_ = beta / asa0_rat;
+      double dtau = dt / asa0_rat;
       tau_s_ = 1.0 / Hs_conformal;
-      tau_fin_ = tau_s_ + dt_;
+      tau_fin_ = tau_s_ + dtau;
+      std::cout << "dtau = " << dtau << ", tau_s=" << tau_s_ << ", tau_fin=" << tau_fin_ << "\n";
 
       // check valid bubble nucleation type
       const char* allowed_nuc[] = {"exp", "sim"};
@@ -115,7 +119,7 @@ PTParams::PTParams(double vw, double alN, double beta, double dt, double wNeN_ra
         cpsq_ = 1.0 / 3.0;
         cmsq_ = cpsq_;
       } else {
-          throw std::invalid_argument("Only Bag model has been implemented so far");
+        throw std::invalid_argument("Only Bag model has been implemented so far");
       }
 
       // check valid speed of sound (should cp or cm be larger for non-bag??)
@@ -124,6 +128,7 @@ PTParams::PTParams(double vw, double alN, double beta, double dt, double wNeN_ra
       }
 
       Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
+      std::cout << "Rs = " << Rs_ << "\n";
     }
 
 std::ostream& operator<<(std::ostream& os, const PTParams& params) {
