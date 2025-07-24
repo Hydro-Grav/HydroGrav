@@ -46,17 +46,16 @@ const Universe& default_universe() {
 // make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
-    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dt, dflt_PTParams::wNeN_rat, dflt_PTParams::nuc_type, default_universe()) {}
+    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::betaH, dflt_PTParams::wNeN_rat, dflt_PTParams::nuc_type, default_universe()) {}
 
-PTParams::PTParams(double vw, double alN, double beta, double dt, double wNeN_rat, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double betaH, double wNeN_rat, const char* nuc_type, const Universe& un)
     : universe_(un),
       vw_(vw),
       alN_(alN),
-      beta_(beta),
+      betaH_(betaH),
       Rs_(),
       tau_s_(),
       tau_fin_(),
-      dt_(dt),
       wNeN_rat_(wNeN_rat),
       eos_model_(),
       cpsq_(),
@@ -77,28 +76,20 @@ PTParams::PTParams(double vw, double alN, double beta, double dt, double wNeN_ra
         throw std::invalid_argument("Unphysical strength parameter passed into PTParams. Must have alN > 0.");
       }
 
-      // Check valid beta
-      if (beta <= 0.0) {
+      // Check valid betaH
+      if (betaH <= 0.0) {
         throw std::invalid_argument("Unphysical transition rate parameter passed into PTParams. Must have beta > 0.");
       }
 
-      // check valid PT duration
-      if (dt < 0.0) {
-        std::cout << "Warning: dt < 0. Taking |dt| as input instead.";
-        dt_ = std::abs(dt);
-      } else if (dt == 0.0) {
-        throw std::invalid_argument("Unphysical PT duration passed into PTParams. Must have dt > 0.");
-      }
-
+      // conformal time scales
       auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
-      // asa0_rat = 1;
-      const auto Hs_conformal = asa0_rat * universe_.Hs();
+      const auto Hs_conformal = universe_.Hs() * asa0_rat;
 
-      beta_ = beta / asa0_rat;
-      double dtau = dt / asa0_rat;
+      beta_ = betaH * Hs_conformal;
+      const auto dtau = 1 / beta_;
+      
       tau_s_ = 1.0 / Hs_conformal;
       tau_fin_ = tau_s_ + dtau;
-      std::cout << "dtau = " << dtau << ", tau_s=" << tau_s_ << ", tau_fin=" << tau_fin_ << "\n";
 
       // check valid bubble nucleation type
       const char* allowed_nuc[] = {"exp", "sim"};
@@ -138,8 +129,8 @@ std::ostream& operator<<(std::ostream& os, const PTParams& params) {
        << std::setw(35) << "Nucleation type:" << params.nuc_type_ << "\n"
        << std::setw(35) << "Wall velocity:" << "vw=" << params.vw_ << "\n"
        << std::setw(35) << "PT strength parameter:" << "alN=" << params.alN_ << "\n"
+       << std::setw(35) << "Normalised transition rate:" << "beta/H=" << params.betaH_ << "\n"
        << std::setw(35) << "Transition rate parameter:" << "beta=" << params.beta_ << "\n"
-       << std::setw(35) << "PT duration" << "dt=" << params.dt_ << "\n"
        << std::setw(35) << "Speed of sound (broken phase):" << "cpsq=" << params.cpsq_ << "\n"
        << std::setw(35) << "Speed of sound (old phase):" << "cmsq=" << params.cmsq_ << "\n"
        << std::setw(35) << "Mean bubble separation:" << "Rs=" << params.Rs_ << "\n"
