@@ -45,6 +45,17 @@ if(ENABLE_COMPILER_WARNINGS)
 endif()
 
 # --------------------------
+# Compiler optimizations
+# --------------------------
+option(ENABLE_COMPILER_OPTIMIZATIONS "Enable compiler optimizations" ON)
+if(ENABLE_COMPILER_OPTIMIZATIONS)
+  include(CompilerOptimisations)
+  set(_deepphase_optimization_flags "${OPTIMIZATION_FLAGS_TO_ADD}")
+  # Propagate optimization flags to subdirectories
+  set(_deepphase_optimization_flags "${_deepphase_optimization_flags}" CACHE INTERNAL "DeepPhase compiler optimization flags")
+endif()
+
+# --------------------------
 # Other compile options
 # --------------------------
 option(BUILD_WITH_UNIT_TESTS "Enable unit tests" ON)
@@ -90,12 +101,15 @@ endif()
 # --------------------------
 # Library target
 # --------------------------
-
 add_library(DeepPhaseLib STATIC ${SOURCES} ${HEADERS})
 add_library(DeepPhase::DeepPhaseLib ALIAS DeepPhaseLib)
 
 if(ENABLE_COMPILER_WARNINGS AND _deepphase_warning_flags)
   target_compile_options(DeepPhaseLib PRIVATE ${_deepphase_warning_flags})
+endif()
+
+if(ENABLE_COMPILER_OPTIMIZATIONS AND _deepphase_optimization_flags)
+  target_compile_options(DeepPhaseLib PRIVATE ${_deepphase_optimization_flags})
 endif()
 
 target_include_directories(DeepPhaseLib

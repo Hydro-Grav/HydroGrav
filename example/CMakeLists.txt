@@ -15,12 +15,15 @@ link_libraries(
 )
 
 # --------------------------
-# Compiler warnings macro
+# Compiler flags macro
 # --------------------------
 macro(add_example_executable name)
   add_executable(${name} ${ARGN})
   if(_deepphase_warning_flags)
     target_compile_options(${name} PRIVATE ${_deepphase_warning_flags})
+  endif()
+  if(_deepphase_optimization_flags)
+    target_compile_options(${name} PRIVATE ${_deepphase_optimization_flags})
   endif()
 endmacro()
 
