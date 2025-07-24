@@ -9,6 +9,7 @@
 #include <fstream>
 #include <omp.h>
 #include <chrono>
+#include <shared_mutex>
 
 #include "ap.h"
 #include "interpolation.h"
@@ -175,8 +176,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
     // precompute dlt
-    // const auto delta = dlt_SSM(k_vals, p_vals, z_vals, params);
-    const auto delta = dlt_SSM2(kRs_vals, pRs_vals, z_vals, params);
+    const auto delta = dlt_SSM(kRs_vals, pRs_vals, z_vals, params);
     std::vector<double> GW_P_vals(nk);
 
     #pragma omp parallel for schedule(static)
@@ -221,15 +221,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 /***************************/
 
 /*** dlt spectrum ***/
-// double ptilde(double k, double p, double z) {
-//     const auto arg = k*k - 2.0 * k * p * z + p*p;
-
-//     if (std::abs(arg) < 1e-10)
-//         return 0.0; // avoids numerical precision issues giving arg < 0
-
-//     return std::sqrt(arg);
-// }
-
+// inline this later?
 double ff(double tau_m, double kcs) {
     // kcs = k*cs -> ff called this way to make dlt faster
     return std::cos(kcs * tau_m); // for SSM -> NEED TO UPDATE THIS
@@ -358,7 +350,7 @@ std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vecto
 }
 
 // same as dlt_SSM but with flattened index
-std::vector<double> dlt_SSM2(const std::vector<double>& kRs_vals, const std::vector<double>& pRs_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
+std::vector<double> dlt_SSM(const std::vector<double>& kRs_vals, const std::vector<double>& pRs_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
     /***************************** CLOCK ******************************/
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
@@ -376,8 +368,17 @@ std::vector<double> dlt_SSM2(const std::vector<double>& kRs_vals, const std::vec
     std::vector<double> result(nk * np * nz);
     constexpr std::array<double,2> sum_vals = {-1.0, 1.0};
 
+    // cache for sici
+    // SiCiCache sici_cache;
+
+    // std::vector<double> x1_vals(nk * np * nz);
+    // std::vector<double> x2_vals(nk * np * nz);
+
     #pragma omp parallel
     {
+        // local thread cache for sici
+        // static thread_local SiCiCache sici_cache;
+
         #pragma omp for collapse(3) schedule(static)
         for (size_t kk = 0; kk < nk; kk++)
         for (size_t pp = 0; pp < np; pp++)
@@ -400,6 +401,9 @@ std::vector<double> dlt_SSM2(const std::vector<double>& kRs_vals, const std::vec
 
                     const auto x1 = pmn * tau_fin;
                     const auto x2 = pmn * tau_s;
+
+                    // x1_vals[kk * np * nz + pp * nz + zz] = x1;
+                    // x2_vals[kk * np * nz + pp * nz + zz] = x2;
 
                     double Si_x1, Ci_x1, Si_x2, Ci_x2;
                     sici(x1, Si_x1, Ci_x1);
@@ -424,75 +428,21 @@ std::vector<double> dlt_SSM2(const std::vector<double>& kRs_vals, const std::vec
         }
     }
 
-    /***************************** CLOCK ******************************/
-    const auto tf = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = tf - ti;
-    std::cout << "Timer (dlt_SSM): " << duration.count() << " s" << std::endl;
-    /******************************************************************/
+    // std::vector<double> x_vals;
+    // x_vals.reserve(x1_vals.size() + x2_vals.size());
+    // x_vals.insert(x_vals.end(), x1_vals.begin(), x1_vals.end());
+    // x_vals.insert(x_vals.end(), x2_vals.begin(), x2_vals.end());
+    // const auto duplicates = count_duplicates(x_vals);
 
-    return result;
-}
+    // std::cout << "printing duplicates..." << std::endl;
 
-std::vector<std::vector<std::vector<double>>> dlt_SSM(const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
-    /***************************** CLOCK ******************************/
-    const auto ti = std::chrono::high_resolution_clock::now();
-    /******************************************************************/
+    // std::vector<std::pair<double, int>> dup_vec(duplicates.begin(), duplicates.end());
 
-    const auto cs = std::sqrt(params.cpsq());
-    const auto tau_s = params.tau_s();
-    const auto tau_fin = params.tau_fin();
-
-    const auto nk = k_vals.size();
-    const auto np = p_vals.size();
-    const auto nz = z_vals.size();
-
-    // reserve memory for integration
-    std::vector<std::vector<std::vector<double>>> result(nk, std::vector<std::vector<double>>(np, std::vector<double>(nz)));
-    constexpr std::array<double,2> sum_vals = {-1.0, 1.0};
-
-    #pragma omp parallel
-    {
-        #pragma omp for collapse(3) schedule(static)
-        for (size_t kk = 0; kk < nk; kk++)
-        for (size_t pp = 0; pp < np; pp++)
-        for (size_t zz = 0; zz < nz; zz++) {
-            const auto k = k_vals[kk];
-            const auto p = p_vals[pp];
-            const auto z = z_vals[zz];
-
-            const auto pt = ptilde(k, p, z);
-            // const auto pt = std::sqrt(k*k - 2.0 * k * p * z + p*p);
-            auto dlt_temp = 0.0;
-
-            // regular for loop
-            for (int i = 0; i < 2; i++) { // loop over m
-                const auto m = sum_vals[i];
-                const auto pmn_1 = (p + m * pt) * cs;
-                for (int j = 0; j < 2; j++) { // loop over n
-                    const auto n = sum_vals[j];
-                    const auto pmn = pmn_1 + n * k;
-
-                    const auto x1 = pmn * tau_fin;
-                    const auto x2 = pmn * tau_s;
-
-                    double Si_x1, Ci_x1, Si_x2, Ci_x2;
-                    alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
-                    alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
-
-                    // Im(Si(x))=0 for real x
-                    // Im(Ci(x))=pi (x<0), 0 (x>0)
-                    // Taking difference dCi -> imaginary part cancels since sign of x1, x2 always the same
-                    const auto dSi = Si_x1 - Si_x2;
-                    const auto dCi = Ci_x1 - Ci_x2;
-
-                    dlt_temp += 0.25 * (dCi * dCi + dSi * dSi);
-                }
-            }
-
-            // result[kk][pp][zz] = dlt_temp[thread_id];
-            result[kk][pp][zz] = dlt_temp;
-        }
-    }
+    // #pragma omp parallel for
+    // for (int i = 0; i < static_cast<int>(dup_vec.size()); ++i) {
+    //     const auto& pair = dup_vec[i];
+    //     std::cout << "Value " << pair.first << " appears " << pair.second << " times" << std::endl;
+    // }
 
     /***************************** CLOCK ******************************/
     const auto tf = std::chrono::high_resolution_clock::now();
