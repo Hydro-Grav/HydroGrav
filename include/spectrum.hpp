@@ -82,7 +82,7 @@ double dtau_fin(double tau_fin, double tau_s);
 
 std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params);
 std::vector<double> dlt_SSM(const std::vector<double>& kRs_vals, const std::vector<double>& pRs_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params);
-
+double dlt_SSM2(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin);
 
 /**
  * @brief Calculates kinetic (velocity) power spectrum
@@ -110,6 +110,8 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 
 
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
+PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
+
 /**
  * @brief Calculates prefactor for GW power spectrum $\Omega_{GW}$
  *
