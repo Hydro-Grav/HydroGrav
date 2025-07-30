@@ -298,10 +298,6 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
     const auto ptRs_min = find_min_pt(kRs_vals, pRs_vals);
     const auto ptRs_max = ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
 
-    if (ptRs_min < 1e-5) {
-        std::cout << "Warning: zetaKin a bit unstable for ptRs_min < 1e-5" << std::endl;
-    }
-
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
 
     // construct interpolating function for zetaKin(ptRs)
