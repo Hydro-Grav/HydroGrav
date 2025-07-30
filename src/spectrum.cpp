@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <omp.h>
 #include <chrono>
@@ -134,6 +135,33 @@ PowerSpec& PowerSpec::operator/=(double scalar) {
 }
 /***************************/
 
+// minimises pt(k,p,z=1)
+double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>& p_vals) {
+    size_t i = 0, j = 0;
+    double min_pt = std::numeric_limits<double>::infinity();
+
+    while (i < k_vals.size() && j < p_vals.size()) {
+        double k = k_vals[i];
+        double p = p_vals[j];
+        double diff = k - p;
+        double pt = std::abs(diff);
+
+        if (pt > 1e-10) {  // skip exact matches
+            if (pt < min_pt) {
+                min_pt = pt;
+            }
+        }
+
+        // Move the pointer for the smaller value
+        if (k < p)
+            ++i;
+        else
+            ++j;
+    }
+
+    return min_pt;
+}
+
 /*** GW power spectrum ***/
 // add option for inputing pRs_vals, Ttilde_vals and z_vals?
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
@@ -244,8 +272,8 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 
     const auto nk = kRs_vals.size();
 
-    const auto pRs_vals = logspace(1e-2, 1e+3, 1000); // P = p*Rs
-    const auto np = pRs_vals.size();
+    const auto np = 1000;
+    const auto pRs_vals = logspace(1e-2, 1e+3, np); // P = p*Rs
 
     std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
     for (size_t i = 0; i < np; i++) {
@@ -254,35 +282,42 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
         pRs2_vals[i] = pRs * pRs;
     }
 
-    const auto z_vals = linspace(-1.0, 1.0, 1000); // logspace gives nan over this domain
-    const auto nz = z_vals.size();
+    const auto nz = 1000;
+    const auto z_vals = linspace(-1.0, 1.0, nz); // logspace gives nan over this domain
+
     const auto npnz = np * nz;
 
     /********** precompute normalised kinetic spectrum **********/
-    // NOTE: this is currently a bit buggy and domain of interpolating function requires fine tuning depending on range of k,p,z
-    // zetaKin(ptRs) can't be precomputed since ptRs = ptRs(k,p,z) -> use interpolator (much faster than constructing PowerSpec objects inside loops)
-
-    // calc temp ptRs vals for interpolating func
-    const auto pRs_max = pRs_vals.back();
-    const auto kRs_max = kRs_vals.back();
-    const auto ptRs_max = 10.0 * (kRs_max + pRs_max); // max of pt=sqrt(k^2-2kpz+p^2)
-    const auto ptRs_min = 1e-7; // not sure how to choose best min val - update later
-
-    const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2.0*np);
-
     const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
     const auto zk_pRs_vals = zk_pRs_spec.P(); // store zetaKin(pRs) vals (quicker than calling interpolator)
 
+    // NOTE: zetaKin(ptRs) can't be precomputed since ptRs = ptRs(k,p,z)
+    //       > use interpolator instead (much faster than constructing PowerSpec objects inside loops)
+
+    // calc temp ptRs vals for interpolating func
+    const auto ptRs_min = find_min_pt(kRs_vals, pRs_vals);
+    const auto ptRs_max = ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
+
+    if (ptRs_min < 1e-5) {
+        std::cout << "Warning: zetaKin a bit unstable for ptRs_min < 1e-5" << std::endl;
+    }
+
+    const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
+
     // construct interpolating function for zetaKin(ptRs)
+    // WARNING: alglib spline does not do bound check, need to do this manually!!
     const auto zk_ptRs_spec = zetaKin(ptRs_vals_tmp, profile);
     const auto zk_ptRs_K_vals = zk_ptRs_spec.K();
     const auto zk_ptRs_P_vals = zk_ptRs_spec.P();
+
+    const auto zk_ptRs_K_min = zk_ptRs_K_vals.front();
+    const auto zk_ptRs_K_max = zk_ptRs_K_vals.back();
 
     alglib::real_1d_array K_vals, P_vals;
     K_vals.setcontent(zk_ptRs_K_vals.size(), zk_ptRs_K_vals.data());
     P_vals.setcontent(zk_ptRs_P_vals.size(), zk_ptRs_P_vals.data());
 
-    alglib::spline1dinterpolant zk_ptRs_interp;;
+    alglib::spline1dinterpolant zk_ptRs_interp;
     alglib::spline1dbuildcubic(K_vals, P_vals, zk_ptRs_interp);
     /************************************************************/
 
@@ -308,14 +343,17 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
                     const auto z = z_vals[zz];
                     const auto ptRs = ptilde(kRs, pRs, z);
 
-
                     if (ptRs == 0.0) { // careful! need to check this converges properly for pt=0!
                         integrand[pp * np + zz] = 0.0;
                         continue;
                     }
 
-                    const auto pt = ptRs * Rs_inv;                    
-                    const auto dlt = dlt_SSM2(k, p, pt, cs, tau_s, tau_fin);
+                    // if this fails, need to manually adjust ptRs_min
+                    if (ptRs < zk_ptRs_K_min || ptRs > zk_ptRs_K_max) {
+                        throw std::runtime_error("ptRs out of bounds in GWSpec2: " + std::to_string(ptRs) + " not in [" + std::to_string(zk_ptRs_K_min) + ", " + std::to_string(zk_ptRs_K_max) + "]");
+                    }
+                
+                    const auto dlt = dlt_SSM2(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);
                     const auto zk_ptRs_val = alglib::spline1dcalc(zk_ptRs_interp, ptRs);
 
                     const auto z_fac = 1.0 - z;
