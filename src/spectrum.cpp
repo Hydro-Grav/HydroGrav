@@ -41,10 +41,10 @@ namespace Spectrum {
 /***** PowerSpec class *****/
 
 // Define ctors
-PowerSpec::PowerSpec(const std::vector<double>& k_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params)
-    : data_(Spectrum{k_vals, P_vals}),
+PowerSpec::PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params)
+    : data_(Spectrum{K_vals, P_vals}),
       params_(params) {
-        if (k_vals.size() != P_vals.size()) {
+        if (K_vals.size() != P_vals.size()) {
             throw std::invalid_argument("PowerSpec: k and P vectors must be the same size!");
         }
     }
@@ -60,10 +60,10 @@ void PowerSpec::write(const std::string& filename) const {
     std::ofstream file(filename);
     file << "k,P\n";
 
-    const auto k_vals = data_.first;
+    const auto K_vals = data_.first;
     const auto P_vals = data_.second;
-    for (size_t i = 0; i < k_vals.size(); ++i) {
-        file << k_vals[i] << "," << P_vals[i] << "\n";
+    for (size_t i = 0; i < K_vals.size(); ++i) {
+        file << K_vals[i] << "," << P_vals[i] << "\n";
     }
     file.close();
     std::cout << "Saved to " << filename << "!\n";

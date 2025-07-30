@@ -113,11 +113,11 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
     : params_(params),
       cpsq_(params.cpsq()), cmsq_(params.cmsq()),
       vw_(params.vw()), alN_(params.alN()),
+      alp_min_(std::numeric_limits<double>::quiet_NaN()), 
+      alp_max_(std::numeric_limits<double>::quiet_NaN()),
       mode_(),
       xi0_(), xif_(),
       y0_(),
-      alp_min_(std::numeric_limits<double>::quiet_NaN()), 
-      alp_max_(std::numeric_limits<double>::quiet_NaN()),
       xi_vals_(), v_vals_(), w_vals_(), la_vals_()
     {
         /********************** Notation for fluid parameters **********************/
