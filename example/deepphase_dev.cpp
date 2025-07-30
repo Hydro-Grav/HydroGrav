@@ -6,7 +6,8 @@
 #include <string>
 #include <cassert>
 #include <chrono>
-// #include <gperftools/profiler.h>
+#include <gperftools/profiler.h>
+#include <omp.h>
 
 // modify include list when testing of program finished - currently includes everything
 #include "hydrodynamics.hpp"
@@ -116,12 +117,12 @@ void example_GW_Spec(const std::string& filename) {
 
     const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
 
-    un.print();
-    params.print();
+    // un.print();
+    // params.print();
 
     // Define GW spectrum
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params);
+    const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
     
     // Write/plot to disk
     // OmegaGW.write(filename + ".csv");
@@ -166,7 +167,7 @@ void test_dSiCi_accuracy() {
 
 int main() {
     /************************ CLOCK / PROFILER *************************/
-    // ProfilerStart("profile.out");
+    ProfilerStart("profile.out");
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
 
@@ -199,14 +200,14 @@ int main() {
     // const auto pRs_vals = logspace(1e-2, 1e+3, 1000);
     // const auto z_vals = linspace(-1.0, 1.0, 1000);
 
-    // const auto delta = Spectrum::dlt_SSM2(kRs_vals, pRs_vals, z_vals, params);
+    // const auto delta = Spectrum::dlt_SSM(kRs_vals, pRs_vals, z_vals, params);
     
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = tf - ti;
     std::cout << "Timer: " << duration.count() << " s" << std::endl;
-    // ProfilerStop();
+    ProfilerStop();
     /******************************************************************/
     return 0;
 }
