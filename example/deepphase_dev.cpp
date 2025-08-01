@@ -6,7 +6,7 @@
 #include <string>
 #include <cassert>
 #include <chrono>
-#include <gperftools/profiler.h>
+// #include <gperftools/profiler.h>
 #include <omp.h>
 
 // modify include list when testing of program finished - currently includes everything
@@ -167,7 +167,7 @@ void test_dSiCi_accuracy() {
 
 int main() {
     /************************ CLOCK / PROFILER *************************/
-    ProfilerStart("profile.out");
+    // ProfilerStart("profile.out");
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
 
@@ -281,7 +281,7 @@ int main() {
     const auto tf = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = tf - ti;
     std::cout << "Timer: " << duration.count() << " s" << std::endl;
-    ProfilerStop();
+    // ProfilerStop();
     /******************************************************************/
     return 0;
 }
