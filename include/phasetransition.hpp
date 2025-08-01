@@ -20,18 +20,18 @@ namespace PhaseTransition {
 
 // move universe class somewhere else?
 struct dflt_universe {
-  static constexpr double T0 = 2.41e-13; // GeV
-  static constexpr double Ts = 100.0; // GeV
-  static constexpr double H0 = 1.45e-42; // GeV
-  static constexpr double Hs = 1.41e-14; // GeV
-  static constexpr double g0 = 3.91;
-  static constexpr double gs = 106.75;
-  // static constexpr double T0 = 2.725;
-  // static constexpr double Ts = 100.0;
-  // static constexpr double H0 = 67.8;
-  // static constexpr double Hs = 1.0;  
+  // static constexpr double T0 = 2.41e-13; // GeV
+  // static constexpr double Ts = 100.0; // GeV
+  // static constexpr double H0 = 1.45e-42; // GeV
+  // static constexpr double Hs = 1.41e-14; // GeV
   // static constexpr double g0 = 3.91;
-  // static constexpr double gs = 100.0;
+  // static constexpr double gs = 106.75;
+  static constexpr double T0 = 2.725;
+  static constexpr double Ts = 100.0;
+  static constexpr double H0 = 67.8;
+  static constexpr double Hs = 1.0;  
+  static constexpr double g0 = 3.91;
+  static constexpr double gs = 100.0;
 };
 
 /**

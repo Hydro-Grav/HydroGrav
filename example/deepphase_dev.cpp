@@ -226,8 +226,8 @@ int main() {
     // test_profile_params();
     // example_FluidProfile("profile");
     // example_Kin_Spec("Ekin");
-    // example_GW_Spec("GW_spec");
-    GW_spec_comparison("GW_spec_comparison");
+    example_GW_Spec("GW_spec");
+    // GW_spec_comparison("GW_spec_comparison");
     // test_dSiCi_accuracy();
 
     // const PhaseTransition::Universe un;
