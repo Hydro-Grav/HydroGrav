@@ -71,11 +71,16 @@ class PowerSpec {
 inline double ptilde(double k, double p, double z) {
     const auto arg = k*k - 2.0 * k * p * z + p*p;
 
+    if (arg < 0.0)
+        throw std::runtime_error("arg<0 in Spectrum::ptilde"); // avoids numerical precision issues giving arg < 0
+
     if (std::abs(arg) < 1e-10)
         return 0.0; // avoids numerical precision issues giving arg < 0
 
     return std::sqrt(arg);
   }
+
+double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>& p_vals);
 
 double ff(double tau_m, double kcs);
 double dtau_fin(double tau_fin, double tau_s);
