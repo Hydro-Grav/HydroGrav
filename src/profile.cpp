@@ -50,21 +50,26 @@ double dwdxi(double xi, double v, double w, const double csq) {
     return w * gammaSq(v) * mu(xi, v) * (1.0 + 1.0 / csq) * dvdxi(xi, v, csq);
 }
 
-double dxi_dtau(double xi, double v, const double csq) {
-    return xi * ((xi-v)*(xi-v) - csq * (1-xi*v)*(1-xi*v));
-}
-
-double dv_dtau(double xi, double v, const double csq) {
-    return 2.0 * v * csq * (1-v*v) * (1 - xi*v);
-}
-
-double dw_dtau(double xi, double v, double w, const double csq) {
-    return w * (1 + 1/csq) * gammaSq(v) * mu(xi, v) * dv_dtau(xi, v, csq);
+double dTdxi(double xi, double v, double T, const double csq) {
+    return T * gammaSq(v) * mu(xi, v) * dvdxi(xi, v, csq);
 }
 /*************************************************************************************/
 
 // Warning: doesn't work for w profile yet!
 void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pts, int y_pts, const std::string& filename) {
+    // EoM parametrised by time coord tau
+    auto dxi_dtau = [] (double xi, double v, const double csq) {
+        return xi * ((xi-v)*(xi-v) - csq * (1-xi*v)*(1-xi*v));
+    };
+
+    auto dv_dtau = [] (double xi, double v, const double csq) {
+        return 2.0 * v * csq * (1-v*v) * (1 - xi*v);
+    };
+
+    auto dw_dtau = [&dv_dtau] (double xi, double v, double w, const double csq) {
+        return w * (1 + 1/csq) * gammaSq(v) * mu(xi, v) * dv_dtau(xi, v, csq);
+    };
+    
     std::cout << "Generating streamplot data for fluid profile... ";
     std::cout << "(warning: does not work for w(xi) profile yet!) ";
     

@@ -29,10 +29,7 @@ double mu(double xi, double v);
 
 double dvdxi(double xi, double v, const double csq);
 double dwdxi(double xi, double v, double w, const double csq);
-
-double dxi_dtau(double xi, double v, const double csq);
-double dv_dtau(double xi, double v, const double csq);
-double dw_dtau(double xi, double v, double w, const double csq);
+double dTdxi(double xi, double v, double T, const double csq);
 
 void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pts, int y_pts, const std::string& filename);
 void generate_streamplot_data(const PhaseTransition::PTParams& params);
