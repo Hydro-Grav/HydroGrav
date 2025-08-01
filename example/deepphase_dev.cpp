@@ -7,6 +7,7 @@
 #include <cassert>
 #include <chrono>
 // #include <gperftools/profiler.h>
+#include <omp.h>
 
 // modify include list when testing of program finished - currently includes everything
 #include "hydrodynamics.hpp"
@@ -116,12 +117,12 @@ void example_GW_Spec(const std::string& filename) {
 
     const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
 
-    un.print();
-    params.print();
+    // un.print();
+    // params.print();
 
     // Define GW spectrum
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params);
+    const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
     
     // Write/plot to disk
     // OmegaGW.write(filename + ".csv");
@@ -194,12 +195,86 @@ int main() {
     // const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
     // const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
+    // const Hydrodynamics::FluidProfile profile(params);
 
-    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    // const auto pRs_vals = logspace(1e-2, 1e+3, 1000);
-    // const auto z_vals = linspace(-1.0, 1.0, 1000);
+    // const auto nk = 100;
+    // const auto kRs_vals = logspace(1e-3, 1e+3, nk);
 
-    // const auto delta = Spectrum::dlt_SSM2(kRs_vals, pRs_vals, z_vals, params);
+    // const auto np = 1000;
+    // const auto pRs_vals = logspace(1e-2, 1e+3, np);
+
+    // const auto nz = 1000;
+    // const auto z_vals = linspace(-1.0, 1.0, nz);
+
+    // // const auto delta = Spectrum::dlt_SSM(kRs_vals, pRs_vals, z_vals, params);
+
+    // double ptRs_min = 1.;
+    // std::vector<double> kpz_min(3), kpz_max(3);
+    // double ptRs_max = 2.;
+    // for (size_t kk = 0; kk < nk; kk++ ) {
+    //     const auto kRs = kRs_vals[kk];
+    //     for (size_t pp = 0; pp < np; pp++) {
+    //         const auto pRs = pRs_vals[pp];
+    //         for (size_t zz = 0; zz < nz; zz++) {
+    //             const auto z = z_vals[zz];
+    //             const auto ptRs = Spectrum::ptilde(kRs, pRs, z);
+    //             if (ptRs == 0.0)
+    //                 continue;
+                
+    //             // ptRs_vals[kk * np * nz + pp * nz + zz] = ptRs;
+
+    //             if (ptRs < ptRs_min) {
+    //                 ptRs_min = ptRs;
+    //                 kpz_min[0] = kRs;
+    //                 kpz_min[1] = pRs;
+    //                 kpz_min[2] = z;
+    //             }
+
+    //             if (ptRs > ptRs_max) {
+    //                 ptRs_max = ptRs;
+    //                 kpz_max[0] = kRs;
+    //                 kpz_max[1] = pRs;
+    //                 kpz_max[2] = z;
+    //             }
+    //         }
+    //     }
+    // }
+
+    // std::cout << "ptRs_min = " << ptRs_min << ", ptRs_max = " << ptRs_max << std::endl;
+    // std::cout << "kpz_min=" << kpz_min[0] << ", " << kpz_min[1] << ", " << kpz_min[2] << "\n";
+    // std::cout << "kpz_max" << kpz_max[0] << ", " << kpz_max[1] << ", " << kpz_max[2] << "\n";
+
+
+    // // const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
+    // const auto ptRs_vals_tmp = logspace(1e-5, ptRs_max, 2*np);
+
+    // // construct interpolating function for zetaKin(ptRs)
+    // const auto zk_ptRs_spec = Spectrum::zetaKin(ptRs_vals_tmp, profile);
+    // const auto zk_ptRs_K_vals = zk_ptRs_spec.K();
+    // const auto zk_ptRs_P_vals = zk_ptRs_spec.P();
+
+    // alglib::real_1d_array K_vals, P_vals;
+    // K_vals.setcontent(zk_ptRs_K_vals.size(), zk_ptRs_K_vals.data());
+    // P_vals.setcontent(zk_ptRs_P_vals.size(), zk_ptRs_P_vals.data());
+
+    // alglib::spline1dinterpolant zk_ptRs_interp;;
+    // alglib::spline1dbuildcubic(K_vals, P_vals, zk_ptRs_interp);
+
+    // std::vector<double> zk_ptRs_vals(ptRs_vals_tmp.size());
+    // for (size_t i = 0; i < ptRs_vals_tmp.size(); i++) {
+    //     const auto ptRs = ptRs_vals_tmp[i];
+    //     zk_ptRs_vals[i] = alglib::spline1dcalc(zk_ptRs_interp, ptRs);
+    // }
+    
+    // plt::figure_size(800, 600);
+    // plt::loglog(zk_ptRs_K_vals, zk_ptRs_P_vals, "k-");
+    // plt::loglog(ptRs_vals_tmp, zk_ptRs_vals, "r--");
+    // plt::suptitle("vw = " + to_string_with_precision(params.vw()) + ", alN = " + to_string_with_precision(params.alN()));
+    // plt::xlabel("K=kRs");
+    // // plt::xlim(zk_ptRs_K_vals.front(), zk_ptRs_K_vals.back());
+    // plt::xlim(1e-7, 1e-4);
+    // plt::grid(true);
+    // plt::save("spectrum_interp.png");
     
 
     /************************ CLOCK / PROFILER *************************/

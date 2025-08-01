@@ -19,6 +19,15 @@ TO DO:
 
 namespace PhaseTransition {
 
+Universe::Universe()
+    : Universe(dflt_universe::T0, dflt_universe::Ts, dflt_universe::H0, dflt_universe::Hs, dflt_universe::g0, dflt_universe::gs) {}
+
+Universe::Universe(double Ts, double Hs, double gs)
+    : T0_(dflt_universe::T0), Ts_(Ts), H0_(dflt_universe::H0), Hs_(Hs), g0_(dflt_universe::g0), gs_(gs) {}
+
+Universe::Universe(double T0, double Ts, double H0, double Hs, double g0, double gs)
+    : T0_(T0), Ts_(Ts), H0_(H0), Hs_(Hs), g0_(g0), gs_(gs) {}
+
 std::ostream& operator<<(std::ostream& os, const Universe& un) {
     os << "************** Universe parameters **************\n"
        << std::left
@@ -50,6 +59,8 @@ PTParams::PTParams()
 
 PTParams::PTParams(double vw, double alN, double beta, double dtau, double wNeN_rat, const char* nuc_type, const Universe& un)
     : universe_(un),
+      eos_model_(),
+      nuc_type_(),
       vw_(vw),
       alN_(alN),
       beta_(beta),
@@ -58,10 +69,8 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double wNeN_
       tau_fin_(),
       dtau_(dtau),
       wNeN_rat_(wNeN_rat),
-      eos_model_(),
       cpsq_(),
-      cmsq_(),
-      nuc_type_()
+      cmsq_()
     {
 
       // check valid vw

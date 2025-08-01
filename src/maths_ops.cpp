@@ -185,6 +185,77 @@ double simpson_2d_integrate(const std::vector<double>& x, const std::vector<doub
     return total;
 }
 
+double simpson_2d_integrate_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat) {
+    const size_t nx = x.size();
+    const size_t ny = y.size();
+
+    if (f_flat.size() != nx * ny) {
+        throw std::invalid_argument("Size of f_flat must be x.size() * y.size()");
+    }
+
+    auto at = [&](size_t j, size_t i) -> double {
+        return f_flat[j * nx + i];
+    };
+
+    double total = 0.0;
+
+    size_t nx_lim = (nx % 2 == 0) ? nx - 1 : nx;
+    size_t ny_lim = (ny % 2 == 0) ? ny - 1 : ny;
+
+    for (size_t j = 0; j + 2 < ny_lim; j += 2) {
+        double hy1 = y[j + 1] - y[j];
+        double hy2 = y[j + 2] - y[j + 1];
+        double hy = y[j + 2] - y[j];
+
+        for (size_t i = 0; i + 2 < nx_lim; i += 2) {
+            double hx1 = x[i + 1] - x[i];
+            double hx2 = x[i + 2] - x[i + 1];
+            double hx = x[i + 2] - x[i];
+
+            if (std::abs(hx1 - hx2) > 1e-8 || std::abs(hy1 - hy2) > 1e-8) {
+                // Composite trapezoidal rule
+                total += 0.25 * hx1 * hy1 * (at(j, i) + at(j + 1, i) + at(j, i + 1) + at(j + 1, i + 1));
+                total += 0.25 * hx2 * hy1 * (at(j, i + 1) + at(j + 1, i + 1) + at(j, i + 2) + at(j + 1, i + 2));
+                total += 0.25 * hx1 * hy2 * (at(j + 1, i) + at(j + 2, i) + at(j + 1, i + 1) + at(j + 2, i + 1));
+                total += 0.25 * hx2 * hy2 * (at(j + 1, i + 1) + at(j + 2, i + 1) + at(j + 1, i + 2) + at(j + 2, i + 2));
+            } else {
+                // 2D Simpson's rule
+                total += (hx * hy / 36.0) * (
+                    at(j, i) + 4 * at(j, i + 1) + at(j, i + 2) +
+                    4 * (at(j + 1, i) + 4 * at(j + 1, i + 1) + at(j + 1, i + 2)) +
+                    at(j + 2, i) + 4 * at(j + 2, i + 1) + at(j + 2, i + 2)
+                );
+            }
+        }
+    }
+
+    // Handle right edge strip in x
+    if (nx % 2 == 0) {
+        for (size_t j = 0; j + 1 < ny; ++j) {
+            double hx = x[nx - 1] - x[nx - 2];
+            double hy = y[j + 1] - y[j];
+            total += 0.25 * hx * hy * (
+                at(j, nx - 2) + at(j + 1, nx - 2) +
+                at(j, nx - 1) + at(j + 1, nx - 1)
+            );
+        }
+    }
+
+    // Handle top edge strip in y
+    if (ny % 2 == 0) {
+        for (size_t i = 0; i + 1 < nx; ++i) {
+            double hx = x[i + 1] - x[i];
+            double hy = y[ny - 1] - y[ny - 2];
+            total += 0.25 * hx * hy * (
+                at(ny - 2, i) + at(ny - 2, i + 1) +
+                at(ny - 1, i) + at(ny - 1, i + 1)
+            );
+        }
+    }
+
+    return total;
+}
+
 void precompute_1d_weights(
     const std::vector<double>& coords,
     std::vector<std::vector<double>>& weights,
@@ -554,4 +625,22 @@ alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec) {
     alglib::real_1d_array result;
     result = oss.str().c_str();  // real_1d_array supports string assignment
     return result;
+}
+
+std::unordered_map<double, size_t> count_duplicates(const std::vector<double>& vec) {
+    std::unordered_map<double, size_t> counts;
+    std::unordered_map<double, size_t> duplicates;
+
+    #pragma omp parallel for
+    for (size_t i = 0; i < vec.size(); ++i) {
+        const double& val = vec[i];
+        counts[val]++;
+        if (counts[val] == 2) {
+            duplicates[val] = 2;
+        } else if (counts[val] > 2) {
+            duplicates[val] = counts[val];
+        }
+    }
+
+    return duplicates;
 }
