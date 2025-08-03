@@ -38,12 +38,9 @@ struct dflt_universe {
 class Universe {
   public:
     // ctors
-    Universe()
-      : Universe(dflt_universe::T0, dflt_universe::Ts, dflt_universe::H0, dflt_universe::Hs, dflt_universe::g0, dflt_universe::gs) {}
-    Universe(double Ts, double Hs, double gs)
-      : T0_(dflt_universe::T0), Ts_(Ts), H0_(dflt_universe::H0), Hs_(Hs), g0_(dflt_universe::g0), gs_(gs) {}
-    Universe(double T0, double Ts, double H0, double Hs, double g0, double gs)
-      : T0_(T0), Ts_(Ts), H0_(H0), Hs_(Hs), g0_(g0), gs_(gs) {}
+    Universe();
+    Universe(double Ts, double Hs, double gs);
+    Universe(double T0, double Ts, double H0, double Hs, double g0, double gs);
 
     // params today (0) and at start of PT (s)
     double T0() const { return T0_; } // temperature of universe
@@ -63,12 +60,15 @@ class Universe {
     const double T0_, Ts_, H0_, Hs_, g0_, gs_;
 };
 
+// unused
 const Universe& default_universe();
 
 struct dflt_PTParams {
   static constexpr double vw = 0.8;              // Wall velocity
   static constexpr double alN = 0.1;           // PT strength 
+  static constexpr double beta = 1.0;            // Transition rate param
   static constexpr double betaH = 100.0;            // Transition rate param
+  static constexpr double dtau = 10.0;            // PT duration
   static constexpr double wNeN_rat = 1.0 + 1./3.;       // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
@@ -120,8 +120,8 @@ units:
       double vw_, alN_, betaH_, beta_, Rs_, tau_s_, tau_fin_, wNeN_rat_, cpsq_, cmsq_;
       std::string eos_model_; // equation of state model (bag or Veff)
       const char *nuc_type_;
+      // double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, wNeN_rat_, cpsq_, cmsq_;
 
-      void check_valid_params() const;
       bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
       bool is_valid_csq(double csq) const;
     };

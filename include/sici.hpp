@@ -71,7 +71,6 @@ inline void sici(double x, double& si, double& ci) {
 
         if (x < 0) {
             si = -si;
-            ci = ci;
         }
         return;
     }
@@ -87,7 +86,6 @@ inline void sici(double x, double& si, double& ci) {
         
         if (x < 0) {
             si = -si;
-            ci = ci;
         }
         return;
     }

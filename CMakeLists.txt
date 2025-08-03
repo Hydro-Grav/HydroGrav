@@ -33,6 +33,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# For gpu offloading
+# set(CMAKE_C_COMPILER clang-18)
+# set(CMAKE_CXX_COMPILER clang++-18)
+
 # --------------------------
 # Compiler warnings
 # --------------------------

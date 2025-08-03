@@ -95,13 +95,10 @@ std::pair<std::vector<double>, std::vector<double>> prof_ints_fl(const std::vect
     std::vector<double> fd(m); 
     std::vector<double> l(m);
 
-    std::vector<std::vector<double>> fd_integrands(omp_get_max_threads(), std::vector<double>(n));
-    std::vector<std::vector<double>> l_integrands(omp_get_max_threads(), std::vector<double>(n));
     #pragma omp parallel
     {
-        int tid = omp_get_thread_num();
-        std::vector<double>& fd_integrand = fd_integrands[tid]; // local thread copy of integrand
-        std::vector<double>& l_integrand = l_integrands[tid];
+        std::vector<double> fd_integrand(n);
+        std::vector<double> l_integrand(n);
 
         #pragma omp for
         for (size_t j = 0; j < m; j++) { // chi
@@ -121,7 +118,6 @@ std::pair<std::vector<double>, std::vector<double>> prof_ints_fl(const std::vect
                 l_integrand[i] = fac * inv_chi * xi * la_prof * sin_cx;
             }
 
-            // much faster than interpolating function + boost integrator
             fd[j] = simpson_integrate(xi_vals, fd_integrand);
             l[j] = simpson_integrate(xi_vals, l_integrand);
         }

@@ -95,6 +95,7 @@ std::string to_string_with_precision(double value, int precision = 2);
 
 double simpson_integrate(const std::vector<double>& x, const std::vector<double>& y);
 double simpson_2d_integrate(const std::vector<double>& x, const std::vector<double>& y, const std::vector<std::vector<double>>& f);
+double simpson_2d_integrate_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat);
 
 struct SimpsonWeights2D {
     std::vector<std::vector<double>> Ax_weights; // size: (nx-2) x 3
@@ -153,5 +154,7 @@ double find_smallest_root(
     int N = 1000);
 
 alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec);
+
+std::unordered_map<double, size_t> count_duplicates(const std::vector<double>& vec);
 
 #endif // INCLUDE_MATHS_OPS_HPP_H
