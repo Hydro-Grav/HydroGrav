@@ -123,7 +123,7 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
       mode_(),
       xi0_(), xif_(),
       y0_(),
-      xi_vals_(), v_vals_(), w_vals_(), la_vals_()
+      xi_vals_(), v_vals_(), w_vals_(), T_vals_(), la_vals_()
     {
         /********************** Notation for fluid parameters **********************/
         /* xi_sh = position of shock wave                                          */
@@ -174,9 +174,8 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         xi_vals_ = prof[0];
         v_vals_ = prof[1];
         w_vals_ = prof[2];
-        la_vals_ = prof[3];
-
-        assert(xi_vals_.size() == v_vals_.size() && xi_vals_.size() == w_vals_.size());
+        T_vals_ = prof[3];
+        la_vals_ = prof[4];
 
         // build interpolating functions (probably not needed)
         // if (v_prof_.is_initialised() || w_prof_.is_initialised() || la_prof_.is_initialised()) {
@@ -197,7 +196,7 @@ void FluidProfile::write(const std::string& filename) const {
     file << "xi,v,w,la\n";
 
     for (size_t i = 0; i < xi_vals_.size(); ++i) {
-        file << xi_vals_[i] << "," << v_vals_[i] << "," << w_vals_[i] << "," << la_vals_[i] << "\n";
+        file << xi_vals_[i] << "," << v_vals_[i] << "," << w_vals_[i] << "," << la_vals_[i] << "," << T_vals_[i] << "\n";
     }
     file.close();
 
@@ -213,7 +212,7 @@ void FluidProfile::plot(const std::string& filename) const {
     plt::figure_size(2400, 600);
 
     // v(xi)
-    plt::subplot2grid(1, 3, 0, 0);
+    plt::subplot2grid(2, 2, 0, 0);
     plt::plot(xi_vals_, v_vals_);
     plt::xlabel("xi");
     plt::ylabel("v(xi)");
@@ -221,15 +220,23 @@ void FluidProfile::plot(const std::string& filename) const {
     plt::grid(true);
 
     // w(xi)
-    plt::subplot2grid(1, 3, 0, 1);
+    plt::subplot2grid(2, 2, 0, 1);
     plt::plot(xi_vals_, w_vals_);
     plt::xlabel("xi");
     plt::ylabel("w(xi)");
     plt::xlim(0.0, 1.0);
     plt::grid(true);
 
+    // T(xi)
+    plt::subplot2grid(2, 2, 1, 0);
+    plt::plot(xi_vals_, T_vals_);
+    plt::xlabel("xi");
+    plt::ylabel("T(xi)");
+    plt::xlim(0.0, 1.0);
+    plt::grid(true);
+
     // la(xi)
-    plt::subplot2grid(1, 3, 0, 2);
+    plt::subplot2grid(2, 2, 1, 1);
     plt::plot(xi_vals_, la_vals_);
     plt::xlabel("xi");
     plt::ylabel("la(xi)");
@@ -337,6 +344,13 @@ double FluidProfile::calc_w1wN(double xi_sh) const { // w1/wN
     // alpha_1 w1 = alpha_N wN
     const auto xi_sh_sq = xi_sh * xi_sh;
     return (9.0 * xi_sh_sq - 1.0) / (3.0 * (1.0 - xi_sh_sq));
+}
+
+// bag model only (comes from w=(4/3)*a*T^4)
+// passes in cpsq, cmsq since it is reused to get T1/TN (at shock front) with c1sq=c2sq=cpsq
+double FluidProfile::calc_ToTN(double wmwN, double cpsq, double cmsq) const {
+    const auto fac = wmwN * (1.0 + cpsq) / (1.0 + cmsq);
+    return std::pow(fac, 0.25);
 }
 
 // bag model only
@@ -542,29 +556,24 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     }
     std::cout << "\n";
 
-    // wrapper for hydrodynamic EoM - move into struct
+    // wrapper for hydrodynamic EoM - move into struct?
     auto dydxi = [this](double xi, const state_type& y) -> state_type {
         const auto v = y[0];
         const auto w = y[1];
         const auto csq = (xi < vw_) ? cmsq_ : cpsq_;
 
-        return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq) };
-    };
-
-    auto dvdxi_vec = [this](double xi, const state_type& y) -> state_type {
-        const auto v = y[0];
-        const auto csq = (xi < vw_) ? cmsq_ : cpsq_;
-
-        return { dvdxi(xi, v, csq) }; // returns dv/dxi only
+        return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq), dTdxi(xi, v, w, csq) };
     };
 
     const auto dlt = 0.001; // wall and shocks are discontinuities so start integration just before them
     std::vector<state_type> y_sol_tmp;
-    state_type xi_sol_tmp, v_sol_tmp, w_sol_tmp, la_sol_tmp;
+    state_type xi_sol_tmp, v_sol_tmp, w_sol_tmp, T_sol_tmp, la_sol_tmp;
 
-    const double w_start_val = 1.0; // w+/wN (det), w2/wN (deflag/hybrid)
-    const double la_start_val = 0.0;
-    double w_end_val, la_end_val;
+    const auto w_start_val = 1.0; // w+/wN (det), w2/wN (deflag/hybrid)
+    const auto T_start_val = 1.0; // T+/TN (det), T2/TN (deflag/hybrid);
+    const auto la_start_val = 0.0;
+    
+    double w_end_val, T_end_val, la_end_val;
 
     if (mode_ < 2) { // deflagration & hybrid
         // hybrid and deflagration ICs the same for xi_w < xi < xi_sh
@@ -580,7 +589,8 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
         const auto w1wN = calc_w1wN(xi0_);
         y0_.push_back(w1wN);
 
-        // std::cout << "v1UF=" << v1UF << ", w1wN=" << w1wN << "\n";
+        const auto T1TN = calc_ToTN(w1wN, cpsq_, cpsq_); // c1sq = c2sq = cpsq
+        y0_.push_back(T1TN);
 
         // solver
         const auto sol = rk4_solver(dydxi, xi0_, xif_, y0_, n);
@@ -591,6 +601,8 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
         for (size_t i = 0; i < xi_sol_tmp.size(); i++) {
             v_sol_tmp.push_back(y_sol_tmp[i][0]);
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
+            T_sol_tmp.push_back(y_sol_tmp[i][2]);
+
             la_sol_tmp.push_back(get_la_front_wall(w_sol_tmp[i]));
         }
 
@@ -603,8 +615,8 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
         // Note: need alp for this so must do root-finding BEFORE determining if alp is good/bad
         const auto alp = get_alp_wall(vpUF, vw_);
 
-        std::cout << "alp=" << alp << ", alp_min=" << alp_min_ << ", alp_max=" << alp_max_ << ", alN=" << alN_ << "\n";
-        std::cout << std::setprecision(10) << "xi_sh=" << xi_sh << "\n";
+        // std::cout << "alp=" << alp << ", alp_min=" << alp_min_ << ", alp_max=" << alp_max_ << ", alN=" << alN_ << "\n";
+        // std::cout << std::setprecision(10) << "xi_sh=" << xi_sh << "\n";
         
         if (alp >= alN_) throw std::invalid_argument("alpha_+ must be < alpha_N");
         if (alp < alp_min_) throw std::invalid_argument("alpha_+ too small for shock");
@@ -615,9 +627,9 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
             const auto vm = -vw_;
             const auto vp = calc_vp(vm, alp);
             const auto wpwN = w_sol_tmp.back(); // w(xi_w + dlt) = w+/wN
-            const auto wmwN = calc_wm(wpwN, vp, vm); // from matching condition at wall
 
-            w_end_val = wmwN; // enthalpy just behind wall
+            w_end_val = calc_wm(wpwN, vp, vm); // wm/wN, from matching condition at wall
+            T_end_val = calc_ToTN(w_end_val, cpsq_, cmsq_); // Tm/TN
             la_end_val = get_la_behind_wall(w_end_val);
 
         } else { // hybrid
@@ -637,6 +649,9 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
             const auto wmwN = calc_wm(wpwN, vp, vm);
             y0_rf.push_back(wmwN);
 
+            const auto TmTN = calc_ToTN(wmwN, cpsq_, cmsq_);
+            y0_rf.push_back(TmTN);
+
             const auto [xi_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydxi, xi0_rf, xif_rf, y0_rf, n);
 
             // combine rarefaction wave with shockwave part of solution
@@ -644,13 +659,22 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
                 xi_sol_tmp.push_back(xi_sol_rf_tmp[i]);
                 v_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
                 w_sol_tmp.push_back(y_sol_rf_tmp[i][1]);
+                T_sol_tmp.push_back(y_sol_rf_tmp[i][2]);
+
                 la_sol_tmp.push_back(get_la_behind_wall(y_sol_rf_tmp[i][1]));
             }
 
             xif_ = xif_rf; // update xif value to behind rarefaction wave
             w_end_val = w_sol_tmp.back();
+            T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
         }
+
+        std::cout << "v_start=" << v_sol_tmp.front() << ", v_end=" << v_sol_tmp.back() << "\n";
+        std::cout << "w_start=" << w_sol_tmp.front() << ", w_end=" << w_sol_tmp.back() << "\n";
+        std::cout << "T_start=" << T_sol_tmp.front() << ", T_end=" << T_sol_tmp.back() << "\n";
+        std::cout << "la_start=" << la_sol_tmp.front() << ", la_end=" << la_sol_tmp.back() << "\n";
+        
     } else { // detonation
         // cm < xi < xi_w
         xi0_ = vw_ - dlt;
@@ -670,6 +694,11 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
         const auto wmwN = calc_wm(wpwN, vp, vm);
         y0_.push_back(wmwN);
 
+        // initial condition T0 = T(xi_w) = Tm/TN
+        // const auto TmTN = calc_ToTN(wmwN, cpsq_, cmsq_);
+        const auto TmTN = 1.0;
+        y0_.push_back(TmTN);
+
         // solver
         // [xi_sol_tmp, y_sol_tmp] = rk4_solver(dydxi, xi0_, xif_, y0_, n);
         const auto sol = rk4_solver(dydxi, xi0_, xif_, y0_, n);
@@ -677,14 +706,23 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
         y_sol_tmp = sol.second;
 
         // fill v, w vectors
+        // Optimisation Note: pre-allocate memory for these vectors to speed up?
         for (size_t i = 0; i < xi_sol_tmp.size(); i++) {
             v_sol_tmp.push_back(y_sol_tmp[i][0]);
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
+            T_sol_tmp.push_back(y_sol_tmp[i][2]);
+
             la_sol_tmp.push_back(get_la_behind_wall(w_sol_tmp[i]));
         }
 
         w_end_val = w_sol_tmp.back(); // not sure why
+        T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
+
+        std::cout << "v_start=" << v_sol_tmp.front() << ", v_end=" << v_sol_tmp.back() << "\n";
+        std::cout << "w_start=" << w_sol_tmp.front() << ", w_end=" << w_sol_tmp.back() << "\n";
+        std::cout << "T_start=" << T_sol_tmp.front() << ", T_end=" << T_sol_tmp.back() << "\n";
+        std::cout << "la_start=" << la_sol_tmp.front() << ", la_end=" << la_sol_tmp.back() << "\n";
     }
     
 
@@ -698,10 +736,13 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     const state_type w_start(n, w_start_val);
     const state_type w_end(n, w_end_val);
 
+    const state_type T_start(n, T_start_val);
+    const state_type T_end(n, T_end_val);
+
     const state_type la_start(n, la_start_val);
     const state_type la_end(n, la_end_val);
 
-    state_type xi_sol, v_sol, w_sol, la_sol;
+    state_type xi_sol, v_sol, w_sol, T_sol, la_sol;
 
     // concatenate xi vals
     xi_sol.insert(xi_sol.end(), xi_start.begin(), xi_start.end());
@@ -718,6 +759,11 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     w_sol.insert(w_sol.end(), w_sol_tmp.begin(), w_sol_tmp.end());
     w_sol.insert(w_sol.end(), w_end.begin(), w_end.end());
 
+    // concatenate T(xi) vals
+    T_sol.insert(T_sol.end(), T_start.begin(), T_start.end());
+    T_sol.insert(T_sol.end(), T_sol_tmp.begin(), T_sol_tmp.end());
+    T_sol.insert(T_sol.end(), T_end.begin(), T_end.end());
+
     // concatenate la(xi) vals
     la_sol.insert(la_sol.end(), la_start.begin(), la_start.end());
     la_sol.insert(la_sol.end(), la_sol_tmp.begin(), la_sol_tmp.end());
@@ -727,9 +773,10 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     std::reverse(xi_sol.begin(), xi_sol.end());
     std::reverse(v_sol.begin(), v_sol.end());
     std::reverse(w_sol.begin(), w_sol.end());
+    std::reverse(T_sol.begin(), T_sol.end());
     std::reverse(la_sol.begin(), la_sol.end());
 
-    return {xi_sol, v_sol, w_sol, la_sol};
+    return {xi_sol, v_sol, w_sol, T_sol, la_sol};
 }
 /*******************************************************************************/
 

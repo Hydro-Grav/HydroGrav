@@ -100,7 +100,7 @@ class FluidProfile {
     // double vpUF_, vmUF_, v1UF_, v2UF_;
     // double wp_, wm_, w1_, w2_;
     
-    state_type xi_vals_, v_vals_, w_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
+    state_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
     int get_mode(double vw, double cmsq, double alN) const;
     double vJ_det(double alp) const;
@@ -109,6 +109,7 @@ class FluidProfile {
     double calc_vp(double vm, double alpha_p) const;
     double calc_wm(double wp, double vp, double vm) const;
     double calc_w1wN(double xi_sh) const;
+    double calc_ToTN(double wmwN, double cpsq, double cmsq) const;
 
     double xi_shock(double v1UF) const; // position of shock front
     double v1UF_from_shock(double xi_sh) const;
