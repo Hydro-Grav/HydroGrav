@@ -55,15 +55,16 @@ const Universe& default_universe() {
 // make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
-    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::betaH, dflt_PTParams::wNeN_rat, dflt_PTParams::nuc_type, default_universe()) {}
+    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::betaH, dflt_PTParams::dtauH, dflt_PTParams::wNeN_rat, dflt_PTParams::nuc_type, default_universe()) {}
 
-PTParams::PTParams(double vw, double alN, double betaH, double wNeN_rat, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double betaH, double dtauH, double wNeN_rat, const char* nuc_type, const Universe& un)
     : universe_(un),
       eos_model_(),
       nuc_type_(),
       vw_(vw),
       alN_(alN),
       betaH_(betaH),
+      dtauH_(dtauH),
       Rs_(),
       tau_s_(),
       tau_fin_(),
@@ -94,11 +95,11 @@ PTParams::PTParams(double vw, double alN, double betaH, double wNeN_rat, const c
       auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
       const auto Hs_conformal = universe_.Hs() * asa0_rat;
 
-      beta_ = betaH * Hs_conformal;
-      const auto dtau = 1 / beta_;
-      
+      beta_ = betaH_ * Hs_conformal;
+      dtau_ = dtauH_ / Hs_conformal;
+
       tau_s_ = 1.0 / Hs_conformal;
-      tau_fin_ = tau_s_ + dtau;
+      tau_fin_ = tau_s_ + dtau_;
 
       // check valid bubble nucleation type
       const char* allowed_nuc[] = {"exp", "sim"};
@@ -140,6 +141,8 @@ std::ostream& operator<<(std::ostream& os, const PTParams& params) {
        << std::setw(35) << "PT strength parameter:" << "alN=" << params.alN_ << "\n"
        << std::setw(35) << "Normalised transition rate:" << "beta/H=" << params.betaH_ << "\n"
        << std::setw(35) << "Transition rate parameter:" << "beta=" << params.beta_ << "\n"
+       << std::setw(35) << "PT duration (normalised):" << "dtauH=" << params.dtauH_ << "\n"
+       << std::setw(35) << "PT duration:" << "dtau=" << params.dtau_ << "\n"
        << std::setw(35) << "Speed of sound (broken phase):" << "cpsq=" << params.cpsq_ << "\n"
        << std::setw(35) << "Speed of sound (old phase):" << "cmsq=" << params.cmsq_ << "\n"
        << std::setw(35) << "Mean bubble separation:" << "Rs=" << params.Rs_ << "\n"

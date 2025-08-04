@@ -8,10 +8,11 @@ int main(int argc, char* argv[]) {
     const auto vw = PhaseTransition::dflt_PTParams::vw;
     const auto alN = PhaseTransition::dflt_PTParams::alN;
     const auto betaH = PhaseTransition::dflt_PTParams::betaH;
+    const auto dtauH = PhaseTransition::dflt_PTParams::dtauH;
     const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    const PhaseTransition::PTParams params(vw, alN, betaH, wNeN_rat, nuc_type, un);
+    const PhaseTransition::PTParams params(vw, alN, betaH, dtauH, wNeN_rat, nuc_type, un);
 
     // Create hydrodynamic profile of bubble
     const Hydrodynamics::FluidProfile profile(params);

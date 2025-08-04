@@ -53,6 +53,7 @@ CMakeCache.txt
 # Python
 /.ipynb_checkpoints/
 *.ipynb
+/plots/
 
 # Matplotlibcpp
 /include/matplotlibcpp.h

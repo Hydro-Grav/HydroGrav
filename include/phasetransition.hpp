@@ -66,9 +66,8 @@ const Universe& default_universe();
 struct dflt_PTParams {
   static constexpr double vw = 0.8;              // Wall velocity
   static constexpr double alN = 0.1;           // PT strength 
-  static constexpr double beta = 1.0;            // Transition rate param
-  static constexpr double betaH = 100.0;            // Transition rate param
-  static constexpr double dtau = 10.0;            // PT duration
+  static constexpr double betaH = 10.0;            // Transition rate param
+  static constexpr double dtauH = 1.0;            // PT duration
   static constexpr double wNeN_rat = 1.0 + 1./3.;       // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
@@ -93,7 +92,7 @@ units:
   public:
     // ctors
     PTParams();
-    PTParams(double vw, double alN, double betaH, double wNeN_rat, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double betaH, double dtauH, double wNeN_rat, const char* nuc_type, const Universe& un);
 
     Universe un() const { return universe_; } // universe parameters
 
@@ -103,6 +102,8 @@ units:
     double alN() const { return alN_; } // strength parameter at nuc temp (alN_N)
     double betaH() const { return betaH_; } // normalised transition rate (beta/H)
     double beta() const { return beta_; } // inverse PT duration
+    double dtauH() const { return dtauH_; } // normalised time scale (dtau * H)
+    double dtau() const { return dtau_; } // time scale dtau
     double Rs() const { return Rs_; } // characteristic length scale R_*
     double tau_s() const { return tau_s_; } // start time of PT
     double tau_fin() const { return tau_fin_; } // end time of PT
@@ -117,7 +118,7 @@ units:
   
   private:
       const Universe universe_;
-      double vw_, alN_, betaH_, beta_, Rs_, tau_s_, tau_fin_, wNeN_rat_, cpsq_, cmsq_;
+      double vw_, alN_, betaH_, beta_, dtauH_, dtau_, Rs_, tau_s_, tau_fin_, wNeN_rat_, cpsq_, cmsq_;
       std::string eos_model_; // equation of state model (bag or Veff)
       const char *nuc_type_;
       // double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, wNeN_rat_, cpsq_, cmsq_;
