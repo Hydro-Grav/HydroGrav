@@ -6,6 +6,8 @@
 #include <iostream>
 #include <vector>
 
+#include "physics.hpp"
+
 /*
 TO DO:
 - add option to input a Veff -> derive fluid dynamics from this?
@@ -24,14 +26,12 @@ struct dflt_universe {
   // static constexpr double Ts = 100.0; // GeV
   // static constexpr double H0 = 1.45e-42; // GeV
   // static constexpr double Hs = 1.41e-14; // GeV
-  // static constexpr double g0 = 3.91;
-  // static constexpr double gs = 106.75;
-  static constexpr double T0 = 2.725;
+  
+  static constexpr double T0 = 2.725 * kB; // K * GeV/K = GeV // good
   static constexpr double Ts = 100.0;
-  static constexpr double H0 = 67.8;
-  static constexpr double Hs = 1.0;  
-  static constexpr double g0 = 3.91;
-  static constexpr double gs = 100.0;
+  static constexpr double H0 = 67.8; // GeV^2? - needs to be in units of T^2 for Hs definition to make sense
+  static constexpr double g0 = 3.91; // good
+  static constexpr double gs = 106.75; // good
 };
 
 /**
@@ -45,8 +45,8 @@ class Universe {
   public:
     // ctors
     Universe();
-    Universe(double Ts, double Hs, double gs);
-    Universe(double T0, double Ts, double H0, double Hs, double g0, double gs);
+    Universe(double Ts, double gs);
+    Universe(double T0, double Ts, double g0, double gs, double H0);
 
     // params today (0) and at start of PT (s)
     double T0() const { return T0_; } // temperature of universe
@@ -63,7 +63,8 @@ class Universe {
     friend std::ostream& operator<<(std::ostream& os, const Universe& p);
 
   private:
-    const double T0_, Ts_, H0_, Hs_, g0_, gs_;
+    const double T0_, Ts_, g0_, gs_, H0_;
+    double Hs_;
 };
 
 // unused

@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "phasetransition.hpp"
+#include "maths_ops.hpp"
 
 /*
 TO DO:
@@ -20,13 +21,18 @@ TO DO:
 namespace PhaseTransition {
 
 Universe::Universe()
-    : Universe(dflt_universe::T0, dflt_universe::Ts, dflt_universe::H0, dflt_universe::Hs, dflt_universe::g0, dflt_universe::gs) {}
+    : Universe(dflt_universe::T0, dflt_universe::Ts, dflt_universe::g0, dflt_universe::gs, dflt_universe::H0) {}
 
-Universe::Universe(double Ts, double Hs, double gs)
-    : T0_(dflt_universe::T0), Ts_(Ts), H0_(dflt_universe::H0), Hs_(Hs), g0_(dflt_universe::g0), gs_(gs) {}
+Universe::Universe(double Ts, double gs)
+    : Universe(dflt_universe::T0, Ts, dflt_universe::g0, gs, dflt_universe::H0) {}
 
-Universe::Universe(double T0, double Ts, double H0, double Hs, double g0, double gs)
-    : T0_(T0), Ts_(Ts), H0_(H0), Hs_(Hs), g0_(g0), gs_(gs) {}
+Universe::Universe(double T0, double Ts, double g0, double gs, double H0)
+    : T0_(T0), Ts_(Ts), g0_(g0), gs_(gs), H0_(H0), Hs_() {
+      const auto GNewt = 1.0;
+      const auto hbar = 1.0;
+      const auto pi_hbar = M_PI / hbar;
+      Hs_ = 4.0 * power(pi_hbar, 3) * GNewt * gs_ * power(Ts, 4) / 45.0;
+    }
 
 std::ostream& operator<<(std::ostream& os, const Universe& un) {
     os << "************** Universe parameters **************\n"

@@ -7,6 +7,7 @@
  * @brief Contains basic relativistic physics utility functions.
  */
 
+static constexpr double kB = 8.61733326e-14; // Boltzmann constant (GeV/K)
 
 /**
  * @brief Computes the Lorentz factor γ for a given velocity.

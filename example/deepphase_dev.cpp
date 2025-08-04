@@ -57,6 +57,24 @@ void test_FluidProfile_params() {
     std::cout << "Parameter test for FluidProfile passed!\n";    
 }
 
+// Fluid profile
+void example_FluidProfie(const std::string& filename) {
+    const auto vw = 0.5;
+    const auto alN = 0.1;
+    const auto beta = PhaseTransition::dflt_PTParams::beta;
+    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
+    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+
+    const PhaseTransition::Universe un;
+    const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
+    params.print();
+
+    const Hydrodynamics::FluidProfile profile(params);
+
+    profile.write(filename + ".csv");
+    profile.plot(filename + ".png");
+}
 // Kinetic power spectrum
 void example_Kin_Spec(const std::string& filename) {
     // Create default universe parameters (temperature, Hubble and DoF today and at PT)
@@ -134,48 +152,48 @@ void example_GW_Spec(const std::string& filename) {
 }
 
 // compare with Caprini paper
-void GW_spec_comparison(const std::string& filename) {
-    // define universe parameters
-    const auto T0 = PhaseTransition::dflt_universe::T0;
-    const auto Ts = PhaseTransition::dflt_universe::Ts;
-    const auto H0 = PhaseTransition::dflt_universe::H0;
-    const auto Hs = PhaseTransition::dflt_universe::Hs;
-    const auto g0 = PhaseTransition::dflt_universe::g0;
-    const auto gs = PhaseTransition::dflt_universe::gs;
+// void GW_spec_comparison(const std::string& filename) {
+//     // define universe parameters
+//     const auto T0 = PhaseTransition::dflt_universe::T0;
+//     const auto Ts = PhaseTransition::dflt_universe::Ts;
+//     const auto H0 = PhaseTransition::dflt_universe::H0;
+//     const auto Hs = PhaseTransition::dflt_universe::Hs;
+//     const auto g0 = PhaseTransition::dflt_universe::g0;
+//     const auto gs = PhaseTransition::dflt_universe::gs;
 
-    const PhaseTransition::Universe un(T0, Ts, H0, Hs, g0, gs);
+//     const PhaseTransition::Universe un(T0, Ts, H0, Hs, g0, gs);
 
-    // from Pol et al.
-    const auto vw = 0.5;
-    const auto alN = 0.1;
-    const auto RsHs = 1.0;
-    const auto Rs = RsHs / Hs;
-    const auto dtau = 10.0 * Rs;
+//     // from Pol et al.
+//     const auto vw = 0.5;
+//     const auto alN = 0.1;
+//     const auto RsHs = 1.0;
+//     const auto Rs = RsHs / Hs;
+//     const auto dtau = 10.0 * Rs;
 
-    std::cout << "vw= " << vw << ", alN = " << alN << ", RsHs = " << RsHs << ", Rs = " << Rs << ", dtau = " << dtau << "\n";
+//     std::cout << "vw= " << vw << ", alN = " << alN << ", RsHs = " << RsHs << ", Rs = " << Rs << ", dtau = " << dtau << "\n";
 
-    // conversion to PTParams input
-    const auto betaH = std::pow(8.0 * M_PI, 1./3.) * vw / RsHs;
-    const auto beta = betaH * Hs;
+//     // conversion to PTParams input
+//     const auto betaH = std::pow(8.0 * M_PI, 1./3.) * vw / RsHs;
+//     const auto beta = betaH * Hs;
     
-    const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
-    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+//     const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
+//     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
+//     const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
 
-    // un.print();
-    // params.print();
+//     // un.print();
+//     // params.print();
 
-    // Define GW spectrum
-    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params);
+//     // Define GW spectrum
+//     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+//     const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params);
     
-    #ifdef ENABLE_MATPLOTLIB
-    OmegaGW.plot(filename + ".png");
-    #endif
+//     #ifdef ENABLE_MATPLOTLIB
+//     OmegaGW.plot(filename + ".png");
+//     #endif
 
-    return;
-}
+//     return;
+// }
 
 void test_dSiCi_accuracy() {
     const std::vector<std::pair<double, double>> test_ranges = {
@@ -226,101 +244,10 @@ int main() {
     // test_profile_params();
     // example_FluidProfile("profile");
     // example_Kin_Spec("Ekin");
-    example_GW_Spec("GW_spec");
+    // example_GW_Spec("GW_spec");
+    example_FluidProfie("profile");
     // GW_spec_comparison("GW_spec_comparison");
-    // test_dSiCi_accuracy();
-
-    // const PhaseTransition::Universe un;
-
-    // const auto vw = 0.8;
-    // const auto alN = 0.1;
-    // const auto beta = PhaseTransition::dflt_PTParams::beta;
-    // const auto dtau = PhaseTransition::dflt_PTParams::dtau;
-    // const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
-    // const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
-
-    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
-    // const Hydrodynamics::FluidProfile profile(params);
-
-    // const auto nk = 100;
-    // const auto kRs_vals = logspace(1e-3, 1e+3, nk);
-
-    // const auto np = 1000;
-    // const auto pRs_vals = logspace(1e-2, 1e+3, np);
-
-    // const auto nz = 1000;
-    // const auto z_vals = linspace(-1.0, 1.0, nz);
-
-    // // const auto delta = Spectrum::dlt_SSM(kRs_vals, pRs_vals, z_vals, params);
-
-    // double ptRs_min = 1.;
-    // std::vector<double> kpz_min(3), kpz_max(3);
-    // double ptRs_max = 2.;
-    // for (size_t kk = 0; kk < nk; kk++ ) {
-    //     const auto kRs = kRs_vals[kk];
-    //     for (size_t pp = 0; pp < np; pp++) {
-    //         const auto pRs = pRs_vals[pp];
-    //         for (size_t zz = 0; zz < nz; zz++) {
-    //             const auto z = z_vals[zz];
-    //             const auto ptRs = Spectrum::ptilde(kRs, pRs, z);
-    //             if (ptRs == 0.0)
-    //                 continue;
-                
-    //             // ptRs_vals[kk * np * nz + pp * nz + zz] = ptRs;
-
-    //             if (ptRs < ptRs_min) {
-    //                 ptRs_min = ptRs;
-    //                 kpz_min[0] = kRs;
-    //                 kpz_min[1] = pRs;
-    //                 kpz_min[2] = z;
-    //             }
-
-    //             if (ptRs > ptRs_max) {
-    //                 ptRs_max = ptRs;
-    //                 kpz_max[0] = kRs;
-    //                 kpz_max[1] = pRs;
-    //                 kpz_max[2] = z;
-    //             }
-    //         }
-    //     }
-    // }
-
-    // std::cout << "ptRs_min = " << ptRs_min << ", ptRs_max = " << ptRs_max << std::endl;
-    // std::cout << "kpz_min=" << kpz_min[0] << ", " << kpz_min[1] << ", " << kpz_min[2] << "\n";
-    // std::cout << "kpz_max" << kpz_max[0] << ", " << kpz_max[1] << ", " << kpz_max[2] << "\n";
-
-
-    // // const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
-    // const auto ptRs_vals_tmp = logspace(1e-5, ptRs_max, 2*np);
-
-    // // construct interpolating function for zetaKin(ptRs)
-    // const auto zk_ptRs_spec = Spectrum::zetaKin(ptRs_vals_tmp, profile);
-    // const auto zk_ptRs_K_vals = zk_ptRs_spec.K();
-    // const auto zk_ptRs_P_vals = zk_ptRs_spec.P();
-
-    // alglib::real_1d_array K_vals, P_vals;
-    // K_vals.setcontent(zk_ptRs_K_vals.size(), zk_ptRs_K_vals.data());
-    // P_vals.setcontent(zk_ptRs_P_vals.size(), zk_ptRs_P_vals.data());
-
-    // alglib::spline1dinterpolant zk_ptRs_interp;;
-    // alglib::spline1dbuildcubic(K_vals, P_vals, zk_ptRs_interp);
-
-    // std::vector<double> zk_ptRs_vals(ptRs_vals_tmp.size());
-    // for (size_t i = 0; i < ptRs_vals_tmp.size(); i++) {
-    //     const auto ptRs = ptRs_vals_tmp[i];
-    //     zk_ptRs_vals[i] = alglib::spline1dcalc(zk_ptRs_interp, ptRs);
-    // }
-    
-    // plt::figure_size(800, 600);
-    // plt::loglog(zk_ptRs_K_vals, zk_ptRs_P_vals, "k-");
-    // plt::loglog(ptRs_vals_tmp, zk_ptRs_vals, "r--");
-    // plt::suptitle("vw = " + to_string_with_precision(params.vw()) + ", alN = " + to_string_with_precision(params.alN()));
-    // plt::xlabel("K=kRs");
-    // // plt::xlim(zk_ptRs_K_vals.front(), zk_ptRs_K_vals.back());
-    // plt::xlim(1e-7, 1e-4);
-    // plt::grid(true);
-    // plt::save("spectrum_interp.png");
-    
+    // test_dSiCi_accuracy();    
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();

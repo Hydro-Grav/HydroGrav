@@ -8,6 +8,9 @@
 #include <iomanip>
 #include <cassert>
 
+#include "ap.h"
+#include "interpolation.h"
+
 #include "profile.hpp"
 #include "phasetransition.hpp"
 #include "hydrodynamics.hpp"
@@ -26,6 +29,17 @@ TO DO:
 - write summary of detonation/deflag/hybrid at top of ctor
 - change from using y0 to using FluidState class!
 - update xi_start and xi_end so they have same spacing as xi_vals -> makes it easier for integrating v(xi) i think!
+*/
+
+/*
+Veff stuff
+- update w1wN
+- update xi_shock
+- update v1UF_from_shock
+- update la(xi)
+- check shooting method is okay
+- change speed of sound to use dp/dT and de/dT (use interpolator?)
+
 */
 
 namespace Hydrodynamics { // calculate bubble profile
@@ -113,9 +127,26 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
 }
 
 /****************************** FluidProfile class ******************************/
-// Define ctor
-FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t n)
-    : params_(params),
+
+    /********************** Notation for fluid parameters **********************/
+    /* xi_sh = position of shock wave                                          */
+    /*                                                                         */
+    /* bubble wall frame:                                                      */
+    /*   vm, vp (velocity of fluid behind (m) and in front (p) of bubble wall) */
+    /*   wm, wp (enthalpy of fluid behind (m) and in front (p) of bubble wall) */
+    /*                                                                         */
+    /* shock frame:                                                            */
+    /*   v1, v2 (velocity of fluid behind (1) and in front of (2) shock)       */
+    /*                                                                         */
+    /* centre of bubble/centre of shock frame (universe frame):                */
+    /*   As above, but ending with 'UF'                                        */
+    /***************************************************************************/
+
+// ctor for passing Veff
+// make sure it passes in T/TN, P(T)/wN, e(T)/wN!!
+FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const state_type& veff_T_vals, const state_type& veff_p_vals, const state_type& veff_e_vals, const size_t n)
+    : eos_(), // does this need to be a member var?
+      params_(params),
       cpsq_(params.cpsq()), cmsq_(params.cmsq()),
       vw_(params.vw()), alN_(params.alN()),
       alp_min_(std::numeric_limits<double>::quiet_NaN()), 
@@ -123,53 +154,53 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
       mode_(),
       xi0_(), xif_(),
       y0_(),
+      veff_T_vals_(veff_T_vals), veff_p_vals_(veff_p_vals), veff_e_vals_(veff_e_vals), veff_w_vals_(),
+      ToTN_interp_(),
       xi_vals_(), v_vals_(), w_vals_(), T_vals_(), la_vals_()
     {
-        /********************** Notation for fluid parameters **********************/
-        /* xi_sh = position of shock wave                                          */
-        /*                                                                         */
-        /* bubble wall frame:                                                      */
-        /*   vm, vp (velocity of fluid behind (m) and in front (p) of bubble wall) */
-        /*   wm, wp (enthalpy of fluid behind (m) and in front (p) of bubble wall) */
-        /*                                                                         */
-        /* shock frame:                                                            */
-        /*   v1, v2 (velocity of fluid behind (1) and in front of (2) shock)       */
-        /*                                                                         */
-        /* centre of bubble/centre of shock frame (universe frame):                */
-        /*   As above, but ending with 'UF'                                        */
-        /***************************************************************************/
-
-        if (alN_ <= 0.0) {
-            throw std::invalid_argument("alN must be > 0");
-        }
+        if (alN_ <= 0.0) throw std::invalid_argument("alN must be > 0");
 
         // define hydrodynamic mode
         mode_ = get_mode(vw_, cmsq_, alN_);
 
         // check alN large enough for shock (deflag/hybrid only)
         if (mode_ == 0 || mode_ == 1) {
-            // const auto alp_minmax = get_alp_minmax(vw_, cpsq_, cmsq_);
-            const auto alp_minmax = get_alp_minmax(vw_, cpsq_);
+            const auto alp_minmax = get_alp_minmax(vw_);
             alp_min_ = alp_minmax[0];
             alp_max_ = alp_minmax[1];
 
-            // std::cout << "alp_min=" << alp_min_ << ", alp_max=" << alp_max_ << "\n";
-
             // alN > alp > alp_min (can't properly constrain from above since we need alp)
             if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
-            // if (alN_ > alp_max_) {
-            //     std::cout << "Warning: alN > alp_max\n";
-            // }
         }
 
-        // need this?
-        if (mode_ < 0 || mode_ > 2) {
-            throw std::invalid_argument("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
+        if (veff_T_vals_.empty() || veff_p_vals_.empty() || veff_e_vals_.empty()) { // bag eos
+            std::cout << "Calculating fluid profile using Bag equation of state\n";
+            eos_ = "bag";
+        } else { // veff eos
+            std::cout << "Calculating fluid profile using generic equation of state from Veff\n";
+            eos_ = "veff";
+
+            const auto nT = veff_T_vals_.size();
+            if (veff_p_vals_.size() != nT && veff_e_vals_.size() != nT) {
+                throw std::runtime_error("Temperature, pressure and energy density vectors must have the same size.");
+            }
+
+            // store w(T) vals
+            state_type veff_w_vals_(nT);
+            for (size_t i = 0; i < nT; ++i) {
+                veff_w_vals_[i] = veff_e_vals_[i] + veff_p_vals_[i]; // w=e+p
+            }
+
+            // interpolate T/TN(w/wN) for generic EoS
+            alglib::real_1d_array ToTN_vals, wowN_vals;
+            ToTN_vals.setcontent(nT, veff_T_vals_.data());
+            wowN_vals.setcontent(nT, veff_w_vals_.data());
+
+            alglib::spline1dbuildcubic(ToTN_vals, wowN_vals, ToTN_interp_);
         }
 
         // calculate fluid profiles v(xi), w(xi), la(xi)
         const auto prof = solve_profile(n);
-        // const auto prof = read("../input_profile_def.csv");
 
         xi_vals_ = prof[0];
         v_vals_ = prof[1];
@@ -177,16 +208,12 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         T_vals_ = prof[3];
         la_vals_ = prof[4];
 
-        // build interpolating functions (probably not needed)
-        // if (v_prof_.is_initialised() || w_prof_.is_initialised() || la_prof_.is_initialised()) {
-        //     std::cerr << "Warning: Overwriting existing interpolating functions in FluidProfile." << std::endl;
-        // }
-        // v_prof_.build(xi_vals_, v_vals_);
-        // w_prof_.build(xi_vals_, w_vals_);
-        // la_prof_.build(xi_vals_, la_vals_);
-
         std::cout << "Fluid profile constructed!\n";
     }
+
+// ctor for bag model
+FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t n)
+    : FluidProfile(params, {}, {}, {}, n) {}
 
 // Public functions
 void FluidProfile::write(const std::string& filename) const {
@@ -246,7 +273,7 @@ void FluidProfile::plot(const std::string& filename) const {
     plt::suptitle("vw = " + to_string_with_precision(vw_) + ", alpha = " + to_string_with_precision(alN_));
     plt::save(filename);
 
-    std::cout << "Bubble profile plot saved to '" << filename << "'." << std::endl;
+    std::cout << "Fluid profile plot saved to '" << filename << "'." << std::endl;
 
     return;
 }
@@ -288,23 +315,12 @@ std::vector<state_type> FluidProfile::read(const std::string& filename) const {
     return {xi_vals, v_vals, w_vals, la_vals};
 }
 
-// done
 int FluidProfile::get_mode(double vw, double cmsq, double alN) const {
     const auto vwsq = vw * vw;
 
-    // deflagration
     if (vwsq < cmsq) return 0; // deflagration
     if (vw < vJ_det(alN)) return 1; // hybrid
     return 2; // detonation
-
-    // hybrid
-    // don't understand hybrid condition (copied from Xiao's code)
-    // const auto fac1 = 1.0 - 3.0 * alN + vwsq * (1.0/cmsq + 3.0 * alN);
-    // const auto fac2 = -4.0 * vwsq / cmsq + fac1 * fac1;
-    // if (fac1 < 0.0 || fac2 < 0.0) return 1;
-
-    // // detonation
-    // return 2;
 }
 
 // generic for Veff
@@ -334,7 +350,6 @@ double FluidProfile::calc_vm(double vp, double alp) const { // inverse of vp(vm,
 
 // generic for Veff
 // from matching condition w+*v+*gamma+^2=w-*v-*gamma-^2
-// generic for all EoS and hydrodynamic models using perfect fluid EM tensor
 double FluidProfile::calc_wm(double wp, double vp, double vm) const {
     return wp * abs(vp) * (1.0 - vm * vm) / (abs(vm) * (1.0 - vp * vp));
 }
@@ -346,11 +361,16 @@ double FluidProfile::calc_w1wN(double xi_sh) const { // w1/wN
     return (9.0 * xi_sh_sq - 1.0) / (3.0 * (1.0 - xi_sh_sq));
 }
 
-// bag model only (comes from w=(4/3)*a*T^4)
+// generic for Veff
 // passes in cpsq, cmsq since it is reused to get T1/TN (at shock front) with c1sq=c2sq=cpsq
+// not sure if (1+cpsq)/(1+cmsq) is correct
 double FluidProfile::calc_ToTN(double wmwN, double cpsq, double cmsq) const {
-    const auto fac = wmwN * (1.0 + cpsq) / (1.0 + cmsq);
-    return std::pow(fac, 0.25);
+    if (eos_ == "bag") {
+        // w=(4/3)*a*T^4 -> w/wN = (a/aN) * (T/TN)^4
+        const auto fac = wmwN * (1.0 + cpsq) / (1.0 + cmsq);
+        return std::pow(fac, 0.25);
+    }
+    return alglib::spline1dcalc(ToTN_interp_, wmwN); // call interpolator for generic EoS
 }
 
 // bag model only
@@ -382,6 +402,7 @@ double FluidProfile::xi_shock(double v1UF) const {
     // }
 }
 
+// bag model only
 double FluidProfile::v1UF_from_shock(double xi_sh) const {
     if (xi_sh < std::sqrt(cpsq_) || xi_sh > 1.0) {
         // condition relaxed in if statement since for some vw & alN, xi_shock VERY close to bounds
@@ -395,15 +416,14 @@ double FluidProfile::v1UF_from_shock(double xi_sh) const {
 
 // generic for Veff
 // might need to fix al_min = 0 if numerical precision causes it to be slightly negative
-std::vector<double> FluidProfile::get_alp_minmax(double vw, double cpsq) const {
-    // same as get_alp_wall but using vp, vm
-    const auto cp = std::sqrt(cpsq);
+std::vector<double> FluidProfile::get_alp_minmax(double vw) const {
+    const auto cp = std::sqrt(cpsq_);
 
     const auto vm = std::min(cp, vw); // vw for deflag (vw < cm), cm for hybrid (cp < vw)
     const auto vp_min = 0.0;
     const auto vp_max = vm; // |v+| < |v-|
     
-
+    // same as get_alp_wall but using vp, vm
     auto get_alp = [] (double vp, double vm) {
         return gammaSq(vp) * (vp * vp - vp * vm - vp / (3.0 * vm) + 1.0 / 3.0);
     };
@@ -420,60 +440,7 @@ double FluidProfile::get_alp_wall(double vpUF, double vw) const {
     return gammaSq(vpUF) * vpUF * (2.0 * vw * vpUF + 1.0 - 3.0 * vw * vw) / (3.0 * vw);
 }
 
-// alpha_+ from shock condition
-// i think small numerical errors in vpUF and v1UF add up a lot here (taking exp probably does this)
-// which is why get_alp_wall slightly different to get_alp_shock - best not to use this
-double FluidProfile::get_alp_shock(double vpUF, double v1UF, double alN) const {
-    const auto xi_sh = xi_shock(v1UF);
-    const auto alpha1 = alN * 3.0 * (1.0 - xi_sh * xi_sh) / (9.0 * xi_sh * xi_sh - 1.0);
-    // const auto alpha1 = alN * gammaSq(v1UF) * (3.0 + 5.0 * v1UF - 4.0 * v1UF * std::sqrt(3.0 + v1UF * v1UF)) / 3.0;
-    
-    auto integrand_func = [] (double xi, double v, double cpsq) {
-        return (1.0 / cpsq + 1.0) * gammaSq(v) * mu(xi, v);
-    };
-
-    const int n = 5000;
-    const auto v_vals = linspace(vpUF, v1UF, n);
-    std::vector<double> integrand_vals(n);
-    for (size_t i = 0; i < integrand_vals.size(); i++) {
-        const auto v = v_vals[i];
-        integrand_vals[i] = integrand_func(xi_sh, v, cpsq_);
-    }
-    const auto w1wp_rat = std::exp(simpson_integrate(v_vals, integrand_vals)); // w1/wp
-
-    return w1wp_rat * alpha1;
-}
-
-// unused - too numerically unstable & doesn't always converge
-double FluidProfile::alp_residual_func(double xi_sh, const deriv_func& dydxi) const {
-    // initial conditions
-    const auto xi0 = xi_sh - 0.001;
-    const auto v1UF = v1UF_from_shock(xi_sh);
-    const auto w1wN = calc_w1wN(xi_sh);
-
-    const std::vector<double> y0 = {v1UF, w1wN}; // v0 = v(xi_sh) = v1UF
-
-    // solve fluid EoM to get vpUF
-    // WARNING: choosing num steps too small gives bad result!
-    const auto [xi_sol, y_sol] = rk4_solver(dydxi, xi0, xif_, y0, 10000);
-    const auto vpUF = y_sol.back()[0]; // vpUF = v(xi_w) (endpoint of integration)
-    const auto wpwN = y_sol.back()[1];
-
-    // std::cout << "v1UF=" << v1UF << ", xi_sh=" << xi_sh << ", vpUF = " << vpUF << "\n";
-    
-    // calc alpha_+ from wall & shock constraints
-    const auto alp_wall = get_alp_wall(vpUF, vw_);
-    // const auto alp_shock = get_alp_shock(vpUF, v1UF, alN_);
-    // const auto alp_shock = (w1wN / wpwN) * alN * 3.0 * (1.0 - xi_sh * xi_sh) / (9.0 * xi_sh * xi_sh - 1.0);
-    const auto alp_shock = alN_ / wpwN;
-
-    // std::cout << "alp_wall=" << alp_wall << ", alp_sh=" << alp_shock << ", v1UF=" << v1UF << ", xi_sh=" << xi_sh << ", vpUF = " << vpUF << "\n";
-    
-    // try taking log(alp_wall / alp_shock)? has well defined zero for root and is monotonic
-    return alp_wall - alp_shock;
-    // return std::log(std::abs(alp_wall / alp_shock));
-}
-
+// generic for Veff
 double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi) const {
     // initial conditions
     const auto xi0 = xi_sh - 0.001;
@@ -497,13 +464,19 @@ double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi) co
     return std::log(std::abs(alN_wall / alN_)); // doesn't always work for some vw, alN
 }
 
-
-// generic for Veff
+// bag model only
 double FluidProfile::get_la_behind_wall(double w) const {
-    // la(xi) behind bubble wall (detonations)
+    // la(xi)=(3/4)*(w(xi)/wN - 1 - alN) behind bubble wall (detonations)
     return 0.75 * (w - 1.0 - alN_);
 }
 
+// bag model only
+double FluidProfile::get_la_front_wall(double w) const {
+    // la(xi)=(3/4)*(w(xi)/wN - 1) in front of bubble wall (deflagrations)
+    return 0.75 * (w - 1.0);
+}
+
+// generic for Veff
 double FluidProfile::find_shock(const deriv_func& dydxi) const {
     // Root-finding algorithm for initial condition v0 = v(xi_sh) = v1UF
 
@@ -539,13 +512,12 @@ double FluidProfile::find_shock(const deriv_func& dydxi) const {
     // return find_smallest_root(residual, xi_sh_min, xi_sh_max); // very slow
 }
 
-// generic for Veff
-double FluidProfile::get_la_front_wall(double w) const {
-    // la(xi) in front of bubble wall (deflagrations)
-    return 0.75 * (w - 1.0);
-}
-
 std::vector<state_type> FluidProfile::solve_profile(int n) {
+    // check valid hydrodynamic mode
+    if (!(mode_ == 0 || mode_ == 1 || mode_ == 2)) {
+            throw std::invalid_argument("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
+    }
+
     std::cout << "Solving fluid profile for hydrodynamic mode=";
     if (mode_ == 0) {
         std::cout << "deflagration";
@@ -670,11 +642,11 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
             la_end_val = la_sol_tmp.back();
         }
 
-        std::cout << "v_start=" << v_sol_tmp.front() << ", v_end=" << v_sol_tmp.back() << "\n";
-        std::cout << "w_start=" << w_sol_tmp.front() << ", w_end=" << w_sol_tmp.back() << "\n";
-        std::cout << "T_start=" << T_sol_tmp.front() << ", T_end=" << T_sol_tmp.back() << "\n";
-        std::cout << "la_start=" << la_sol_tmp.front() << ", la_end=" << la_sol_tmp.back() << "\n";
-        
+        // std::cout << "v_start=" << v_sol_tmp.front() << ", v_end=" << v_sol_tmp.back() << "\n";
+        // std::cout << "w_start=" << w_sol_tmp.front() << ", w_end=" << w_sol_tmp.back() << "\n";
+        // std::cout << "T_start=" << T_sol_tmp.front() << ", T_end=" << T_sol_tmp.back() << "\n";
+        // std::cout << "la_start=" << la_sol_tmp.front() << ", la_end=" << la_sol_tmp.back() << "\n";
+
     } else { // detonation
         // cm < xi < xi_w
         xi0_ = vw_ - dlt;
@@ -719,10 +691,10 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
 
-        std::cout << "v_start=" << v_sol_tmp.front() << ", v_end=" << v_sol_tmp.back() << "\n";
-        std::cout << "w_start=" << w_sol_tmp.front() << ", w_end=" << w_sol_tmp.back() << "\n";
-        std::cout << "T_start=" << T_sol_tmp.front() << ", T_end=" << T_sol_tmp.back() << "\n";
-        std::cout << "la_start=" << la_sol_tmp.front() << ", la_end=" << la_sol_tmp.back() << "\n";
+        // std::cout << "v_start=" << v_sol_tmp.front() << ", v_end=" << v_sol_tmp.back() << "\n";
+        // std::cout << "w_start=" << w_sol_tmp.front() << ", w_end=" << w_sol_tmp.back() << "\n";
+        // std::cout << "T_start=" << T_sol_tmp.front() << ", T_end=" << T_sol_tmp.back() << "\n";
+        // std::cout << "la_start=" << la_sol_tmp.front() << ", la_end=" << la_sol_tmp.back() << "\n";
     }
     
 

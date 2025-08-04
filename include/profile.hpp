@@ -5,6 +5,9 @@
 #include <vector>
 #include <string>
 
+#include "ap.h"
+#include "interpolation.h"
+
 #include "maths_ops.hpp"
 #include "phasetransition.hpp"
 
@@ -13,6 +16,8 @@ TO DO:
 - move generate_stream_plot() elsewhere? independent of initial conditions so the same for all instances of FluidProfile
 - add some safety thing for private vals and prof in FluidProfile to stop them from changing (helper static function to precompute in initialiser list)
 - add dflt ctor for FluidProfile that just uses dflt ctor for PTParams
+- add error handling if P(T) or e(T) called using FluidProfile ctor for Bag model
+- calculate cpsq, cmsq internally in FluidProfile (rather than as input) when passing in p(T) and e(T) to avoid wrong input
 */
 
 namespace Hydrodynamics {
@@ -66,11 +71,13 @@ using state_type = std::vector<double>;
  */
 class FluidProfile {
   public:
+    FluidProfile(const PhaseTransition::PTParams& params, const state_type& T_vals, const state_type& pres_vals, const state_type& edens_vals, const size_t n=5000);
     FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000); // ctor
     // write dflt ctor?
 
     // are these needed?
     PhaseTransition::PTParams params() const { return params_; }; // PT parameters
+    std::string eos() const { return eos_; }; // Equation of state (bag or veff)
 
     double xi0() const { return xi0_; };
     double xif() const { return xif_; };
@@ -88,6 +95,8 @@ class FluidProfile {
     #endif
 
   private:
+    std::string eos_; // bag or veff
+
     const PhaseTransition::PTParams params_; // local copy of PT parameters
     const double cpsq_, cmsq_, vw_, alN_;
     double alp_min_, alp_max_;
@@ -95,10 +104,10 @@ class FluidProfile {
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
     double xi0_, xif_; // initial/final xi
     std::vector<double> y0_; // initial conditions {v0, w0}
-    
-    // double vp_, vm_, v1_, v2_;
-    // double vpUF_, vmUF_, v1UF_, v2UF_;
-    // double wp_, wm_, w1_, w2_;
+
+    // Veff stuff
+    const state_type veff_T_vals_, veff_p_vals_, veff_e_vals_, veff_w_vals_; // T, P(T), e(T) for fluid profile using generic EoS
+    alglib::spline1dinterpolant ToTN_interp_;
     
     state_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
@@ -113,11 +122,9 @@ class FluidProfile {
 
     double xi_shock(double v1UF) const; // position of shock front
     double v1UF_from_shock(double xi_sh) const;
-    std::vector<double> get_alp_minmax(double vw, double cpsq) const;
+    std::vector<double> get_alp_minmax(double vw) const;
     double get_alp_wall(double vpUF, double vw) const;
-    double get_alp_shock(double vpUF, double v1UF, double alphaN) const;
 
-    double alp_residual_func(double xi_sh, const deriv_func& dydxi) const;
     double alN_residual_func(double xi_sh, const deriv_func& dydxi) const;
 
     double get_la_behind_wall(double w) const;
