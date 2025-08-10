@@ -24,14 +24,10 @@ int main(int argc, char* argv[]) {
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
     Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
 
-    std::string path = "gw_spectrum_" + std::to_string(betaH) + "_" + std::to_string(dtauH);
-    OmegaGW.write(path + ".csv");
-    OmegaGW.plot(path + ".png");
-
-    // OmegaGW.write("gw_spectrum.csv");
+    OmegaGW.write("gw_spectrum.csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    // OmegaGW.plot("gw_spectrum.png");
+    OmegaGW.plot("gw_spectrum.png");
     #endif
 
     return 0;
