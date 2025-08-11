@@ -71,7 +71,7 @@ using state_type = std::vector<double>;
  */
 class FluidProfile {
   public:
-    FluidProfile(const PhaseTransition::PTParams& params, const state_type& T_vals, const state_type& pres_vals, const state_type& edens_vals, const size_t n=5000);
+    FluidProfile(const PhaseTransition::PTParams& params, const state_type& veff_T_vals, const state_type& veff_p_vals, const state_type& veff_e_vals, const size_t n=5000);
     FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000); // ctor
     // write dflt ctor?
 
@@ -94,6 +94,8 @@ class FluidProfile {
     void plot(const std::string& filename = "bubble_prof.png") const; // Plots bubble profiles
     #endif
 
+    state_type get_csq() const;
+
   private:
     std::string eos_; // bag or veff
 
@@ -107,7 +109,10 @@ class FluidProfile {
 
     // Veff stuff
     const state_type veff_T_vals_, veff_p_vals_, veff_e_vals_, veff_w_vals_; // T, P(T), e(T) for fluid profile using generic EoS
-    alglib::spline1dinterpolant ToTN_interp_;
+    alglib::spline1dinterpolant veff_p_interp_, veff_e_interp_, veff_w_interp_; // e(T), w(T) interpolating functions
+    double TN_, pN_, eN_, wN_; // thermo quantities at nucleation temp T=TN
+    
+    alglib::spline1dinterpolant ToTN_interp_; // T/TN as a function of w/wN
     
     state_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
@@ -131,8 +136,13 @@ class FluidProfile {
     double get_la_front_wall(double w) const;
 
     double find_shock(const deriv_func& dydxi) const;
+
+    // double matching_residual(double vp, double pp, double ep, double TmTN) const;
+    // std::vector<double> get_IC_detonation(double vp, double TpTN) const;
+
     // put number of integration points in input file? seems bad to hardcode
     std::vector<state_type> solve_profile(int n=100);
+    // std::vector<state_type> solve_profile_veff(int n=100);
     // state_type calc_lambda_vals(state_type w_vals) const;
 
     // testing purposes ONLY
