@@ -95,10 +95,10 @@ PTParams::PTParams(double vw, double alN, double betaH, double dtauH, double wNe
       auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
       const auto Hs_conformal = universe_.Hs() * asa0_rat;
 
-      beta_ = betaH_ * Hs_conformal;
-      dtau_ = dtauH_ / Hs_conformal;
+      beta_ = betaH_;
+      dtau_ = dtauH_;
 
-      tau_s_ = 1.0 / Hs_conformal;
+      tau_s_ = 1.0;
       tau_fin_ = tau_s_ + dtau_;
 
       // check valid bubble nucleation type
@@ -129,7 +129,6 @@ PTParams::PTParams(double vw, double alN, double betaH, double dtauH, double wNe
       }
 
       Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
-      std::cout << "Rs = " << Rs_ << "\n";
     }
 
 std::ostream& operator<<(std::ostream& os, const PTParams& params) {
@@ -137,15 +136,13 @@ std::ostream& operator<<(std::ostream& os, const PTParams& params) {
        << std::left
       //  << std::setw(35) << "Equation of state:" << params.model_ << "\n"
        << std::setw(35) << "Nucleation type:" << params.nuc_type_ << "\n"
-       << std::setw(35) << "Wall velocity:" << "vw=" << params.vw_ << "\n"
-       << std::setw(35) << "PT strength parameter:" << "alN=" << params.alN_ << "\n"
-       << std::setw(35) << "Normalised transition rate:" << "beta/H=" << params.betaH_ << "\n"
-       << std::setw(35) << "Transition rate parameter:" << "beta=" << params.beta_ << "\n"
-       << std::setw(35) << "PT duration (normalised):" << "dtauH=" << params.dtauH_ << "\n"
-       << std::setw(35) << "PT duration:" << "dtau=" << params.dtau_ << "\n"
-       << std::setw(35) << "Speed of sound (broken phase):" << "cpsq=" << params.cpsq_ << "\n"
-       << std::setw(35) << "Speed of sound (old phase):" << "cmsq=" << params.cmsq_ << "\n"
-       << std::setw(35) << "Mean bubble separation:" << "Rs=" << params.Rs_ << "\n"
+       << std::setw(35) << "Wall velocity:" << "vw = " << params.vw_ << "\n"
+       << std::setw(35) << "PT strength parameter:" << "alN = " << params.alN_ << "\n"
+       << std::setw(35) << "Normalised transition rate:" << "beta/H = " << params.betaH_ << "\n"
+       << std::setw(35) << "PT duration (normalised):" << "dtauH = " << params.dtauH_ << "\n"
+       << std::setw(35) << "Speed of sound (broken phase):" << "cpsq = " << params.cpsq_ << "\n"
+       << std::setw(35) << "Speed of sound (old phase):" << "cmsq = " << params.cmsq_ << "\n"
+       << std::setw(35) << "Mean bubble separation:" << "RH = " << params.Rs_ << "\n"
        << "*************************************************\n";
        
     return os;
