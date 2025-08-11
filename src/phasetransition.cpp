@@ -61,9 +61,9 @@ const Universe& default_universe() {
 // make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
-    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::wNeN_rat, dflt_PTParams::nuc_type, default_universe()) {}
+    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::TN, dflt_PTParams::wNeN_rat, dflt_PTParams::nuc_type, default_universe()) {}
 
-PTParams::PTParams(double vw, double alN, double beta, double dtau, double wNeN_rat, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, double wNeN_rat, const char* nuc_type, const Universe& un)
     : universe_(un),
       eos_model_(),
       nuc_type_(),
@@ -74,6 +74,7 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double wNeN_
       tau_s_(),
       tau_fin_(),
       dtau_(dtau),
+      TN_(TN),
       wNeN_rat_(wNeN_rat),
       cpsq_(),
       cmsq_()
@@ -103,6 +104,10 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double wNeN_
         dtau_ = std::abs(dtau);
       } else if (dtau == 0.0) {
         throw std::invalid_argument("Unphysical PT duration passed into PTParams. Must have dtau > 0.");
+      }
+
+      if (TN <= 0.0) {
+        throw std::invalid_argument("Unphysical nucleation temperature passed into PTParams. Must have TN > 0.");
       }
 
       const auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();

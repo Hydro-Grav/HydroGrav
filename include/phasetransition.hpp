@@ -76,6 +76,7 @@ struct dflt_PTParams {
   static constexpr double beta = 1.0;            // Transition rate param
   // static constexpr double betaH = 100.0;            // Transition rate param
   static constexpr double dtau = 10.0;            // PT duration
+  static constexpr double TN = 1.0;      // Nucleation temperature
   static constexpr double wNeN_rat = 1.0 + 1./3.;       // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
@@ -100,7 +101,7 @@ units:
   public:
     // ctors
     PTParams();
-    PTParams(double vw, double alN, double beta, double dtau, double wNeN_rat, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double beta, double dtau, double TN, double wNeN_rat, const char* nuc_type, const Universe& un);
 
     Universe un() const { return universe_; } // universe parameters
 
@@ -113,9 +114,12 @@ units:
     double tau_s() const { return tau_s_; } // start time of PT
     double tau_fin() const { return tau_fin_; } // end time of PT
     double dtau() const { return dtau_; } // PT duration
-    double wNeN_rat() const { return wNeN_rat_; } // ratio of enthalpy to energy density (wN/eN)
+    double TN() const { return TN_; } // nucleation temperature
 
+    // unused?
+    double wNeN_rat() const { return wNeN_rat_; } // ratio of enthalpy to energy density (wN/eN)
     const std::string eos_model() const { return eos_model_; } // equation of state model (bag or Veff)
+
     const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
 
     // print params
@@ -126,7 +130,7 @@ units:
       const Universe universe_;
       std::string eos_model_; // equation of state model (bag or Veff)
       const char *nuc_type_;
-      double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, wNeN_rat_, cpsq_, cmsq_;
+      double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, TN_, wNeN_rat_, cpsq_, cmsq_;
 
       bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
       bool is_valid_csq(double csq) const;
