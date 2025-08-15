@@ -71,7 +71,7 @@ using state_type = std::vector<double>;
  */
 class FluidProfile {
   public:
-    FluidProfile(const PhaseTransition::PTParams& params, const state_type& veff_T_vals, const state_type& veff_p_vals, const state_type& veff_e_vals, const size_t n=5000);
+    FluidProfile(const PhaseTransition::PTParams& params, const state_type& veff_T_vals, const state_type& veff_ps_vals, const state_type& veff_pb_vals, const state_type& veff_es_vals, const state_type& veff_eb_vals, const size_t n=5000);
     FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000); // ctor
     // write dflt ctor?
 
@@ -87,6 +87,7 @@ class FluidProfile {
     state_type v_vals() const { return v_vals_; }; // v(xi)
     state_type w_vals() const { return w_vals_; }; // w(xi)
     state_type la_vals() const { return la_vals_; }; // la(xi)
+    state_type T_vals() const { return T_vals_; }
 
     void write(const std::string& filename = "bubble_prof.csv") const; // write bubble profile to disk
     
@@ -108,9 +109,9 @@ class FluidProfile {
     std::vector<double> y0_; // initial conditions {v0, w0}
 
     // Veff stuff
-    const state_type veff_T_vals_, veff_p_vals_, veff_e_vals_, veff_w_vals_; // T, P(T), e(T) for fluid profile using generic EoS
-    alglib::spline1dinterpolant veff_p_interp_, veff_e_interp_, veff_w_interp_; // e(T), w(T) interpolating functions
-    double TN_, pN_, eN_, wN_; // thermo quantities at nucleation temp T=TN
+    state_type veff_TTN_vals_;
+    const state_type veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_; // T, P(T), e(T) for fluid profile using generic EoS
+    alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_;
     
     alglib::spline1dinterpolant ToTN_interp_; // T/TN as a function of w/wN
     
@@ -137,8 +138,8 @@ class FluidProfile {
 
     double find_shock(const deriv_func& dydxi) const;
 
-    // double matching_residual(double vp, double pp, double ep, double TmTN) const;
-    // std::vector<double> get_IC_detonation(double vp, double TpTN) const;
+    double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
+    std::vector<double> get_IC_detonation_veff(double vp, double TpTN) const;
 
     // put number of integration points in input file? seems bad to hardcode
     std::vector<state_type> solve_profile(int n=100);
@@ -147,7 +148,6 @@ class FluidProfile {
 
     // testing purposes ONLY
     std::vector<state_type> read(const std::string& filename) const; // read bubble profile from disk
-
 };
 
 } // namespace Hydrodynamics
