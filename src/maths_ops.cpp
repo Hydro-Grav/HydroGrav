@@ -563,6 +563,96 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
     throw std::runtime_error("Bisection method did not converge.");
 }
 
+double root_finder2(const std::function<double(double)> &f, double x0, double tol, int max_iter, double h) {
+    double x = x0;
+    double fx = f(x);
+
+    for (int iter = 0; iter < max_iter; ++iter) {
+        if (std::fabs(fx) < tol) {
+            return x; // converged
+        }
+
+        // Numerical derivative (Jacobian in 1D)
+        double dfx = (f(x + h) - f(x - h)) / (2 * h);
+
+        if (std::fabs(dfx) < 1e-14) {
+            throw std::runtime_error("Derivative too small — cannot continue.");
+        }
+
+        // Newton step
+        double step = -fx / dfx;
+        double x_new = x + step;
+        double fx_new = f(x_new);
+
+        // Safeguard: if Newton step fails to improve, fall back to secant-like step
+        if (std::fabs(fx_new) > std::fabs(fx)) {
+            // fallback: small step in opposite direction
+            x_new = x - (step * 0.5);
+            fx_new = f(x_new);
+        }
+
+        x = x_new;
+        fx = fx_new;
+    }
+
+    throw std::runtime_error("fsolve_like did not converge within max_iter.");
+}
+
+std::vector<double> newton_solve(const std::function<std::vector<double>(std::vector<double>)>& F, std::vector<double> x0, double tol, int max_iter, double h) {
+    if (x0.size() != 2)
+        throw std::invalid_argument("newton_solve_fd requires exactly 2 variables.");
+
+    auto numerical_jacobian = [&](const std::vector<double> &x) {
+        std::vector<std::vector<double>> J(2, std::vector<double>(2));
+        auto f0 = F(x);
+        if (f0.size() != 2)
+            throw std::invalid_argument("Function F must return exactly 2 values.");
+
+        for (int j = 0; j < 2; ++j) {
+            auto xh = x;
+            xh[j] += h;
+            auto fh = F(xh);
+            for (int i = 0; i < 2; ++i) {
+                J[i][j] = (fh[i] - f0[i]) / h;
+            }
+        }
+        return J;
+    };
+
+    auto solve_linear_2x2 = [](const std::vector<std::vector<double>> &A,
+                               const std::vector<double> &b) {
+        double det = A[0][0]*A[1][1] - A[0][1]*A[1][0];
+        if (std::fabs(det) < 1e-14)
+            throw std::runtime_error("Jacobian is singular!");
+        std::vector<double> x(2);
+        x[0] = (b[0]*A[1][1] - b[1]*A[0][1]) / det;
+        x[1] = (A[0][0]*b[1] - A[1][0]*b[0]) / det;
+        return x;
+    };
+
+    for (int iter = 0; iter < max_iter; ++iter) {
+        auto fx = F(x0);
+        if (fx.size() != 2)
+            throw std::invalid_argument("Function F must return exactly 2 values.");
+
+        double norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
+        if (norm < tol) return x0;
+
+        auto J = numerical_jacobian(x0);
+
+        std::vector<double> minus_fx = { -fx[0], -fx[1] };
+        auto dx = solve_linear_2x2(J, minus_fx);
+
+        x0[0] += dx[0];
+        x0[1] += dx[1];
+
+        if (std::sqrt(dx[0]*dx[0] + dx[1]*dx[1]) < tol)
+            return x0;
+    }
+
+    throw std::runtime_error("Did not converge");
+}
+
 std::vector<std::pair<double, double>> find_brackets(const std::function<double(double)>& f, double a, double b, int N) {
     std::vector<std::pair<double, double>> brackets;
     double dx = (b - a) / N;

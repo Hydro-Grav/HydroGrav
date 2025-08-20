@@ -210,6 +210,16 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const state_
                 veff_TTN_vals_.push_back(veff_T_vals[i] * TN_inv);
             }
 
+            plt::figure_size(800, 800);
+            plt::plot(veff_TTN_vals_, veff_eb_vals, "r-");
+            plt::plot(veff_TTN_vals_, veff_es_vals, "b-");
+            plt::xlabel("T");
+            plt::ylabel("e(T)");
+            plt::xlim(1.0, 1.2);
+            plt::ylim(0.0, 0.6e+9);
+            plt::grid(true);
+            plt::save("veff_e.png");
+
             // store w(T) vals
             // state_type veff_w_vals_(nT);
             // for (size_t i = 0; i < nT; ++i) {
@@ -517,6 +527,57 @@ double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi) co
     return std::log(std::abs(alN_wall / alN_)); // doesn't always work for some vw, alN
 }
 
+double FluidProfile::veff_residual_func(double xi_sh, const deriv_func& dydxi) const {
+    const auto v2 = -xi_sh;
+    // const auto w2wN = 1.0;
+    const auto T2TN = 1.0;
+
+    const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN); // p and e in front of shock
+    const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
+
+    std::cout << "test1\n";
+
+    // solve for v1, T1/TN
+    std::function<std::vector<double>(std::vector<double>)> matching_helper = [this, v2, p2, e2] (std::vector<double> y0) {
+        return matching_eqs_veff(p2, e2, v2, y0[0], y0[1]); // y0 = {v1, T1TN}
+    };
+
+    // y0 = {v1, T1TN}
+    // Tm/TN called out of bounds for some choices of xi_sh -> could short circuit in this case?
+    const auto y0 = newton_solve(matching_helper, {v2, T2TN}); // initial guess v2, T2TN
+
+    std::cout << "test2\n";
+
+    // solve EoM to get vp, Tp/TN
+    const auto xi0 = xi_sh - 0.001;
+    const auto [xi_sol, y_sol] = rk4_solver(dydxi, xi0, xif_, y0, 10000);
+
+    const auto vpUF = y_sol.back()[0]; // vpUF = v(xi_w) (endpoint of integration)
+    const auto vp = mu(vw_, vpUF);
+    const auto TpTN = y_sol.back()[1];
+
+    std::cout << "test3\n";
+
+    // calc vm, Tm/TN from matching condition at wall
+    const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN);
+    const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
+
+    std::cout << "test4\n";
+
+    std::function<std::vector<double>(std::vector<double>)> matching_helper2 = [this, vp, pp, ep] (std::vector<double> y0) {
+        return matching_eqs_veff(pp, ep, vp, y0[0], y0[1]); // y0 = {v1, T1TN}
+    };
+
+    
+    const auto sol = newton_solve(matching_helper2, {vp, TpTN}); // initial guess vp, TpTN
+    const auto vm = sol[0];
+    const auto TmTN = sol[1];
+
+    std::cout << "test5\n";
+
+    return vm - vw_;
+}
+
 // bag model only
 double FluidProfile::get_la_behind_wall(double w) const {
     // la(xi)=(3/4)*(w(xi)/wN - 1 - alN) behind bubble wall (detonations)
@@ -546,14 +607,21 @@ double FluidProfile::get_la_front_wall(double w) const {
 // }
 
 
-// generic for Veff
 double FluidProfile::find_shock(const deriv_func& dydxi) const {
     // Root-finding algorithm for initial condition v0 = v(xi_sh) = v1UF
 
-    // residual function f(xi_sh) = alN_calc - alN_actual
-    std::function<double(double)> residual = [this, &dydxi] (double xi_sh) {
-        return alN_residual_func(xi_sh, dydxi);
-    };
+    std::function<double(double)> residual;
+    if (eos_ == "bag") {
+        // f(xi_sh) = alN_calc - alN_actual
+        residual = [this, &dydxi] (double xi_sh) {
+            return alN_residual_func(xi_sh, dydxi);
+        };
+    } else if (eos_ == "veff") {
+        residual = [this, &dydxi] (double xi_sh) {
+            return veff_residual_func(xi_sh, dydxi);
+        };
+    }
+
 
     // cp < xi_sh < 1 (shock must be supersonic and less than speed of light)
     const double xi_sh_min = std::max(std::sqrt(cpsq_), vw_); // xi_sh > cp > xi_w (deflag), xi_sh > xi_w > cp (hybrid)
@@ -579,9 +647,9 @@ double FluidProfile::find_shock(const deriv_func& dydxi) const {
     // plt::save("../residual.png");
 
     return root_finder(residual, xi_sh_min, xi_sh_max, 1e-7, 100);
-    // return find_smallest_root(residual, xi_sh_min, xi_sh_max); // very slow
 }
 
+// unused
 double FluidProfile::matching_residual_veff(double vp, double pp, double ep, double TmTN) const {    
     if (TmTN < veff_TTN_vals_.front() || TmTN > veff_TTN_vals_.back()) {
         throw std::out_of_range("Tm/TN is called out of bounds for spline!");
@@ -592,8 +660,24 @@ double FluidProfile::matching_residual_veff(double vp, double pp, double ep, dou
 
     const auto fac1 = (pm - pp) / (vp * (em - ep));
     const auto fac2 = vp * (ep + pm) / (em + pp);
-    return fac1 - fac2;
-    // return std::log(std::abs(fac1 / fac2));
+
+    return std::log(std::abs(fac1 / fac2));
+}
+
+// this one doesn't have any poles so converges to correct root properly
+std::vector<double> FluidProfile::matching_eqs_veff(double pp, double ep, double vp, double vm, double TmTN) const {    
+    if (TmTN < veff_TTN_vals_.front() || TmTN > veff_TTN_vals_.back()) {
+        std::cout << "Tm/TN= " << TmTN << "\n";
+        throw std::out_of_range("Tm/TN is called out of bounds for spline!");
+    }
+
+    const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN); // p_-, e_-
+    const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
+
+    const auto eq1 = vp * vm * (em - ep) - (pm - pp);
+    const auto eq2 = vm * (em + pp) - vp * (ep + pm);
+
+    return {eq1, eq2};
 }
 
 std::vector<double> FluidProfile::get_IC_detonation_veff(double vp, double TpTN) const {
@@ -601,58 +685,20 @@ std::vector<double> FluidProfile::get_IC_detonation_veff(double vp, double TpTN)
     //      vp * vm = (pm - pp) / (em - ep)
     //      vp / vm = (em + pp) / (ep + pm)
 
-    // use root-finder to get Tm/TN
     if (TpTN < veff_TTN_vals_.front() || TpTN > veff_TTN_vals_.back()) {
         throw std::out_of_range("Tp/TN is called out of bounds for spline");
     }
     const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN); // p_+, e_+
     const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
 
-    std::function<double(double)> residual = [this, vp, pp, ep] (double TmTN) {
-        return matching_residual_veff(vp, pp, ep, TmTN);
+    std::function<std::vector<double>(std::vector<double>)> matching_helper = [this, vp, pp, ep] (std::vector<double> y0) {
+        return matching_eqs_veff(pp, ep, vp, y0[0], y0[1]); // y0 = {vm, TmTN}
     };
-
-    const auto TmTN_min = veff_TTN_vals_.front();
-    const auto TmTN_max = veff_TTN_vals_.back();
-    // const auto TmTN_min = 1.05; // tmp
-    // const auto TmTN_max = 1.2;
-
-    /* testing residual */
-    const auto TmTN_vals = linspace(TmTN_min, TmTN_max, 500);
-    std::vector<double> res_vals;
-    for (int i = 0; i < TmTN_vals.size(); i++) {
-        const auto val = residual(TmTN_vals[i]);
-        res_vals.push_back(val);
-        // if (val < 0.0) {
-        //     std::cout << "res<0 for xi_sh[" << i << "]=" << xi_sh_vals[i] << "\n";
-        // }
-    }
-
-    plt::figure_size(800, 600);
-    plt::plot(TmTN_vals, res_vals, "k-");
-    plt::ylim(-10, 10);
-    plt::grid(true);
-    plt::save("residual.png");
-    /********************/
     
-    // solve for TmTN that minimises residual
-    const auto TmTN = root_finder(residual, TmTN_min, TmTN_max, 1e-7, 100);
+    // solve matching eqs
+    const auto sol = newton_solve(matching_helper, {vp, TpTN}); // initial guess vp, TpTN
 
-    // calculate vm
-    const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN); // p_-, e_-
-    const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
-
-    std::cout << "pp=" << pp << ", ep=" << ep << "\n";
-    std::cout << "pm=" << pm << ", em=" << em << "\n";
-
-    const auto vm1 = vp * (ep + pm) / (em + pp);
-    const auto vm2 = (pm - pp) / (vp * (em - ep));
-    std::cout << "vm1=" << vm1 << ", vm2=" << vm2 << "\n";
-
-    const auto vm = vp * (ep + pm) / (em + pp);
-    // vm = (pm - pp) / (vp * (em - ep));
-
-    return {vm, TmTN}; // vm, Tm/TN
+    return {sol[0], sol[1]}; // {vm, Tm/TN}
 }
 
 std::vector<state_type> FluidProfile::solve_profile(int n) {
@@ -672,14 +718,25 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     std::cout << "\n";
 
     // wrapper for hydrodynamic EoM - move into struct?
-    auto dydxi = [this](double xi, const state_type& y) -> state_type {
-        const auto v = y[0];
-        const auto w = y[1];
-        const auto T = y[2];
-        const auto csq = (xi < vw_) ? cmsq_ : cpsq_; // change to csq(T) when implemented
+    std::function<state_type(double, const state_type&)> dydxi;
+    if (eos_ == "bag") {
+        dydxi = [this] (double xi, const state_type& y) -> state_type {
+            const auto v = y[0];
+            const auto w = y[1];
+            const auto T = y[2];
+            const auto csq = (xi < vw_) ? cmsq_ : cpsq_; // change to csq(T) when implemented
 
-        return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq), dTdxi(xi, v, T, csq) };
-    };
+            return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq), dTdxi(xi, v, T, csq) };
+        };
+    } else if (eos_ == "veff") {
+        dydxi = [this] (double xi, const state_type& y) -> state_type {
+            const auto v = y[0];
+            const auto T = y[1];
+            const auto csq = (xi < vw_) ? cmsq_ : cpsq_; // change to csq(T) when implemented
+
+            return { dvdxi(xi, v, csq), dTdxi(xi, v, T, csq) };
+        };
+    }
 
     const auto dlt = 0.001; // wall and shocks are discontinuities so start integration just before them
     std::vector<state_type> y_sol_tmp;
@@ -811,13 +868,23 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
             vm = calc_vm(vp, alp);
             wmwN = calc_wm(wpwN, vp, vm);
             TmTN = calc_ToTN(wmwN, cpsq_, cmsq_);
-            // TmTN = 1.0;
         } else {
             const auto ics = get_IC_detonation_veff(vp, TpTN);
             vm = ics[0];
             TmTN = ics[1];
             // wmwN = 1.45995;
             wmwN = calc_wm(wpwN, vp, vm);
+        }
+
+        // do better error handling later
+        if (vm >= vw_) {
+            throw std::invalid_argument("vm must be < vw for detonation");
+        }
+        if (wmwN <= wpwN) {
+            throw std::invalid_argument("wm/wN must be > wp/wN for detonation");
+        }
+        if (TmTN <= TpTN) {
+            throw std::invalid_argument("Tm/TN must be > Tp/TN for detonation");
         }
 
         const auto vmUF = mu(vw_, abs(vm));

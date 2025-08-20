@@ -132,6 +132,7 @@ class FluidProfile {
     double get_alp_wall(double vpUF, double vw) const;
 
     double alN_residual_func(double xi_sh, const deriv_func& dydxi) const;
+    double veff_residual_func(double xi_sh, const deriv_func& dydxi) const;
 
     double get_la_behind_wall(double w) const;
     double get_la_front_wall(double w) const;
@@ -139,6 +140,8 @@ class FluidProfile {
     double find_shock(const deriv_func& dydxi) const;
 
     double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
+    std::vector<double> matching_eqs_veff(double pp, double ep, double vp, double vm, double TmTN) const;
+
     std::vector<double> get_IC_detonation_veff(double vp, double TpTN) const;
 
     // put number of integration points in input file? seems bad to hardcode

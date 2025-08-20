@@ -60,7 +60,10 @@ void test_FluidProfile_params() {
 
 // Fluid profile
 void example_FluidProfie(const std::string& filename) {
-    const auto vw = 0.9;
+    // const auto vw = 0.9; // detonation
+    const auto vw = 0.4; // deflagration
+    // const auto vw = 0.6; // hybrid
+
     const auto alN = 0.11384915003991744;
     const auto beta = PhaseTransition::dflt_PTParams::beta;
     const auto dtau = PhaseTransition::dflt_PTParams::dtau;
@@ -120,7 +123,7 @@ void example_FluidProfie(const std::string& filename) {
     const auto T_veff = profile_veff.T_vals();
     const auto la_veff = profile_veff.la_vals();
 
-    plt::figure_size(2400, 600);
+    plt::figure_size(2400, 800);
 
     // v(xi)
     plt::subplot2grid(2, 2, 0, 0);
