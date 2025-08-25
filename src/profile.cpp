@@ -210,35 +210,30 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const state_
                 veff_TTN_vals_.push_back(veff_T_vals[i] * TN_inv);
             }
 
-            plt::figure_size(800, 800);
-            plt::plot(veff_TTN_vals_, veff_eb_vals, "r-");
-            plt::plot(veff_TTN_vals_, veff_es_vals, "b-");
-            plt::xlabel("T");
-            plt::ylabel("e(T)");
-            plt::xlim(1.0, 1.2);
-            plt::ylim(0.0, 0.6e+9);
-            plt::grid(true);
-            plt::save("veff_e.png");
-
-            // store w(T) vals
-            // state_type veff_w_vals_(nT);
-            // for (size_t i = 0; i < nT; ++i) {
-            //     veff_w_vals_[i] = veff_e_vals_[i] + veff_p_vals_[i]; // w=e+p
-            // }
+            // store w(T/TN) vals
+            state_type veff_ws_vals_(nT), veff_wb_vals_(nT);
+            for (size_t i = 0; i < nT; ++i) {
+                veff_ws_vals_[i] = veff_es_vals_[i] + veff_ps_vals_[i]; // w=e+p
+                veff_wb_vals_[i] = veff_eb_vals_[i] + veff_pb_vals_[i];
+            }
 
             // construct interpolating functions p(T/TN), e(T/TN) in s/b phases
-            alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_pb_array, veff_eb_array;
+            alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_ws_array, veff_pb_array, veff_eb_array, veff_wb_array;
             veff_TTN_array.setcontent(nT, veff_TTN_vals_.data());
 
             veff_ps_array.setcontent(nT, veff_ps_vals_.data()); // symmetric phase
             veff_es_array.setcontent(nT, veff_es_vals_.data());
+            veff_ws_array.setcontent(nT, veff_ws_vals_.data());
             alglib::spline1dbuildcubic(veff_TTN_array, veff_ps_array, veff_ps_interp_);
             alglib::spline1dbuildcubic(veff_TTN_array, veff_es_array, veff_es_interp_);
+            alglib::spline1dbuildcubic(veff_TTN_array, veff_ws_array, veff_ws_interp_);
 
             veff_pb_array.setcontent(nT, veff_pb_vals_.data()); // broken phase
             veff_eb_array.setcontent(nT, veff_eb_vals_.data());
+            veff_wb_array.setcontent(nT, veff_wb_vals_.data());
             alglib::spline1dbuildcubic(veff_TTN_array, veff_pb_array, veff_pb_interp_);
             alglib::spline1dbuildcubic(veff_TTN_array, veff_eb_array, veff_eb_interp_);
+            alglib::spline1dbuildcubic(veff_TTN_array, veff_wb_array, veff_wb_interp_);
         }
 
         // calculate fluid profiles v(xi), w(xi), la(xi)
@@ -276,7 +271,7 @@ void FluidProfile::write(const std::string& filename) const {
 
 #ifdef ENABLE_MATPLOTLIB
 void FluidProfile::plot(const std::string& filename) const {
-    plt::figure_size(2400, 600);
+    plt::figure_size(2400, 800);
 
     // v(xi)
     plt::subplot2grid(2, 2, 0, 0);
@@ -314,6 +309,53 @@ void FluidProfile::plot(const std::string& filename) const {
     plt::save(filename);
 
     std::cout << "Fluid profile plot saved to '" << filename << "'." << std::endl;
+
+    return;
+}
+
+void FluidProfile::plot_thermo(const std::string& filename) const {
+    if (eos_ != "veff")
+        throw std::runtime_error("plot_thermo can only be called when using Veff");
+
+    plt::figure_size(2400, 1600);
+
+    plt::subplot2grid(3, 2, 0, 0);
+    plt::plot(veff_TTN_vals_, veff_es_vals_);
+    plt::xlabel("T/TN");
+    plt::ylabel("es(T/TN)");
+    plt::grid(true);
+
+    plt::subplot2grid(3, 2, 0, 1);
+    plt::plot(veff_TTN_vals_, veff_eb_vals_);
+    plt::xlabel("T/TN");
+    plt::ylabel("eb(T/TN)");
+    plt::grid(true);
+
+    plt::subplot2grid(3, 2, 1, 0);
+    plt::plot(veff_TTN_vals_, veff_ps_vals_);
+    plt::xlabel("T/TN");
+    plt::ylabel("ps(T/TN)");
+    plt::grid(true);
+
+    plt::subplot2grid(3, 2, 1, 1);
+    plt::plot(veff_TTN_vals_, veff_pb_vals_);
+    plt::xlabel("T/TN");
+    plt::ylabel("pb(T/TN)");
+    plt::grid(true);
+
+    plt::subplot2grid(3, 2, 2, 0);
+    plt::plot(veff_TTN_vals_, veff_ws_vals_);
+    plt::xlabel("T/TN");
+    plt::ylabel("ws(T/TN)");
+    plt::grid(true);
+
+    plt::subplot2grid(3, 2, 2, 1);
+    plt::plot(veff_TTN_vals_, veff_wb_vals_);
+    plt::xlabel("T/TN");
+    plt::ylabel("wb(T/TN)");
+    plt::grid(true);
+
+    plt::save(filename);
 
     return;
 }
@@ -527,57 +569,6 @@ double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi) co
     return std::log(std::abs(alN_wall / alN_)); // doesn't always work for some vw, alN
 }
 
-double FluidProfile::veff_residual_func(double xi_sh, const deriv_func& dydxi) const {
-    const auto v2 = -xi_sh;
-    // const auto w2wN = 1.0;
-    const auto T2TN = 1.0;
-
-    const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN); // p and e in front of shock
-    const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
-
-    std::cout << "test1\n";
-
-    // solve for v1, T1/TN
-    std::function<std::vector<double>(std::vector<double>)> matching_helper = [this, v2, p2, e2] (std::vector<double> y0) {
-        return matching_eqs_veff(p2, e2, v2, y0[0], y0[1]); // y0 = {v1, T1TN}
-    };
-
-    // y0 = {v1, T1TN}
-    // Tm/TN called out of bounds for some choices of xi_sh -> could short circuit in this case?
-    const auto y0 = newton_solve(matching_helper, {v2, T2TN}); // initial guess v2, T2TN
-
-    std::cout << "test2\n";
-
-    // solve EoM to get vp, Tp/TN
-    const auto xi0 = xi_sh - 0.001;
-    const auto [xi_sol, y_sol] = rk4_solver(dydxi, xi0, xif_, y0, 10000);
-
-    const auto vpUF = y_sol.back()[0]; // vpUF = v(xi_w) (endpoint of integration)
-    const auto vp = mu(vw_, vpUF);
-    const auto TpTN = y_sol.back()[1];
-
-    std::cout << "test3\n";
-
-    // calc vm, Tm/TN from matching condition at wall
-    const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN);
-    const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
-
-    std::cout << "test4\n";
-
-    std::function<std::vector<double>(std::vector<double>)> matching_helper2 = [this, vp, pp, ep] (std::vector<double> y0) {
-        return matching_eqs_veff(pp, ep, vp, y0[0], y0[1]); // y0 = {v1, T1TN}
-    };
-
-    
-    const auto sol = newton_solve(matching_helper2, {vp, TpTN}); // initial guess vp, TpTN
-    const auto vm = sol[0];
-    const auto TmTN = sol[1];
-
-    std::cout << "test5\n";
-
-    return vm - vw_;
-}
-
 // bag model only
 double FluidProfile::get_la_behind_wall(double w) const {
     // la(xi)=(3/4)*(w(xi)/wN - 1 - alN) behind bubble wall (detonations)
@@ -590,86 +581,234 @@ double FluidProfile::get_la_front_wall(double w) const {
     return 0.75 * (w - 1.0);
 }
 
-// state_type FluidProfile::get_la_vals() const {
-//     const auto eN = alglib::spline1dcalc(veff_e_interp_, TN_);
-//     const auto wN_inv = 1.0 / alglib::spline1dcalc(veff_w_interp_, TN_);
+// not finished - hybrids not done yet
+// should only be used in region where EoM is solved (otherwise need to change def of e_xi to check if xi corresponds to s or b phase)
+state_type FluidProfile::get_lambda(state_type T_vals) const {
+    // la(xi) = (e(xi) - eN) / wN
+    const auto eN = alglib::spline1dcalc(veff_es_interp_, 1.0); // eN = e(T/TN=1)
+    const auto wN = alglib::spline1dcalc(veff_ws_interp_, 1.0); // wN = w(T/TN=1)
+    const auto wN_inv = 1.0 / wN;
 
-//     state_type la_vals(xi_vals_.size());
-//     for (int i = 0; i < la_vals.size(); i++) {
-//         // const auto xi = xi_vals_[i];
-//         const auto T = T_vals_[i]; // T(xi)
-//         const auto e_xi = alglib::spline1dcalc(veff_e_interp, T); // e(T(xi)) = e(xi)
+    // define helper for computing e(xi)=e(T(xi))
+    std::function<double(size_t)> e_xi;
 
-//         la_vals[i] = (e_xi - eN) * wN_inv;
-//     }
+    // add error handling if i > T_vals.size()
+    if (mode_ == 0) { // deflagration - all xi in symmetric phase (xi_w < xi < xi_sh)
+        e_xi = [&] (size_t i) { return alglib::spline1dcalc(veff_es_interp_, T_vals[i]); };
+    } else if (mode_ == 1) { // hybrid
+        e_xi = [&] (size_t i) { return 0.0; };
+    } else { // detonantion - all xi in broken phase (cm < xi < xi_w)
+        e_xi = [&] (size_t i) { return alglib::spline1dcalc(veff_eb_interp_, T_vals[i]); };
+    }
 
-//     return la_vals;
-// }
+    const size_t n = T_vals.size();
+    state_type la_vals(n);
 
+    for (size_t i = 0; i < n; i++) {
+        la_vals[i] = (e_xi(i) - eN) * wN_inv;
+    }
+
+    return la_vals;
+}
+
+double FluidProfile::veff_residual_func(double xi_sh, const deriv_func& dydxi) const {
+    // fluid in front of shock
+    const auto v2 = -xi_sh;
+    const auto w2wN = 1.0;
+    const auto T2TN = 1.0;
+
+    const auto TTN_min = veff_TTN_vals_.front();
+    const auto TTN_max = veff_TTN_vals_.back();
+
+    std::cout << "test1 - veff_residual_func called!\n";
+
+    // matching across shock
+    // std::function<std::vector<double>(std::vector<double>)> shock_matching_helper = [this, v2, T2TN] (std::vector<double> y0) {
+    //     return matching_eqs_shock(v2, T2TN, y0[0], y0[1]); // y0 = {v1, T1TN}
+    // };
+
+    std::function<double(double)> shock_matching_helper2 = [this, v2, T2TN] (double T1TN) {
+        return matching_eqs_shock2(v2, T2TN, T1TN);
+    };
+
+    // testing stuff
+    const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN);
+    const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
+
+    const auto T1TN_vals = linspace(TTN_min, TTN_max, 500);
+    std::vector<double> resi_vals;
+    for (const auto& T1TN : T1TN_vals) {
+        resi_vals.push_back(shock_matching_helper2(T1TN));
+    }
+
+    plt::figure_size(800, 600);
+    plt::plot(T1TN_vals, resi_vals);
+    plt::grid(true);
+    plt::save("residual_sh_matching.png");
+    // testing stuff end
+    
+    // const auto shock_sol = newton_solve(shock_matching_helper, {v2, T2TN}); // initial guess v2, T2TN
+    // const auto T1TN = root_finder(shock_matching_helper2, TTN_min, TTN_max);
+    double T1TN;
+    try {
+        T1TN = root_finder(shock_matching_helper2, TTN_min, TTN_max);
+    } catch (...) {
+        T1TN = T2TN + 0.01;
+    }
+    
+    const auto p1 = alglib::spline1dcalc(veff_ps_interp_, T1TN);
+    const auto e1 = alglib::spline1dcalc(veff_es_interp_, T1TN);
+    // const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN);
+    // const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
+
+    const auto v1 = (p1 - p2) * (e2 + p1) / ((e1 - e2) * (e1 + p2));
+    const auto v1UF = mu(xi_sh, v1);
+    const auto w1wN = calc_wm(w2wN, v2, v1);
+
+    std::cout << "test2 - shock_sol found for given xi_sh!\n";
+    
+    // fluid behind shock
+    // const auto v1 = shock_sol[0];
+    // const auto v1UF = mu(xi_sh, v1);
+    // const auto w1wN = calc_wm(w2wN, v2, v1);
+    // const auto T1TN = shock_sol[1];
+
+    // solve EoM from shock to wall
+    const auto xi0 = xi_sh - 0.001;
+    const auto y0 = {v1UF, w1wN, T1TN};
+    const auto [xi_sol, y_sol] = rk4_solver(dydxi, xi0, xif_, y0, 10000);
+
+    std::cout << "test3 - EoM solved!\n";
+
+    const auto vpUF = y_sol.back()[0]; // vpUF = v(xi_w) (endpoint of integration)
+    const auto vp = mu(vw_, abs(vpUF));
+    const auto wpwN = y_sol.back()[1];
+    const auto TpTN = y_sol.back()[2];
+
+    std::cout << "vpUF=" << vpUF << ", vp=" << vp << ", wpwN=" << wpwN << ", TpTN=" << TpTN << "\n";
+
+    // matching across wall
+    // std::function<std::vector<double>(std::vector<double>)> wall_matching_helper = [this, vp, TpTN] (std::vector<double> y0) {
+    //     return matching_eqs_wall(vp, TpTN, y0[0], y0[1]); // y0 = {vm, TmTN}
+    // };
+
+    std::function<double(double)> wall_matching_helper2 = [this, vp, TpTN] (double TmTN) {
+        return matching_eqs_wall2(vp, TpTN, TmTN);
+    };
+
+    // testing stuff
+    const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN);
+    const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
+
+    const auto TmTN_vals = linspace(TTN_min, TTN_max, 500);
+    std::vector<double> resi_vals2;
+    for (const auto& TmTN : TmTN_vals) {
+        resi_vals2.push_back(wall_matching_helper2(TmTN));
+    }
+
+    plt::figure_size(800, 600);
+    plt::plot(TmTN_vals, resi_vals2);
+    plt::grid(true);
+    plt::save("residual_wall_matching.png");
+    // testing stuff end
+
+    // const auto wall_sol = newton_solve(wall_matching_helper, {vp, TpTN}); // initial guess vp, TpTN
+    // const auto TmTN = root_finder(wall_matching_helper2, TTN_min, TTN_max);
+    double TmTN;
+    try {
+        TmTN = root_finder(wall_matching_helper2, TTN_min, TTN_max);
+    } catch (...) {
+        TmTN = TpTN + 0.01;
+    }
+
+    std::cout << "test4 - wall_sol found!\n";
+
+    const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN);
+    const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
+    // const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN);
+    // const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
+
+    const auto vm = (pm - pp) * (ep + pm) / ((em - ep) * (em + pp));
+
+    // fluid behind wall
+    // const auto vm = wall_sol[0];
+    // const auto wmwN = calc_wm(wpwN, vp, vm);
+    // const auto TmTN = wall_sol[1];
+
+    std::cout << "res=" << vm-vw_ << "\n";
+
+    // residual
+    return std::abs(vm) - vw_;
+}
+
+double FluidProfile::find_shock_veff(const deriv_func& dydxi) const {
+    auto residual = [this, &dydxi] (double xi_sh) {
+        return veff_residual_func(xi_sh, dydxi);
+    };
+
+    const double xi_sh_min = std::max(std::sqrt(cpsq_), vw_);
+    const double xi_sh_max = 1.0;
+
+    // return newton_solve_1d(residual, xi_sh_min);
+    return root_finder(residual, xi_sh_min, xi_sh_max, 1e-7, 100);
+}
 
 double FluidProfile::find_shock(const deriv_func& dydxi) const {
     // Root-finding algorithm for initial condition v0 = v(xi_sh) = v1UF
-
-    std::function<double(double)> residual;
-    if (eos_ == "bag") {
-        // f(xi_sh) = alN_calc - alN_actual
-        residual = [this, &dydxi] (double xi_sh) {
-            return alN_residual_func(xi_sh, dydxi);
-        };
-    } else if (eos_ == "veff") {
-        residual = [this, &dydxi] (double xi_sh) {
-            return veff_residual_func(xi_sh, dydxi);
-        };
-    }
-
+    
+    // f(xi_sh) = alN_calc - alN_actual
+    auto residual = [this, &dydxi] (double xi_sh) {
+        return alN_residual_func(xi_sh, dydxi);
+    };
 
     // cp < xi_sh < 1 (shock must be supersonic and less than speed of light)
     const double xi_sh_min = std::max(std::sqrt(cpsq_), vw_); // xi_sh > cp > xi_w (deflag), xi_sh > xi_w > cp (hybrid)
     const double xi_sh_max = 1.0 - 1e-5; // need to make this closer to 1 for extreme case of hybrids with xi_sh very close to 1
 
-    // const auto xi_sh_vals = linspace(xi_sh_min, xi_sh_max, 500);
-    // const auto xi_sh_vals = linspace(xi_sh_min, xi_sh_min + 0.03, 500);
-    // std::vector<double> res_vals;
-    // for (int i = 0; i < xi_sh_vals.size(); i++) {
-    //     const auto val = residual(xi_sh_vals[i]);
-    //     res_vals.push_back(val);
-    //     // if (val < 0.0) {
-    //     //     std::cout << "res<0 for xi_sh[" << i << "]=" << xi_sh_vals[i] << "\n";
-    //     // }
-    // }
-
-    // plt::figure_size(800, 600);
-    // plt::plot(xi_sh_vals, res_vals, "k-");
-    // // plt::xlim(xi_sh_min - 0.01, xi_sh_max + 0.01);
-    // plt::xlim(xi_sh_min - 0.01, xi_sh_min + 0.04);
-    // // plt::ylim(-1.0, 1.0);
-    // plt::grid(true);
-    // plt::save("../residual.png");
-
     return root_finder(residual, xi_sh_min, xi_sh_max, 1e-7, 100);
 }
 
-// unused
-double FluidProfile::matching_residual_veff(double vp, double pp, double ep, double TmTN) const {    
-    if (TmTN < veff_TTN_vals_.front() || TmTN > veff_TTN_vals_.back()) {
-        throw std::out_of_range("Tm/TN is called out of bounds for spline!");
+std::vector<double> FluidProfile::matching_eqs_shock(double v2, double T2TN, double v1, double T1TN) const {    
+    if (T1TN < veff_TTN_vals_.front() || T1TN > veff_TTN_vals_.back()) {
+        throw std::out_of_range("T1/TN is called out of bounds for spline!");
     }
 
-    const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN); // p_-, e_-
-    const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
+    const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN); // p_2, e_2
+    const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
 
-    const auto fac1 = (pm - pp) / (vp * (em - ep));
-    const auto fac2 = vp * (ep + pm) / (em + pp);
+    const auto p1 = alglib::spline1dcalc(veff_ps_interp_, T1TN); // p_1, e_1
+    const auto e1 = alglib::spline1dcalc(veff_es_interp_, T1TN);
 
-    return std::log(std::abs(fac1 / fac2));
+    const auto eq1 = v2 * v1 * (e1 - e2) - (p1 - p2);
+    const auto eq2 = v1 * (e1 + p2) - v2 * (e2 + p1);
+    // const auto eq1 = v2 * v1 - (p1 - p2) / (e1 - e2);
+    // const auto eq2 = v1 / v2 - (e2 + p1) / (e1 + p2);
+
+    return {eq1, eq2};
 }
 
-// this one doesn't have any poles so converges to correct root properly
-std::vector<double> FluidProfile::matching_eqs_veff(double pp, double ep, double vp, double vm, double TmTN) const {    
+double FluidProfile::matching_eqs_shock2(double v2, double T2TN, double T1TN) const {    
+    if (T1TN < veff_TTN_vals_.front() || T1TN > veff_TTN_vals_.back()) {
+        throw std::out_of_range("T1/TN is called out of bounds for spline!");
+    }
+
+    const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN); // p_2, e_2
+    const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
+
+    const auto p1 = alglib::spline1dcalc(veff_ps_interp_, T1TN); // p_1, e_1
+    const auto e1 = alglib::spline1dcalc(veff_es_interp_, T1TN);
+
+    return v2 * v2 - (p1 - p2) * (e1 + p2) / ((e1 - e2) * (e2 + p1));
+    // return v2 * v2 * (e1 - e2) * (e2 + p1) - (p1 - p2) * (e1 + p2); 
+}
+
+std::vector<double> FluidProfile::matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const {    
     if (TmTN < veff_TTN_vals_.front() || TmTN > veff_TTN_vals_.back()) {
-        std::cout << "Tm/TN= " << TmTN << "\n";
         throw std::out_of_range("Tm/TN is called out of bounds for spline!");
     }
+
+    const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN); // p_+, e_+
+    const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
 
     const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN); // p_-, e_-
     const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
@@ -680,6 +819,20 @@ std::vector<double> FluidProfile::matching_eqs_veff(double pp, double ep, double
     return {eq1, eq2};
 }
 
+double FluidProfile::matching_eqs_wall2(double vp, double TpTN, double TmTN) const {    
+    if (TmTN < veff_TTN_vals_.front() || TmTN > veff_TTN_vals_.back()) {
+        throw std::out_of_range("Tm/TN is called out of bounds for spline!");
+    }
+
+    const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN); // p_+, e_+
+    const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
+
+    const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN); // p_-, e_-
+    const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
+
+    return vp * vp - (pm - pp) * (em + pp) / ((em - ep) * (ep + pm));
+}
+
 std::vector<double> FluidProfile::get_IC_detonation_veff(double vp, double TpTN) const {
     // uses matching conditions to get vm, Tm/TN from vp, Tp/TN
     //      vp * vm = (pm - pp) / (em - ep)
@@ -688,11 +841,11 @@ std::vector<double> FluidProfile::get_IC_detonation_veff(double vp, double TpTN)
     if (TpTN < veff_TTN_vals_.front() || TpTN > veff_TTN_vals_.back()) {
         throw std::out_of_range("Tp/TN is called out of bounds for spline");
     }
-    const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN); // p_+, e_+
-    const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
+    // const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN); // p_+, e_+
+    // const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
 
-    std::function<std::vector<double>(std::vector<double>)> matching_helper = [this, vp, pp, ep] (std::vector<double> y0) {
-        return matching_eqs_veff(pp, ep, vp, y0[0], y0[1]); // y0 = {vm, TmTN}
+    std::function<std::vector<double>(std::vector<double>)> matching_helper = [this, vp, TpTN] (std::vector<double> y0) {
+        return matching_eqs_wall(vp, TpTN, y0[0], y0[1]); // y0 = {vm, TmTN}
     };
     
     // solve matching eqs
@@ -718,25 +871,14 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     std::cout << "\n";
 
     // wrapper for hydrodynamic EoM - move into struct?
-    std::function<state_type(double, const state_type&)> dydxi;
-    if (eos_ == "bag") {
-        dydxi = [this] (double xi, const state_type& y) -> state_type {
-            const auto v = y[0];
-            const auto w = y[1];
-            const auto T = y[2];
-            const auto csq = (xi < vw_) ? cmsq_ : cpsq_; // change to csq(T) when implemented
+    auto dydxi = [this] (double xi, const state_type& y) -> state_type {
+        const auto v = y[0];
+        const auto w = y[1];
+        const auto T = y[2];
+        const auto csq = (xi < vw_) ? cmsq_ : cpsq_; // change to csq(T) when implemented
 
-            return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq), dTdxi(xi, v, T, csq) };
-        };
-    } else if (eos_ == "veff") {
-        dydxi = [this] (double xi, const state_type& y) -> state_type {
-            const auto v = y[0];
-            const auto T = y[1];
-            const auto csq = (xi < vw_) ? cmsq_ : cpsq_; // change to csq(T) when implemented
-
-            return { dvdxi(xi, v, csq), dTdxi(xi, v, T, csq) };
-        };
-    }
+        return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq), dTdxi(xi, v, T, csq) };
+    };
 
     const auto dlt = 0.001; // wall and shocks are discontinuities so start integration just before them
     std::vector<state_type> y_sol_tmp;
@@ -752,8 +894,8 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
         // hybrid and deflagration ICs the same for xi_w < xi < xi_sh
         xif_ = vw_ + dlt;
 
-        const auto xi_sh = find_shock(dydxi);
-        const auto v1UF = v1UF_from_shock(xi_sh);
+        const auto xi_sh = (eos_ == "veff") ? find_shock_veff(dydxi) : find_shock(dydxi);
+        const auto v1UF = v1UF_from_shock(xi_sh); // only valid for bag
         y0_.push_back(v1UF);
 
         xi0_ = xi_shock(v1UF) - dlt;
@@ -907,8 +1049,17 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
             T_sol_tmp.push_back(y_sol_tmp[i][2]);
 
-            la_sol_tmp.push_back(get_la_behind_wall(w_sol_tmp[i]));
+            // la_sol_tmp.push_back(get_la_behind_wall(w_sol_tmp[i]));
         }
+
+        // tmp for testing - use better implementation later
+        if (eos_ == "bag") {
+            for (size_t i = 0; i < xi_sol_tmp.size(); i++) {
+                la_sol_tmp.push_back(get_la_behind_wall(w_sol_tmp[i]));
+            }
+        } else {
+            la_sol_tmp = get_lambda(T_sol_tmp);
+        }        
 
         w_end_val = w_sol_tmp.back(); // not sure why
         T_end_val = T_sol_tmp.back();
@@ -962,7 +1113,7 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     // concatenate la(xi) vals
     la_sol.insert(la_sol.end(), la_start.begin(), la_start.end());
     la_sol.insert(la_sol.end(), la_sol_tmp.begin(), la_sol_tmp.end());
-    la_sol.insert(la_sol.end(), la_end.begin(), la_end.end());
+    la_sol.insert(la_sol.end(), la_end.begin(), la_end.end());    
 
     // reformat from backwards integration
     std::reverse(xi_sol.begin(), xi_sol.end());
@@ -970,7 +1121,7 @@ std::vector<state_type> FluidProfile::solve_profile(int n) {
     std::reverse(w_sol.begin(), w_sol.end());
     std::reverse(T_sol.begin(), T_sol.end());
     std::reverse(la_sol.begin(), la_sol.end());
-
+    
     return {xi_sol, v_sol, w_sol, T_sol, la_sol};
 }
 

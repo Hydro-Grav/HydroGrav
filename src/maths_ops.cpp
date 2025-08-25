@@ -524,6 +524,8 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
     double fa = f(a);
     double fb = f(b);
 
+    // std::cout << "f(a=" << a <<")=" << fa << ", f(b=" << b << ")=" << fb << std::endl;
+
     if (fa * fb > 0.0) {
         throw std::runtime_error("Bisection method interval not bracketed!");
     }
@@ -650,7 +652,30 @@ std::vector<double> newton_solve(const std::function<std::vector<double>(std::ve
             return x0;
     }
 
-    throw std::runtime_error("Did not converge");
+    throw std::runtime_error("Newton's method solver did not converge");
+}
+
+double newton_solve_1d(const std::function<double(double)>& F, double x0, double tol, int max_iter, double h) {
+    for (int iter = 0; iter < max_iter; ++iter) {
+        double fx = F(x0);
+
+        if (std::fabs(fx) < tol)
+            return x0;
+
+        // Numerical derivative (central difference for better stability)
+        double dfx = (F(x0 + h) - F(x0 - h)) / (2.0 * h);
+
+        if (std::fabs(dfx) < 1e-14)
+            throw std::runtime_error("Derivative too small (possible flat region or singularity).");
+
+        double dx = -fx / dfx;
+        x0 += dx;
+
+        if (std::fabs(dx) < tol)
+            return x0;
+    }
+
+    throw std::runtime_error("Newton's method (1D) did not converge");
 }
 
 std::vector<std::pair<double, double>> find_brackets(const std::function<double(double)>& f, double a, double b, int N) {

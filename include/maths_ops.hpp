@@ -141,7 +141,9 @@ std::pair<std::vector<double>, std::vector<state_type>> rk4_solver(
 
 double root_finder(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 double root_finder2(const std::function<double(double)> &f, double x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
+
 std::vector<double> newton_solve(const std::function<std::vector<double>(std::vector<double>)> &F, std::vector<double> x0, double tol = 1e-8, int max_iter = 50, double h = 1e-8);
+double newton_solve_1d(const std::function<double(double)>& F, double x0, double tol = 1e-8, int max_iter = 50, double h = 1e-8);
 
 std::vector<std::pair<double, double>> find_brackets(const std::function<double(double)>& f, double a, double b, int N = 1000);
 std::vector<double> find_all_roots(

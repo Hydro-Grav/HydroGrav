@@ -93,6 +93,7 @@ class FluidProfile {
     
     #ifdef ENABLE_MATPLOTLIB
     void plot(const std::string& filename = "bubble_prof.png") const; // Plots bubble profiles
+    void plot_thermo(const std::string& filename = "thermo.png") const; // Plots e(T), p(T), w(T)
     #endif
 
     state_type get_csq() const;
@@ -110,8 +111,8 @@ class FluidProfile {
 
     // Veff stuff
     state_type veff_TTN_vals_;
-    const state_type veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_; // T, P(T), e(T) for fluid profile using generic EoS
-    alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_;
+    const state_type veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_; // T, P(T), e(T) for fluid profile using generic EoS
+    alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
     
     alglib::spline1dinterpolant ToTN_interp_; // T/TN as a function of w/wN
     
@@ -136,11 +137,16 @@ class FluidProfile {
 
     double get_la_behind_wall(double w) const;
     double get_la_front_wall(double w) const;
+    state_type get_lambda(state_type T_vals) const;
 
     double find_shock(const deriv_func& dydxi) const;
+    double find_shock_veff(const deriv_func& dydxi) const;
 
     double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
-    std::vector<double> matching_eqs_veff(double pp, double ep, double vp, double vm, double TmTN) const;
+    std::vector<double> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
+    std::vector<double> matching_eqs_shock(double v2, double T2TN, double v1, double T1TN) const;
+    double matching_eqs_shock2(double v2, double T2TN, double T1TN) const;
+    double matching_eqs_wall2(double vp, double TpTN, double TmTN) const;
 
     std::vector<double> get_IC_detonation_veff(double vp, double TpTN) const;
 
