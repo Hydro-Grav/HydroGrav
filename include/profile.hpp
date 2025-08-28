@@ -102,7 +102,7 @@ class FluidProfile {
     std::string eos_; // bag or veff
 
     const PhaseTransition::PTParams params_; // local copy of PT parameters
-    const double cpsq_, cmsq_, vw_, alN_;
+    const double cpsq_, cp_, cmsq_, cm_, vw_, alN_;
     double alp_min_, alp_max_;
     
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
@@ -113,8 +113,8 @@ class FluidProfile {
     state_type veff_TTN_vals_;
     const state_type veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_; // T, P(T), e(T) for fluid profile using generic EoS
     alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
-    
-    alglib::spline1dinterpolant ToTN_interp_; // T/TN as a function of w/wN
+
+    double eN_, wN_, wN_inv_;
     
     state_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
@@ -125,7 +125,7 @@ class FluidProfile {
     double calc_vp(double vm, double alpha_p) const;
     double calc_wm(double wp, double vp, double vm) const;
     double calc_w1wN(double xi_sh) const;
-    double calc_ToTN(double wmwN, double cpsq, double cmsq) const;
+    double calc_ToTN(double wowN, double cpsq, double cmsq) const;
 
     double xi_shock(double v1UF) const; // position of shock front
     double v1UF_from_shock(double xi_sh) const;
@@ -139,8 +139,15 @@ class FluidProfile {
     double get_la_front_wall(double w) const;
     state_type get_lambda(state_type T_vals) const;
 
+    double lambda_s(double ToTN) const;
+    double lambda_b(double ToTN) const;
+
     double find_shock(const deriv_func& dydxi) const;
     double find_shock_veff(const deriv_func& dydxi) const;
+
+    std::vector<double> test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
+    std::vector<double> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0) const;
+    std::vector<double> test_wall_matching2(const deriv_func& dydxi, double xi_sh, state_type& y0) const;
 
     double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
     std::vector<double> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
@@ -148,11 +155,12 @@ class FluidProfile {
     double matching_eqs_shock2(double v2, double T2TN, double T1TN) const;
     double matching_eqs_wall2(double vp, double TpTN, double TmTN) const;
 
-    std::vector<double> get_IC_detonation_veff(double vp, double TpTN) const;
+    void get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& ym) const;
+    std::vector<double> get_IC_detonation_veff() const;
 
     // put number of integration points in input file? seems bad to hardcode
     std::vector<state_type> solve_profile(int n=100);
-    // std::vector<state_type> solve_profile_veff(int n=100);
+    std::vector<state_type> solve_profile_veff(int n=100);
     // state_type calc_lambda_vals(state_type w_vals) const;
 
     // testing purposes ONLY

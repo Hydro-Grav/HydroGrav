@@ -9,6 +9,9 @@
 #include <cassert>
 // #include <matplotlibcpp.h>
 
+#include "ap.h"
+#include "solvers.h"
+
 #include "constants.hpp"
 #include "maths_ops.hpp"
 
@@ -536,6 +539,7 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
 
     for (int i = 0; i < max_iter; ++i) {
         double c = 0.5 * (a + b);
+        // std::cout << "c=" << c << "\n";
         double fc = f(c);
 
         if (!std::isfinite(fc)) {
@@ -563,41 +567,6 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
     // std::cout << "Bisection method failed, using smallest root algorithm.\n";
     // return find_smallest_root(f, a, b);
     throw std::runtime_error("Bisection method did not converge.");
-}
-
-double root_finder2(const std::function<double(double)> &f, double x0, double tol, int max_iter, double h) {
-    double x = x0;
-    double fx = f(x);
-
-    for (int iter = 0; iter < max_iter; ++iter) {
-        if (std::fabs(fx) < tol) {
-            return x; // converged
-        }
-
-        // Numerical derivative (Jacobian in 1D)
-        double dfx = (f(x + h) - f(x - h)) / (2 * h);
-
-        if (std::fabs(dfx) < 1e-14) {
-            throw std::runtime_error("Derivative too small — cannot continue.");
-        }
-
-        // Newton step
-        double step = -fx / dfx;
-        double x_new = x + step;
-        double fx_new = f(x_new);
-
-        // Safeguard: if Newton step fails to improve, fall back to secant-like step
-        if (std::fabs(fx_new) > std::fabs(fx)) {
-            // fallback: small step in opposite direction
-            x_new = x - (step * 0.5);
-            fx_new = f(x_new);
-        }
-
-        x = x_new;
-        fx = fx_new;
-    }
-
-    throw std::runtime_error("fsolve_like did not converge within max_iter.");
 }
 
 std::vector<double> newton_solve(const std::function<std::vector<double>(std::vector<double>)>& F, std::vector<double> x0, double tol, int max_iter, double h) {
@@ -633,6 +602,7 @@ std::vector<double> newton_solve(const std::function<std::vector<double>(std::ve
     };
 
     for (int iter = 0; iter < max_iter; ++iter) {
+        // std::cout << "x0[0]=" << x0[0] << ", x0[1]=" << x0[1] << "\n";
         auto fx = F(x0);
         if (fx.size() != 2)
             throw std::invalid_argument("Function F must return exactly 2 values.");
@@ -657,6 +627,7 @@ std::vector<double> newton_solve(const std::function<std::vector<double>(std::ve
 
 double newton_solve_1d(const std::function<double(double)>& F, double x0, double tol, int max_iter, double h) {
     for (int iter = 0; iter < max_iter; ++iter) {
+        // std::cout << "x0=" << x0 << "\n";
         double fx = F(x0);
 
         if (std::fabs(fx) < tol)
@@ -678,54 +649,31 @@ double newton_solve_1d(const std::function<double(double)>& F, double x0, double
     throw std::runtime_error("Newton's method (1D) did not converge");
 }
 
-std::vector<std::pair<double, double>> find_brackets(const std::function<double(double)>& f, double a, double b, int N) {
-    std::vector<std::pair<double, double>> brackets;
-    double dx = (b - a) / N;
-    double x0 = a;
-    double f0 = f(x0);
+double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol, int max_iter) {
+    const double gr = (std::sqrt(5.0) - 1.0) / 2.0; // 0.618...
+    double c = b - gr * (b - a);
+    double d = a + gr * (b - a);
+    double fc = f(c);
+    double fd = f(d);
 
-    for (int i = 1; i <= N; ++i) {
-        double x1 = a + i * dx;
-        double f1 = f(x1);
-        if (f0 * f1 < 0) {
-            brackets.emplace_back(x0, x1);
-        }
-        x0 = x1;
-        f0 = f1;
-    }
-
-    return brackets;
-}
-
-std::vector<double> find_all_roots(
-    const std::function<double(double)>& f,
-    double a,
-    double b,
-    int N)
-{
-    auto brackets = find_brackets(f, a, b, N);
-    std::vector<double> roots;
-    for (const auto& [x0, x1] : brackets) {
-        try {
-            double root = root_finder(f, x0, x1);
-            roots.push_back(root);
-        } catch (...) {
-            // skip if bisection fails
+    int iter = 0;
+    while ((b - a) > tol && iter++ < max_iter) {
+        if (fc < fd) {
+            b = d;
+            d = c;
+            fd = fc;
+            c = b - gr * (b - a);
+            fc = f(c);
+        } else {
+            a = c;
+            c = d;
+            fc = fd;
+            d = a + gr * (b - a);
+            fd = f(d);
         }
     }
-    return roots;
-}
-
-double find_smallest_root(
-    const std::function<double(double)>& f,
-    double a,
-    double b,
-    int N)
-{
-    auto roots = find_all_roots(f, a, b, N);
-    if (roots.empty())
-        throw std::runtime_error("No roots found.");
-    return *std::min_element(roots.begin(), roots.end());
+    double xmid = 0.5*(a + b);
+    return xmid;
 }
 
 alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec) {
@@ -740,22 +688,4 @@ alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec) {
     alglib::real_1d_array result;
     result = oss.str().c_str();  // real_1d_array supports string assignment
     return result;
-}
-
-std::unordered_map<double, size_t> count_duplicates(const std::vector<double>& vec) {
-    std::unordered_map<double, size_t> counts;
-    std::unordered_map<double, size_t> duplicates;
-
-    #pragma omp parallel for
-    for (size_t i = 0; i < vec.size(); ++i) {
-        const double& val = vec[i];
-        counts[val]++;
-        if (counts[val] == 2) {
-            duplicates[val] = 2;
-        } else if (counts[val] > 2) {
-            duplicates[val] = counts[val];
-        }
-    }
-
-    return duplicates;
 }

@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <initializer_list>
 #include <functional>
+#include <streambuf>
 
 #include "ap.h"
 
@@ -140,25 +141,15 @@ std::pair<std::vector<double>, std::vector<state_type>> rk4_solver(
 );
 
 double root_finder(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
-double root_finder2(const std::function<double(double)> &f, double x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
+double root_finder_new(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 
-std::vector<double> newton_solve(const std::function<std::vector<double>(std::vector<double>)> &F, std::vector<double> x0, double tol = 1e-8, int max_iter = 50, double h = 1e-8);
-double newton_solve_1d(const std::function<double(double)>& F, double x0, double tol = 1e-8, int max_iter = 50, double h = 1e-8);
+std::vector<double> newton_solve(const std::function<std::vector<double>(std::vector<double>)> &F, std::vector<double> x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
+double newton_solve_1d(const std::function<double(double)>& F, double x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
 
-std::vector<std::pair<double, double>> find_brackets(const std::function<double(double)>& f, double a, double b, int N = 1000);
-std::vector<double> find_all_roots(
-    const std::function<double(double)>& f,
-    double a,
-    double b,
-    int N = 1000);
-double find_smallest_root(
-    const std::function<double(double)>& f,
-    double a,
-    double b,
-    int N = 1000);
+double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 200);
 
 alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec);
 
-std::unordered_map<double, size_t> count_duplicates(const std::vector<double>& vec);
+// std::unordered_map<double, size_t> count_duplicates(const std::vector<double>& vec);
 
 #endif // INCLUDE_MATHS_OPS_HPP_H

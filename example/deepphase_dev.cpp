@@ -242,50 +242,6 @@ void example_GW_Spec(const std::string& filename) {
     return;
 }
 
-// compare with Caprini paper
-// void GW_spec_comparison(const std::string& filename) {
-//     // define universe parameters
-//     const auto T0 = PhaseTransition::dflt_universe::T0;
-//     const auto Ts = PhaseTransition::dflt_universe::Ts;
-//     const auto H0 = PhaseTransition::dflt_universe::H0;
-//     const auto Hs = PhaseTransition::dflt_universe::Hs;
-//     const auto g0 = PhaseTransition::dflt_universe::g0;
-//     const auto gs = PhaseTransition::dflt_universe::gs;
-
-//     const PhaseTransition::Universe un(T0, Ts, H0, Hs, g0, gs);
-
-//     // from Pol et al.
-//     const auto vw = 0.5;
-//     const auto alN = 0.1;
-//     const auto RsHs = 1.0;
-//     const auto Rs = RsHs / Hs;
-//     const auto dtau = 10.0 * Rs;
-
-//     std::cout << "vw= " << vw << ", alN = " << alN << ", RsHs = " << RsHs << ", Rs = " << Rs << ", dtau = " << dtau << "\n";
-
-//     // conversion to PTParams input
-//     const auto betaH = std::pow(8.0 * M_PI, 1./3.) * vw / RsHs;
-//     const auto beta = betaH * Hs;
-    
-//     const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
-//     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
-
-//     const PhaseTransition::PTParams params(vw, alN, beta, dtau, wNeN_rat, nuc_type, un);
-
-//     // un.print();
-//     // params.print();
-
-//     // Define GW spectrum
-//     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-//     const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params);
-    
-//     #ifdef ENABLE_MATPLOTLIB
-//     OmegaGW.plot(filename + ".png");
-//     #endif
-
-//     return;
-// }
-
 void test_dSiCi_accuracy() {
     const std::vector<std::pair<double, double>> test_ranges = {
         {0.1, 1.0}, {1.0, 10.0}, {5.0, 15.0}, {0.01, 0.1}, {1e-6, 1e-3}
