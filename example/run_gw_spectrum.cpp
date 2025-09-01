@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
     const PhaseTransition::PTParams params(vw, alN, betaH, dtauH, wNeN_rat, nuc_type, un);
     params.print();
 
-    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    const auto kRs_vals = logspace(1e-3, 1e+2, 100);
     Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
 
     OmegaGW.write("gw_spectrum.csv");
