@@ -17,7 +17,16 @@ int main(int argc, char* argv[]) {
         wNeN_rat = std::stod(argv[5]);
     }
 
-    const PhaseTransition::Universe un;
+    alN = 0.06407575454;
+    betaH = 614.6893292;
+    dtauH = 0.00162684;
+    vw = 0.5;
+    wNeN_rat = 1.76678;
+    double Ts = 56.8446;
+    double Hs = 4.80402e-15;
+    double gs = 107.75;
+
+    const PhaseTransition::Universe un(Ts, Hs, gs);
     const PhaseTransition::PTParams params(vw, alN, betaH, dtauH, wNeN_rat, nuc_type, un);
     params.print();
 
