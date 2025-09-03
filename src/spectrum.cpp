@@ -59,12 +59,17 @@ double PowerSpec::max() const {
 void PowerSpec::write(const std::string& filename) const {
     std::cout << "Writing power spectrum to disk... ";
     std::ofstream file(filename);
-    file << "k,P\n";
+    file << "freq,K,P\n";
 
     const auto K_vals = data_.first;
     const auto P_vals = data_.second;
+
+    // TN should just be T_*, not sure if this is right
+    const auto conv_fac = (2.6e-5) * (1.0 / 10.0) * (1.0 / (params_.un().Hs() * params_.Rs())) * (params_.TN() / 100.0) * std::pow(params_.un().gs() / 100.0, 1.0 / 6.0);
+
     for (size_t i = 0; i < K_vals.size(); ++i) {
-        file << K_vals[i] << "," << P_vals[i] << "\n";
+        const auto freq_val = K_vals[i] * conv_fac;
+        file << freq_val << K_vals[i] << "," << P_vals[i] << "\n";
     }
     file.close();
     std::cout << "Saved to " << filename << "!\n";
@@ -272,7 +277,7 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 
     const auto nk = kRs_vals.size();
 
-    const auto np = 1000;
+    const auto np = 2000;
     const auto pRs_vals = logspace(1e-2, 1e+3, np); // P = p*Rs
 
     std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
@@ -282,7 +287,7 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
         pRs2_vals[i] = pRs * pRs;
     }
 
-    const auto nz = 1000;
+    const auto nz = 2000;
     const auto z_vals = linspace(-1.0, 1.0, nz); // logspace gives nan over this domain
 
     const auto npnz = np * nz;
