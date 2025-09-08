@@ -345,8 +345,9 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
                     }
 
                     // if this fails, need to manually adjust ptRs_min
-                    const double tol = 1e-12 * (zk_ptRs_K_max - zk_ptRs_K_min);
-                    if (ptRs < zk_ptRs_K_min - tol || ptRs > zk_ptRs_K_max + tol) {
+                    const double tol_low = 1e-12 * zk_ptRs_K_min;
+                    const double tol_high = 1e-12 * zk_ptRs_K_max;
+                    if (ptRs < zk_ptRs_K_min - tol_low || ptRs > zk_ptRs_K_max + tol_high) {
                         throw std::runtime_error("ptRs out of bounds in GWSpec2: " + std::to_string(ptRs) + " not in [" + std::to_string(zk_ptRs_K_min) + ", " + std::to_string(zk_ptRs_K_max) + "]");
                     }
                 
