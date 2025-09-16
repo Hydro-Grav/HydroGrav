@@ -36,6 +36,7 @@
 /bin/
 /lib/
 /CMakeFiles/
+/figures/
 
 # CMakeJunk
 cmake_install.cmake
