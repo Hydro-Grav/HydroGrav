@@ -128,10 +128,9 @@ class FluidProfile {
 
     double get_la_behind_wall(double w) const;
     double get_la_front_wall(double w) const;
-    state_type get_lambda(state_type T_vals) const;
 
-    double lambda_s(double ToTN) const;
-    double lambda_b(double ToTN) const;
+    double lambda_s(double ToTN, const double eN, const double wN_inv) const;
+    double lambda_b(double ToTN, const double eN, const double wN_inv) const;
 
     double find_shock(const deriv_func& dydxi) const;
     double find_shock_veff(const deriv_func& dydxi) const;

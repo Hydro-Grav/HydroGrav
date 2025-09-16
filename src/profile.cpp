@@ -35,6 +35,7 @@ TO DO:
 - change everything to {v,T,w} format (currently is {v,w,T})
 - get rid of xi0_ and xif_ private variables
 - change dvdxi -> dxidv (it will be more numerically stable for hybrids)
+- go through and check if any varaibles can be removed from class (might need to add eN, wN_inv for lambda calc)
 */
 
 /*
@@ -161,8 +162,6 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
       xi_vals_(), v_vals_(), w_vals_(), T_vals_(), la_vals_()
     {
         std::vector<state_type> prof;
-
-        std::cout << "wNeN_rat = " << params.wNeN_rat() << "\n";
 
         if (params.eos_model() == "veff") { // veff eos
             std::cout << "Calculating fluid profile using generic equation of state from Veff\n";
@@ -490,49 +489,14 @@ double FluidProfile::get_la_front_wall(double w) const {
     return 0.75 * (w - 1.0);
 }
 
-// not finished - hybrids not done yet
-// should only be used in region where EoM is solved (otherwise need to change def of e_xi to check if xi corresponds to s or b phase)
-state_type FluidProfile::get_lambda(state_type T_vals) const {
-    // la(xi) = (e(xi) - eN) / wN
-
-    // define helper for computing e(xi)=e(T(xi))
-    std::function<double(size_t)> e_xi;
-
-    // add error handling if i > T_vals.size()
-    if (mode_ == 0) { // deflagration - all xi in symmetric phase (xi_w < xi < xi_sh)
-        e_xi = [&] (size_t i) { return params_.es_val(T_vals[i]); };
-    } else if (mode_ == 1) { // hybrid
-        e_xi = [&] (size_t i) { return 0.0; };
-    } else { // detonantion - all xi in broken phase (cm < xi < xi_w)
-        e_xi = [&] (size_t i) { return params_.eb_val(T_vals[i]); };
-    }
-
-    const size_t n = T_vals.size();
-    const auto eN = params_.eN();
-    const auto wN_inv = 1.0 / params_.wN();
-
-    state_type la_vals(n);
-    for (size_t i = 0; i < n; i++) {
-        la_vals[i] = (e_xi(i) - eN) * wN_inv;
-    }
-
-    return la_vals;
-}
-
 // change these to lambda functions in solve?
-double FluidProfile::lambda_s(double ToTN) const {
+double FluidProfile::lambda_s(double ToTN, const double eN, const double wN_inv) const {
     const auto es_T = params_.es_val(ToTN); // es(T/TN)
-    const auto eN = params_.eN();
-    const auto wN_inv = 1.0 / params_.wN();
-
     return (es_T - eN) * wN_inv;
 }
 
-double FluidProfile::lambda_b(double ToTN) const {
+double FluidProfile::lambda_b(double ToTN, const double eN, const double wN_inv) const {
     const auto eb_T = params_.eb_val(ToTN); // eb(T/TN)
-    const auto eN = params_.eN();
-    const auto wN_inv = 1.0 / params_.wN();
-
     return (eb_T - eN) * wN_inv;
 }
 
@@ -676,13 +640,9 @@ std::vector<double> FluidProfile::matching_eqs_shock(double v2, double T2TN, dou
         throw std::out_of_range("T1/TN is called out of bounds for spline!");
     }
 
-    // const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN); 
-    // const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
     const auto p2 = params_.ps_val(T2TN); // p_2, e_2
     const auto e2 = params_.es_val(T2TN);
 
-    // const auto p1 = alglib::spline1dcalc(veff_ps_interp_, T1TN);
-    // const auto e1 = alglib::spline1dcalc(veff_es_interp_, T1TN);
     const auto p1 = params_.ps_val(T1TN); // p_1, e_1
     const auto e1 = params_.es_val(T1TN);
 
@@ -701,13 +661,9 @@ std::vector<double> FluidProfile::matching_eqs_wall(double vp, double TpTN, doub
         throw std::out_of_range("Tm/TN is called out of bounds for spline!");
     }
 
-    // const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN);
-    // const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
     const auto pp = params_.ps_val(TpTN); // p_+, e_+
     const auto ep = params_.es_val(TpTN);
 
-    // const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN);
-    // const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
     const auto pm = params_.pb_val(TmTN); // p_-, e_-
     const auto em = params_.eb_val(TmTN);
 
@@ -1130,6 +1086,9 @@ std::vector<state_type> FluidProfile::solve_profile_veff(int n) {
         return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq), dTdxi(xi, v, T, csq) };
     };
 
+    const auto eN = params_.eN();
+    const auto wN_inv = 1.0 / params_.wN();
+
     const auto dlt = 0.001; // wall and shocks are discontinuities so start integration just before them
     std::vector<state_type> y_sol_tmp;
     state_type y0(3), xi_sol_tmp, v_sol_tmp, w_sol_tmp, T_sol_tmp, la_sol_tmp;
@@ -1163,9 +1122,11 @@ std::vector<state_type> FluidProfile::solve_profile_veff(int n) {
         for (size_t i = 0; i < xi_sol_tmp.size(); i++) {
             v_sol_tmp.push_back(y_sol_tmp[i][0]);
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
-            T_sol_tmp.push_back(y_sol_tmp[i][2]);
+            // T_sol_tmp.push_back(y_sol_tmp[i][2]);
             
-            la_sol_tmp.push_back(lambda_s(T_sol_tmp[i])); // lambda in symmetric phase
+            const auto T_sol = y_sol_tmp[i][2];
+            T_sol_tmp.push_back(T_sol);
+            la_sol_tmp.push_back(lambda_s(T_sol, eN, wN_inv)); // lambda in symmetric phase
         }
 
         const auto vpUF = v_sol_tmp.back();
@@ -1178,7 +1139,7 @@ std::vector<state_type> FluidProfile::solve_profile_veff(int n) {
             // fix end values 
             w_end_val = ym[1]; // wmwN
             T_end_val = ym[2]; // TmTN
-            la_end_val = lambda_b(T_end_val); // lambda just behind wall (broken phase)
+            la_end_val = lambda_b(T_end_val, eN, wN_inv); // lambda just behind wall (broken phase)
 
         } else { // hybrid
             // initial conditions for rarefaction wave
@@ -1194,9 +1155,10 @@ std::vector<state_type> FluidProfile::solve_profile_veff(int n) {
                 xi_sol_tmp.push_back(xi_sol_rf_tmp[i]);
                 v_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
                 w_sol_tmp.push_back(y_sol_rf_tmp[i][1]);
-                T_sol_tmp.push_back(y_sol_rf_tmp[i][2]);
 
-                la_sol_tmp.push_back(get_la_behind_wall(y_sol_rf_tmp[i][1]));
+                const auto T_sol_rf = y_sol_rf_tmp[i][2];
+                T_sol_tmp.push_back(T_sol_rf);
+                la_sol_tmp.push_back(lambda_b(T_sol_rf, eN, wN_inv));
             }
 
             xif_ = xif_rf; // update xif value to behind rarefaction wave
@@ -1229,13 +1191,11 @@ std::vector<state_type> FluidProfile::solve_profile_veff(int n) {
         for (size_t i = 0; i < xi_sol_tmp.size(); i++) {
             v_sol_tmp.push_back(y_sol_tmp[i][0]);
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
-            T_sol_tmp.push_back(y_sol_tmp[i][2]);
 
-            // la_sol_tmp.push_back(get_la_behind_wall(w_sol_tmp[i]));
+            const auto T_sol = y_sol_tmp[i][2];
+            T_sol_tmp.push_back(T_sol);
+            la_sol_tmp.push_back(lambda_b(T_sol, eN, wN_inv));
         }
-
-        // tmp for testing - use better implementation later
-        la_sol_tmp = get_lambda(T_sol_tmp);     
 
         w_end_val = w_sol_tmp.back(); // not sure why
         T_end_val = T_sol_tmp.back();
