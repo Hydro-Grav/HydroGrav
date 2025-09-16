@@ -8,6 +8,7 @@
  */
 
 static constexpr double kB = 8.61733326e-14; // Boltzmann constant (GeV/K)
+static constexpr double mP = 1.2209e19; // Planck mass (GeV)
 
 /**
  * @brief Computes the Lorentz factor γ for a given velocity.
