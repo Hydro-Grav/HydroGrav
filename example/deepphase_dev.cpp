@@ -27,96 +27,84 @@
 namespace plt = matplotlibcpp;
 #endif
 
-// tests program across a large parameter space
-void test_FluidProfile_params() {
-    // Fluid profile
-    const auto beta = PhaseTransition::dflt_PTParams::beta;
-    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
-    const auto TN = PhaseTransition::dflt_PTParams::TN;
-    const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
-    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+void test_rk4_solver() {
+    const auto csq = 1.0 / 3.0;
+    const auto cs = sqrt(csq);
 
-    PhaseTransition::Universe un;
-    
-    const auto vw_vals = linspace(1e-5, 1.0 - 1e-5, 10);
-    const auto alN_vals = linspace(1e-5, 1.0, 10);
+    auto dvdxi = [] (double xi, double v, const double csq) -> double {
+        const auto mu_val = (xi - abs(v)) / (1.0 - xi * abs(v));
+        const auto denom = gammaSq(v) * (1.0 - v * xi) * (mu_val * mu_val / csq - 1.0);
+        return (2.0 * v / xi) / denom;
+    };
 
-    for (const auto vw : vw_vals) {
-        for (const auto alN : alN_vals) {
-            PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, wNeN_rat, nuc_type, un);
-            try {
-                Hydrodynamics::FluidProfile prof(params);
-            } catch (std::runtime_error& e) {
-                std::cout << "Failed for vw=" << vw << ", alN=" << alN << ":\n";
-                std::cout << e.what() << "\n";
-            } catch (std::invalid_argument& e) {
-                std::cout << e.what() << "\n";
-            }
-        }
+    auto dydxi = [&dvdxi, csq] (double xi, const state_type& y) -> state_type {
+        const auto v = y[0];
+        return { dvdxi(xi, v, csq) };
+    };
+
+    const auto xi0 = 0.6;
+    const auto xif = cs;
+    const auto v0 = 0.05017106426873362;
+
+    const auto [xi_sol, v_sol] = rk4_solver(dydxi, xi0, xif, {v0}, 1000);
+
+    std::ofstream file("rk4_sol.csv");
+    file << "xi,v\n";
+
+    for (size_t i = 0; i < xi_sol.size(); ++i) {
+        file << xi_sol[i] << "," << v_sol[i][0] << "\n";
     }
+    file.close();
 
-    std::cout << "Parameter test for FluidProfile passed!\n";    
 }
 
 // Fluid profile
-void example_FluidProfie(const std::string& filename) {
+void example_FluidProfile(const std::string& filename) {
     const auto vw = 0.9; // detonation
     // const auto vw = 0.4; // deflagration
     // const auto vw = 0.6; // hybrid
-
+    
+    // Will's benchmark point:
+    // std::string veff_file = "flynn_eos.csv";
+    // const auto Ts = 46.0096;
+    // const auto gs = 106.75;
+    // const auto alN = 0.120242;
+    // const auto Hs = 3.2193e-15; // GeV
+    // const auto betaHs = 588.135; // beta/Hs
+    // const auto beta = betaHs * Hs;
+    // const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    // const auto TN = Ts;
+    // const auto nuc_type = "exp";
+    
+    // Xiao's benchmark point:
+    const auto Ts = 53.370765185008004; // GeV
+    const auto gs = 106.75;
     const auto alN = 0.11384915003991744;
-    const auto beta = PhaseTransition::dflt_PTParams::beta;
+    const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
     const auto dtau = PhaseTransition::dflt_PTParams::dtau;
-    const auto TN = 53.370765185008004;
-    const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
-    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
-
-    const PhaseTransition::Universe un;
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, wNeN_rat, nuc_type, un);
-    params.print();
-
-    // read veff data
-    std::vector<double> veff_T_vals, veff_ps_vals, veff_pb_vals, veff_es_vals, veff_eb_vals;
+    const auto TN = Ts; // GeV
+    const auto nuc_type = "exp";
     std::string veff_file = "thermo.csv";
-    std::ifstream file(veff_file);
-    if (!file) {
-        throw std::runtime_error("Could not open file " + veff_file);
-    }
 
-    std::string line;
-    std::getline(file, line); // Skip header
+    const PhaseTransition::Universe un(Ts, gs);
+    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un);
+    const PhaseTransition::PTParams params_veff(vw, alN, beta, dtau, TN, nuc_type, un, veff_file);
 
-    state_type xi_vals, v_vals, w_vals, la_vals;
-
-    while (std::getline(file, line)) {
-        std::istringstream ss(line);
-        std::array<double,5> values;
-        std::string token;
-
-        for (auto& val : values) {
-            if (!std::getline(ss, token, ',')) {
-                throw std::runtime_error("Malformed line in " + veff_file + ": " + line);
-            }
-            val = std::stod(token);
-        }
-
-        veff_T_vals.push_back(values[0]);
-        veff_pb_vals.push_back(values[1]);
-        veff_ps_vals.push_back(values[2]);
-        veff_eb_vals.push_back(values[3]);
-        veff_es_vals.push_back(values[4]);
-    }
+    un.print();
+    params.print();
 
     const Hydrodynamics::FluidProfile profile_bag(params); // bag model
     // profile_bag.plot("profile_bag.png");
+    // profile_bag.write("prof_bag.csv");
     const auto xi_bag = profile_bag.xi_vals();
     const auto v_bag = profile_bag.v_vals();
     const auto w_bag = profile_bag.w_vals();
     const auto T_bag = profile_bag.T_vals();
     const auto la_bag = profile_bag.la_vals();
 
-    const Hydrodynamics::FluidProfile profile_veff(params, veff_T_vals, veff_ps_vals, veff_pb_vals, veff_es_vals, veff_eb_vals); // veff
+    const Hydrodynamics::FluidProfile profile_veff(params_veff); // veff
     // profile_veff.plot("profile_veff.png");
+    // profile_veff.write("prof_veff.csv");
     const auto xi_veff = profile_veff.xi_vals();
     const auto v_veff = profile_veff.v_vals();
     const auto w_veff = profile_veff.w_vals();
@@ -175,10 +163,9 @@ void example_Kin_Spec(const std::string& filename) {
     const auto beta = PhaseTransition::dflt_PTParams::beta;
     const auto dtau = PhaseTransition::dflt_PTParams::dtau;
     const auto TN = PhaseTransition::dflt_PTParams::TN;
-    const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
 
-    const PhaseTransition::PTParams params1(vw, alN, beta, dtau, TN, wNeN_rat, "exp", un);
-    const PhaseTransition::PTParams params2(vw, alN, beta, dtau, TN, wNeN_rat, "sim", un);
+    const PhaseTransition::PTParams params1(vw, alN, beta, dtau, TN, "exp", un);
+    const PhaseTransition::PTParams params2(vw, alN, beta, dtau, TN, "sim", un);
 
     // Momentum values
     const auto kRs_vals = logspace(1e-1, 1e+3, 500);
@@ -210,33 +197,61 @@ void example_Kin_Spec(const std::string& filename) {
 
 // Gravitational wave power spectrum
 void example_GW_Spec(const std::string& filename) {
-    // Create default universe parameters (temperature, Hubble and DoF today and at PT)
-    const PhaseTransition::Universe un;
+    const auto vw = 0.9; // detonation
+    // const auto vw = 0.4; // deflagration
+    // const auto vw = 0.6; // hybrid
 
-    // define PT parameters
-    // const auto vw = 0.8;
-    // const auto alN = 0.1;
-    const auto vw = PhaseTransition::dflt_PTParams::vw;
-    const auto alN = PhaseTransition::dflt_PTParams::alN;
-    const auto beta = PhaseTransition::dflt_PTParams::beta;
-    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
-    const auto TN = PhaseTransition::dflt_PTParams::TN;
-    const auto wNeN_rat = PhaseTransition::dflt_PTParams::wNeN_rat;
-    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+    
+    // Will's benchmark point:
+    // const auto Ts = 46.0096;
+    // const auto gs = 106.75;
 
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, wNeN_rat, nuc_type, un);
+    // const auto alN = 0.120242;
+    // const auto Hs = 3.2193e-15; // GeV
+    // const auto betaHs = 588.135; // beta/Hs
+    // const auto beta = betaHs * Hs;
+    // const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    // const auto TN = Ts;
+    // const auto nuc_type = "exp";
+    
+    // Xiao's benchmark point:
+    const auto Ts = 53.370765185008004; // GeV
+    const auto gs = 106.75;
 
-    // un.print();
-    // params.print();
+    const auto alN = 0.11384915003991744;
+    const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
+    const auto dtau = 1e+8;
+    const auto TN = Ts; // GeV
+    const auto nuc_type = "exp";
+
+    const PhaseTransition::Universe un(Ts, gs);
+    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un);
+
+    un.print();
+    params.print();
 
     // Define GW spectrum
-    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    const auto freq_vals = logspace(1e-6, 1e+4, 100); // Hz
+    std::vector<double> kRs_vals;
+    for (const auto& f : freq_vals) {
+        const auto kRs = f * (10.0) * (un.Hs() * params.Rs()) * (100.0 / un.Ts()) * std::pow(100.0 / un.gs(), 1.0 / 6.0);
+        kRs_vals.push_back(kRs);
+    }
+    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
     const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
     
     // Write/plot to disk
     // OmegaGW.write(filename + ".csv");
     #ifdef ENABLE_MATPLOTLIB
-    OmegaGW.plot(filename + ".png");
+    // OmegaGW.plot(filename + ".png");
+    plt::figure_size(800, 600);
+    plt::loglog(freq_vals, OmegaGW.P(), "k-");
+    plt::suptitle("vw = " + to_string_with_precision(params.vw()) + ", alN = " + to_string_with_precision(params.alN()));
+    plt::xlabel("f [Hz]");
+    plt::ylabel("Omega_GW(f)");
+    plt::xlim(freq_vals.front(), freq_vals.back());
+    plt::grid(true);
+    plt::save(filename + ".png");
     #endif
 
     return;
@@ -289,12 +304,10 @@ int main() {
     /****************************/
 
     // test_profile_params();
-    // example_FluidProfile("profile");
     // example_Kin_Spec("Ekin");
-    // example_GW_Spec("GW_spec");
-    example_FluidProfie("profile");
-    // GW_spec_comparison("GW_spec_comparison");
-    // test_dSiCi_accuracy();    
+    // example_GW_Spec("GWSpec");
+    example_FluidProfile("profile");
+    // test_rk4_solver();
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();

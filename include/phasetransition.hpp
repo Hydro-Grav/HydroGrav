@@ -6,6 +6,9 @@
 #include <iostream>
 #include <vector>
 
+#include "ap.h"
+#include "interpolation.h"
+
 #include "physics.hpp"
 
 /*
@@ -21,17 +24,13 @@ TO DO:
 namespace PhaseTransition {
 
 // move universe class somewhere else?
-struct dflt_universe {
-  // static constexpr double T0 = 2.41e-13; // GeV
-  // static constexpr double Ts = 100.0; // GeV
-  // static constexpr double H0 = 1.45e-42; // GeV
-  // static constexpr double Hs = 1.41e-14; // GeV
-  
-  static constexpr double T0 = 2.725 * kB; // K * GeV/K = GeV // good
-  static constexpr double Ts = 100.0;
-  static constexpr double H0 = 67.8; // GeV^2? - needs to be in units of T^2 for Hs definition to make sense
-  static constexpr double g0 = 3.91; // good
-  static constexpr double gs = 106.75; // good
+struct dflt_universe { // in units hbar = c = kB = 1
+  static constexpr double T0 = 2.34914e-13; // 2.725 K / (1.16e+13 K/GeV) = 2.349e-13 GeV
+  static constexpr double H0 = 1.44328e-42; // 67.8 km/s/Mpc = 2.09502e21 s^-1 = 1.44328e-42 GeV
+  static constexpr double g0 = 3.91;
+
+  static constexpr double Ts = 50.0; // GeV
+  static constexpr double gs = 106.75;
 };
 
 /**
@@ -63,8 +62,7 @@ class Universe {
     friend std::ostream& operator<<(std::ostream& os, const Universe& p);
 
   private:
-    const double T0_, Ts_, g0_, gs_, H0_;
-    double Hs_;
+    const double T0_, Ts_, g0_, gs_, H0_, Hs_;
 };
 
 // unused
@@ -77,7 +75,6 @@ struct dflt_PTParams {
   // static constexpr double betaH = 100.0;            // Transition rate param
   static constexpr double dtau = 10.0;            // PT duration
   static constexpr double TN = 1.0;      // Nucleation temperature
-  static constexpr double wNeN_rat = 1.0 + 1./3.;       // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
 
@@ -101,7 +98,8 @@ units:
   public:
     // ctors
     PTParams();
-    PTParams(double vw, double alN, double beta, double dtau, double TN, double wNeN_rat, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un, const std::string& eos);
 
     Universe un() const { return universe_; } // universe parameters
 
@@ -115,22 +113,49 @@ units:
     double tau_fin() const { return tau_fin_; } // end time of PT
     double dtau() const { return dtau_; } // PT duration
     double TN() const { return TN_; } // nucleation temperature
-
-    // unused?
-    double wNeN_rat() const { return wNeN_rat_; } // ratio of enthalpy to energy density (wN/eN)
-    const std::string eos_model() const { return eos_model_; } // equation of state model (bag or Veff)
+    double wNeN_rat() const { return wNeN_rat_; } // ratio of nucleation enthalpy and energy density
 
     const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
+    const std::string eos_model() const { return eos_model_; } // equation of state model (bag or Veff)
 
-    // print params
-    void print() const;
+    // for Veff eos
+    std::vector<double> veff_TTN_vals() const { return veff_TTN_vals_; }
+    std::vector<double> veff_ps_vals() const { return veff_ps_vals_; }
+    std::vector<double> veff_pb_vals() const { return veff_pb_vals_; }
+    std::vector<double> veff_es_vals() const { return veff_es_vals_; }
+    std::vector<double> veff_eb_vals() const { return veff_eb_vals_; }
+
+    double ps_val(double TTN) const { return alglib::spline1dcalc(veff_ps_interp_, TTN); }
+    double pb_val(double TTN) const { return alglib::spline1dcalc(veff_pb_interp_, TTN); }
+    double es_val(double TTN) const { return alglib::spline1dcalc(veff_es_interp_, TTN); }
+    double eb_val(double TTN) const { return alglib::spline1dcalc(veff_eb_interp_, TTN); }
+    double ws_val(double TTN) const { return alglib::spline1dcalc(veff_ws_interp_, TTN); }
+    double wb_val(double TTN) const { return alglib::spline1dcalc(veff_wb_interp_, TTN); }
+
+    double TTN_min() const { return veff_TTN_vals_.front(); }
+    double TTN_max() const { return veff_TTN_vals_.back(); }
+
+    double eN() const { return eN_; }
+    double wN() const { return wN_; }
+
     friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
+    void print() const;
+
+    #ifdef ENABLE_MATPLOTLIB
+    void plot_thermo(const std::string& filename) const; // Plots e(T), p(T), w(T)
+    #endif
   
   private:
       const Universe universe_;
       std::string eos_model_; // equation of state model (bag or Veff)
       const char *nuc_type_;
       double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, TN_, wNeN_rat_, cpsq_, cmsq_;
+
+      // for Veff eos
+      std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
+      alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
+      double eN_, wN_;
+
 
       bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
       bool is_valid_csq(double csq) const;

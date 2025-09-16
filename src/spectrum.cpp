@@ -35,6 +35,7 @@ TO DO:
 - change throw exception for P() and K() so that it uses P() and K() when wrong one is called
 - update Ekin to pass in Profile class (or maybe just PTParams?)
 - implement adaptive step-size in Ekin integration (and dlt later too)
+- change input of GWSpec2 to frequencies then convert to kRs internally
 */
 
 namespace Spectrum {
@@ -69,7 +70,7 @@ void PowerSpec::write(const std::string& filename) const {
 
     for (size_t i = 0; i < K_vals.size(); ++i) {
         const auto freq_val = K_vals[i] * conv_fac;
-        file << freq_val << K_vals[i] << "," << P_vals[i] << "\n";
+        file << freq_val << "," << K_vals[i] << "," << P_vals[i] << "\n";
     }
     file.close();
     std::cout << "Saved to " << filename << "!\n";
@@ -198,8 +199,8 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     // calc temp ptRs vals for interpolating func
     const auto pRs_max = pRs_vals.back();
     const auto kRs_max = kRs_vals.back();
-    const auto ptRs_max = 10.0 * (kRs_max + pRs_max); // max of pt=sqrt(k^2-2kpz+p^2)
-    const auto ptRs_min = 1e-7; // not sure how to choose best min val - update later
+    const auto ptRs_max = 15.0 * (kRs_max + pRs_max); // max of pt=sqrt(k^2-2kpz+p^2)
+    const auto ptRs_min = 1e-8; // not sure how to choose best min val - update later
 
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2.0*np);
 
@@ -273,11 +274,12 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
     const auto Rs_inv = 1.0 / params.Rs();
 
     const Hydrodynamics::FluidProfile profile(params); // generate fluid profile
+
     const auto prefac = gw_prefac(kRs_vals, profile); // prefactor
 
     const auto nk = kRs_vals.size();
 
-    const auto np = 2000;
+    const auto np = 1000;
     const auto pRs_vals = logspace(1e-2, 1e+3, np); // P = p*Rs
 
     std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
@@ -287,7 +289,7 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
         pRs2_vals[i] = pRs * pRs;
     }
 
-    const auto nz = 2000;
+    const auto nz = 1000;
     const auto z_vals = linspace(-1.0, 1.0, nz); // logspace gives nan over this domain
 
     const auto npnz = np * nz;
@@ -300,8 +302,8 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
     //       > use interpolator instead (much faster than constructing PowerSpec objects inside loops)
 
     // calc temp ptRs vals for interpolating func
-    const auto ptRs_min = find_min_pt(kRs_vals, pRs_vals);
-    const auto ptRs_max = ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
+    const auto ptRs_min = 0.99 * find_min_pt(kRs_vals, pRs_vals);
+    const auto ptRs_max = 1.01 * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
 
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
 

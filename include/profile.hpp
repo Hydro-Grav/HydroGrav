@@ -71,8 +71,7 @@ using state_type = std::vector<double>;
  */
 class FluidProfile {
   public:
-    FluidProfile(const PhaseTransition::PTParams& params, const state_type& veff_T_vals, const state_type& veff_ps_vals, const state_type& veff_pb_vals, const state_type& veff_es_vals, const state_type& veff_eb_vals, const size_t n=5000);
-    FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000); // ctor
+    FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000);
     // write dflt ctor?
 
     // are these needed?
@@ -93,7 +92,6 @@ class FluidProfile {
     
     #ifdef ENABLE_MATPLOTLIB
     void plot(const std::string& filename = "bubble_prof.png") const; // Plots bubble profiles
-    void plot_thermo(const std::string& filename = "thermo.png") const; // Plots e(T), p(T), w(T)
     #endif
 
     state_type get_csq() const;
@@ -108,13 +106,6 @@ class FluidProfile {
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
     double xi0_, xif_; // initial/final xi
     std::vector<double> y0_; // initial conditions {v0, w0}
-
-    // Veff stuff
-    state_type veff_TTN_vals_;
-    const state_type veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_; // T, P(T), e(T) for fluid profile using generic EoS
-    alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
-
-    double eN_, wN_, wN_inv_;
     
     state_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 

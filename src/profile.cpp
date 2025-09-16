@@ -148,11 +148,8 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
     /*   As above, but ending with 'UF'                                        */
     /***************************************************************************/
 
-// ctor for passing Veff
-// make sure it passes in T/TN, P(T)/wN, e(T)/wN!!
-FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const state_type& veff_T_vals, const state_type& veff_ps_vals, const state_type& veff_pb_vals, const state_type& veff_es_vals, const state_type& veff_eb_vals, const size_t n)
-    : eos_(),
-      params_(params),
+FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t n)
+    : params_(params),
       cpsq_(params.cpsq()), cmsq_(params.cmsq()),
       cp_(std::sqrt(cpsq_)), cm_(std::sqrt(cmsq_)),
       vw_(params.vw()), alN_(params.alN()),
@@ -161,42 +158,15 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const state_
       mode_(),
       xi0_(), xif_(),
       y0_(),
-      veff_TTN_vals_(),
-      veff_ps_vals_(veff_ps_vals), veff_pb_vals_(veff_pb_vals),
-      veff_es_vals_(veff_es_vals), veff_eb_vals_(veff_eb_vals),
-      eN_(), wN_(), wN_inv_(),
       xi_vals_(), v_vals_(), w_vals_(), T_vals_(), la_vals_()
     {
-        if (veff_T_vals.empty()) { // bag eos
-            std::cout << "Calculating fluid profile using Bag equation of state\n";
-            eos_ = "bag";
+        std::vector<state_type> prof;
 
-            if (alN_ <= 0.0) throw std::invalid_argument("alN must be > 0");
+        std::cout << "wNeN_rat = " << params.wNeN_rat() << "\n";
 
-            // define hydrodynamic mode
-            mode_ = get_mode(vw_, cmsq_, alN_);
-
-            // check alN large enough for shock (deflag/hybrid only)
-            if (mode_ == 0 || mode_ == 1) {
-                const auto alp_minmax = get_alp_minmax(vw_);
-                alp_min_ = alp_minmax[0];
-                alp_max_ = alp_minmax[1];
-
-                // alN > alp > alp_min (can't properly constrain from above since we need alp)
-                if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
-            }
-
-        
-        } else { // veff eos
+        if (params.eos_model() == "veff") { // veff eos
             std::cout << "Calculating fluid profile using generic equation of state from Veff\n";
             std::cout << "Warning: alN stored in PTParams is not used for Veff EoS!\n";
-            eos_ = "veff";
-
-            const auto nT = veff_T_vals.size();
-            if (veff_ps_vals_.size() != nT && veff_pb_vals_.size() != nT && 
-                veff_es_vals_.size() != nT && veff_eb_vals_.size() != nT) {
-                throw std::runtime_error("Temperature, pressure and energy density vectors must have the same size.");
-            }
 
             // replace with get_mode_veff when implemented!!
             mode_ = get_mode(vw_, cmsq_, alN_); // placeholder for now!!
@@ -211,51 +181,27 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const state_
                 if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
             }
 
-            // store T/TN vals
-            const auto TN_inv = 1.0 / params_.TN();
-            for (size_t i = 0; i < nT; i++) {
-                veff_TTN_vals_.push_back(veff_T_vals[i] * TN_inv);
-            }
-
-            // store w(T/TN) vals
-            state_type veff_ws_vals_(nT), veff_wb_vals_(nT);
-            for (size_t i = 0; i < nT; ++i) {
-                veff_ws_vals_[i] = veff_es_vals_[i] + veff_ps_vals_[i]; // w=e+p
-                veff_wb_vals_[i] = veff_eb_vals_[i] + veff_pb_vals_[i];
-            }
-
-            // construct interpolating functions p(T/TN), e(T/TN) in s/b phases
-            alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_ws_array, veff_pb_array, veff_eb_array, veff_wb_array;
-            veff_TTN_array.setcontent(nT, veff_TTN_vals_.data());
-
-            veff_ps_array.setcontent(nT, veff_ps_vals_.data()); // symmetric phase
-            veff_es_array.setcontent(nT, veff_es_vals_.data());
-            veff_ws_array.setcontent(nT, veff_ws_vals_.data());
-            alglib::spline1dbuildcubic(veff_TTN_array, veff_ps_array, veff_ps_interp_);
-            alglib::spline1dbuildcubic(veff_TTN_array, veff_es_array, veff_es_interp_);
-            alglib::spline1dbuildcubic(veff_TTN_array, veff_ws_array, veff_ws_interp_);
-
-            veff_pb_array.setcontent(nT, veff_pb_vals_.data()); // broken phase
-            veff_eb_array.setcontent(nT, veff_eb_vals_.data());
-            veff_wb_array.setcontent(nT, veff_wb_vals_.data());
-            alglib::spline1dbuildcubic(veff_TTN_array, veff_pb_array, veff_pb_interp_);
-            alglib::spline1dbuildcubic(veff_TTN_array, veff_eb_array, veff_eb_interp_);
-            alglib::spline1dbuildcubic(veff_TTN_array, veff_wb_array, veff_wb_interp_);
-
-            eN_ = alglib::spline1dcalc(veff_es_interp_, 1.0); // eN = e(T/TN=1)
-            wN_ = alglib::spline1dcalc(veff_ws_interp_, 1.0); // wN = w(T/TN=1)
-            wN_inv_ = 1.0 / wN_;
-            std::cout << "wNeN_rat=" << wN_/eN_ << "\n";
-        }
-
-        // calculate fluid profiles v(xi), w(xi), la(xi)
-        std::vector<state_type> prof;
-        if (eos_ == "veff") {
+            // calculate fluid profiles v(xi), w(xi), la(xi) (remove from conditional when solve_profile finished)
             prof = solve_profile_veff(n);
-        } else if (eos_ == "bag") {
+        } else {
+            std::cout << "Calculating fluid profile using Bag equation of state\n";
+
+            // define hydrodynamic mode
+            mode_ = get_mode(vw_, cmsq_, alN_);
+
+            // check alN large enough for shock (deflag/hybrid only)
+            if (mode_ == 0 || mode_ == 1) {
+                const auto alp_minmax = get_alp_minmax(vw_);
+                alp_min_ = alp_minmax[0];
+                alp_max_ = alp_minmax[1];
+
+                // alN > alp > alp_min (can't properly constrain from above since we need alp)
+                if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
+            }
+
+            // calculate fluid profiles v(xi), w(xi), la(xi) (remove from conditional when solve_profile finished)
             prof = solve_profile(n);
         }
-        // const auto prof = solve_profile(n);
 
         xi_vals_ = prof[0];
         v_vals_ = prof[1];
@@ -265,10 +211,6 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const state_
 
         std::cout << "Fluid profile constructed!\n";
     }
-
-// ctor for bag model
-FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t n)
-    : FluidProfile(params, {}, {}, {}, {}, {}, n) {}
 
 // Public functions
 void FluidProfile::write(const std::string& filename) const {
@@ -330,53 +272,6 @@ void FluidProfile::plot(const std::string& filename) const {
 
     return;
 }
-
-void FluidProfile::plot_thermo(const std::string& filename) const {
-    if (eos_ != "veff")
-        throw std::runtime_error("plot_thermo can only be called when using Veff");
-
-    plt::figure_size(2400, 1600);
-
-    plt::subplot2grid(3, 2, 0, 0);
-    plt::plot(veff_TTN_vals_, veff_es_vals_);
-    plt::xlabel("T/TN");
-    plt::ylabel("es(T/TN)");
-    plt::grid(true);
-
-    plt::subplot2grid(3, 2, 0, 1);
-    plt::plot(veff_TTN_vals_, veff_eb_vals_);
-    plt::xlabel("T/TN");
-    plt::ylabel("eb(T/TN)");
-    plt::grid(true);
-
-    plt::subplot2grid(3, 2, 1, 0);
-    plt::plot(veff_TTN_vals_, veff_ps_vals_);
-    plt::xlabel("T/TN");
-    plt::ylabel("ps(T/TN)");
-    plt::grid(true);
-
-    plt::subplot2grid(3, 2, 1, 1);
-    plt::plot(veff_TTN_vals_, veff_pb_vals_);
-    plt::xlabel("T/TN");
-    plt::ylabel("pb(T/TN)");
-    plt::grid(true);
-
-    plt::subplot2grid(3, 2, 2, 0);
-    plt::plot(veff_TTN_vals_, veff_ws_vals_);
-    plt::xlabel("T/TN");
-    plt::ylabel("ws(T/TN)");
-    plt::grid(true);
-
-    plt::subplot2grid(3, 2, 2, 1);
-    plt::plot(veff_TTN_vals_, veff_wb_vals_);
-    plt::xlabel("T/TN");
-    plt::ylabel("wb(T/TN)");
-    plt::grid(true);
-
-    plt::save(filename);
-
-    return;
-}
 #endif
 
 
@@ -404,7 +299,7 @@ void FluidProfile::plot_thermo(const std::string& filename) const {
 // }
 
 // Private functions
-std::vector<state_type> FluidProfile::read(const std::string& filename) const {
+std::vector<state_type> FluidProfile::read(const std::string& filename) const { // testing purposes ONLY
     std::cout << "Warning: Read fluid profile does not check PT parameters of input file. Manual entry of PT parameters required!\n";
 
     std::ifstream file(filename);
@@ -605,18 +500,20 @@ state_type FluidProfile::get_lambda(state_type T_vals) const {
 
     // add error handling if i > T_vals.size()
     if (mode_ == 0) { // deflagration - all xi in symmetric phase (xi_w < xi < xi_sh)
-        e_xi = [&] (size_t i) { return alglib::spline1dcalc(veff_es_interp_, T_vals[i]); };
+        e_xi = [&] (size_t i) { return params_.es_val(T_vals[i]); };
     } else if (mode_ == 1) { // hybrid
         e_xi = [&] (size_t i) { return 0.0; };
     } else { // detonantion - all xi in broken phase (cm < xi < xi_w)
-        e_xi = [&] (size_t i) { return alglib::spline1dcalc(veff_eb_interp_, T_vals[i]); };
+        e_xi = [&] (size_t i) { return params_.eb_val(T_vals[i]); };
     }
 
     const size_t n = T_vals.size();
-    state_type la_vals(n);
+    const auto eN = params_.eN();
+    const auto wN_inv = 1.0 / params_.wN();
 
+    state_type la_vals(n);
     for (size_t i = 0; i < n; i++) {
-        la_vals[i] = (e_xi(i) - eN_) * wN_inv_;
+        la_vals[i] = (e_xi(i) - eN) * wN_inv;
     }
 
     return la_vals;
@@ -624,15 +521,22 @@ state_type FluidProfile::get_lambda(state_type T_vals) const {
 
 // change these to lambda functions in solve?
 double FluidProfile::lambda_s(double ToTN) const {
-    const auto es_T = alglib::spline1dcalc(veff_es_interp_, ToTN); // es(T/TN)
-    return (es_T - eN_) * wN_inv_;
+    const auto es_T = params_.es_val(ToTN); // es(T/TN)
+    const auto eN = params_.eN();
+    const auto wN_inv = 1.0 / params_.wN();
+
+    return (es_T - eN) * wN_inv;
 }
 
 double FluidProfile::lambda_b(double ToTN) const {
-    const auto eb_T = alglib::spline1dcalc(veff_eb_interp_, ToTN); // es(T/TN)
-    return (eb_T - eN_) * wN_inv_;
+    const auto eb_T = params_.eb_val(ToTN); // eb(T/TN)
+    const auto eN = params_.eN();
+    const auto wN_inv = 1.0 / params_.wN();
+
+    return (eb_T - eN) * wN_inv;
 }
 
+// bag model only
 double FluidProfile::find_shock(const deriv_func& dydxi) const {
     // Root-finding algorithm for initial condition v0 = v(xi_sh) = v1UF
     
@@ -768,15 +672,19 @@ std::vector<double> FluidProfile::test_wall_matching(const deriv_func& dydxi, do
 }
 
 std::vector<double> FluidProfile::matching_eqs_shock(double v2, double T2TN, double v1, double T1TN) const {    
-    if (T1TN < veff_TTN_vals_.front() || T1TN > veff_TTN_vals_.back()) {
+    if (T1TN < params_.TTN_min() || T1TN > params_.TTN_max()) {
         throw std::out_of_range("T1/TN is called out of bounds for spline!");
     }
 
-    const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN); // p_2, e_2
-    const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
+    // const auto p2 = alglib::spline1dcalc(veff_ps_interp_, T2TN); 
+    // const auto e2 = alglib::spline1dcalc(veff_es_interp_, T2TN);
+    const auto p2 = params_.ps_val(T2TN); // p_2, e_2
+    const auto e2 = params_.es_val(T2TN);
 
-    const auto p1 = alglib::spline1dcalc(veff_ps_interp_, T1TN); // p_1, e_1
-    const auto e1 = alglib::spline1dcalc(veff_es_interp_, T1TN);
+    // const auto p1 = alglib::spline1dcalc(veff_ps_interp_, T1TN);
+    // const auto e1 = alglib::spline1dcalc(veff_es_interp_, T1TN);
+    const auto p1 = params_.ps_val(T1TN); // p_1, e_1
+    const auto e1 = params_.es_val(T1TN);
 
     // const auto eq1 = v2 * v1 * (e1 - e2) - (p1 - p2);
     // const auto eq2 = v1 * (e1 + p2) - v2 * (e2 + p1);
@@ -787,17 +695,21 @@ std::vector<double> FluidProfile::matching_eqs_shock(double v2, double T2TN, dou
 }
 
 std::vector<double> FluidProfile::matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const {        
-    if (TmTN < veff_TTN_vals_.front() || TmTN > veff_TTN_vals_.back()) {
+    if (TmTN < params_.TTN_min() || TmTN > params_.TTN_max()) {
         // std::cout << "Tm/TN=" << TmTN << "\n";
-        // std::cout << "TmTN bounds: (" << veff_TTN_vals_.front() << ", " << veff_TTN_vals_.back() << ")\n";
+        // std::cout << "TmTN bounds: (" << params_.TTN_min() << ", " << params_.TTN_max() << ")\n";
         throw std::out_of_range("Tm/TN is called out of bounds for spline!");
     }
 
-    const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN); // p_+, e_+
-    const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
+    // const auto pp = alglib::spline1dcalc(veff_ps_interp_, TpTN);
+    // const auto ep = alglib::spline1dcalc(veff_es_interp_, TpTN);
+    const auto pp = params_.ps_val(TpTN); // p_+, e_+
+    const auto ep = params_.es_val(TpTN);
 
-    const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN); // p_-, e_-
-    const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
+    // const auto pm = alglib::spline1dcalc(veff_pb_interp_, TmTN);
+    // const auto em = alglib::spline1dcalc(veff_eb_interp_, TmTN);
+    const auto pm = params_.pb_val(TmTN); // p_-, e_-
+    const auto em = params_.eb_val(TmTN);
 
     // using regular form seems to make detonation IC calculation go out of bounds for Tm
     const auto eq1 = vp * vm * (em - ep) - (pm - pp);
@@ -810,6 +722,7 @@ std::vector<double> FluidProfile::matching_eqs_wall(double vp, double TpTN, doub
 
 // keep as void or output just xi_sh and y0={v1UF, w1wN, T1TN}?
 // better error handling - change catch (...) to specific throws
+// modify so it stores yp too (simplifies solve_proifle)
 void FluidProfile::get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& ym) const {
     const double xi_sh_min = std::max(std::sqrt(cpsq_), vw_); // xi_sh > cp > xi_w (deflag), xi_sh > xi_w > cp (hybrid)
     const double xi_sh_max = 1.0;
