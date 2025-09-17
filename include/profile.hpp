@@ -36,6 +36,10 @@ double dvdxi(double xi, double v, const double csq);
 double dwdxi(double xi, double v, double w, const double csq);
 double dTdxi(double xi, double v, double T, const double csq);
 
+double dxidv(double xi, double v, const double csq);
+double dxidw(double xi, double v, double w, const double csq);
+double dxidT(double xi, double v, double T, const double csq);
+
 void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pts, int y_pts, const std::string& filename);
 void generate_streamplot_data(const PhaseTransition::PTParams& params);
 
@@ -136,8 +140,7 @@ class FluidProfile {
     double find_shock_veff(const deriv_func& dydxi) const;
 
     std::vector<double> test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
-    std::vector<double> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0) const;
-    std::vector<double> test_wall_matching2(const deriv_func& dydxi, double xi_sh, state_type& y0) const;
+    std::pair<state_type, state_type> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0) const;
 
     double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
     std::vector<double> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
@@ -145,7 +148,7 @@ class FluidProfile {
     double matching_eqs_shock2(double v2, double T2TN, double T1TN) const;
     double matching_eqs_wall2(double vp, double TpTN, double TmTN) const;
 
-    void get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& ym) const;
+    void get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& yp, state_type& ym) const;
     std::vector<double> get_IC_detonation_veff() const;
 
     // put number of integration points in input file? seems bad to hardcode

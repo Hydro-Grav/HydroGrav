@@ -60,8 +60,8 @@ void test_rk4_solver() {
 
 // Fluid profile
 void example_FluidProfile(const std::string& filename) {
-    const auto vw = 0.9; // detonation
-    // const auto vw = 0.4; // deflagration
+    // const auto vw = 0.9; // detonation
+    const auto vw = 0.4; // deflagration
     // const auto vw = 0.6; // hybrid
     
     // Will's benchmark point:

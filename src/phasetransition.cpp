@@ -26,6 +26,7 @@ TO DO:
 - check if UF_trans is the same for vp and vm
 - only inputs to PTParams should be model, alpha, vw and nucleation type i think
 - check beta, Hs, dtau definitions are consistent!
+- default values for veff stuff to nan if not using veff eos
 */
 
 namespace PhaseTransition {
