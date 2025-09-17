@@ -25,7 +25,7 @@ TO DO:
 - update default vals for beta, wp, wm in PTParams
 - check if UF_trans is the same for vp and vm
 - only inputs to PTParams should be model, alpha, vw and nucleation type i think
-- check beta, Hs, dtau definitions are consistent!
+- change taus to 1/Hs_conformal (currently using 1/Hs since otherwise program breaks)
 - default values for veff stuff to nan if not using veff eos
 */
 
@@ -138,11 +138,19 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, c
         throw std::invalid_argument("Unphysical sound wave duration passed into PTParams. Must have dtau > 0.");
       }
 
+      Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
+
       // define duration of sound waves
-      const auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts();
-      const auto Hs_conformal = universe_.Hs() * asa0_rat;
+      const auto asa0_rat = std::pow(universe_.g0() / universe_.gs(), 1./3.) * universe_.T0() / universe_.Ts(); // a_* / a_0
+      const auto Hs_conformal = universe_.Hs() * asa0_rat; // conformal Hubble rate at PT as measured today
       
-      tau_s_ = 1.0e+10; // placeholder
+      // Note on Hs_conformal:
+      // Usual definition of conformal Hubble rate is Hs_conformal = as*Hs, but here we include a redshift factor 1/a0 (i.e. so this is Hs_conformal as measured today)
+      
+      // tau_s should be defined as 1.0 / Hs_conformal (don't understand why!), but this breaks calculation
+      // since tau_s is too large -> Si and Ci integrals are const for such large values so dlt=0 -> OmegaGW=0
+      // tau_s_ = 1.0 / Hs_conformal;
+      tau_s_ = 1.0 / universe_.Hs();
       tau_fin_ = tau_s_ + dtau_;
 
       // define speed of sound in both phases
@@ -236,8 +244,6 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, c
       if (!is_valid_csq(cpsq_) || !is_valid_csq(cmsq_)) {
         throw std::invalid_argument("Unphysical speed of sound passed into PTParams. Must have 0 < cs < 1.");
       }
-
-      Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
     }
 
 std::ostream& operator<<(std::ostream& os, const PTParams& params) {

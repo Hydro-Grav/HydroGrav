@@ -23,12 +23,14 @@ TO DO:
 
 namespace PhaseTransition {
 
-// move universe class somewhere else?
+// DO NOT CHANGE DEFAULT VALS
 struct dflt_universe { // in units hbar = c = kB = 1
+  // values today
   static constexpr double T0 = 2.34914e-13; // 2.725 K / (1.16e+13 K/GeV) = 2.349e-13 GeV
   static constexpr double H0 = 1.44328e-42; // 67.8 km/s/Mpc = 2.09502e21 s^-1 = 1.44328e-42 GeV
   static constexpr double g0 = 3.91;
 
+  // values at start of PT
   static constexpr double Ts = 50.0; // GeV
   static constexpr double gs = 106.75;
 };
@@ -68,13 +70,14 @@ class Universe {
 // unused
 const Universe& default_universe();
 
+// DO NOT CHANGE DEFAULT VALS
 struct dflt_PTParams {
   static constexpr double vw = 0.8;              // Wall velocity
   static constexpr double alN = 0.1;           // PT strength 
-  static constexpr double beta = 1.0;            // Transition rate param
-  // static constexpr double betaH = 100.0;            // Transition rate param
-  static constexpr double dtau = 10.0;            // PT duration
-  static constexpr double TN = 1.0;      // Nucleation temperature
+  static constexpr double beta = 1e-12;            // Transition rate param
+  static constexpr double Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;   
+  static constexpr double dtau = 10.0 * Rs;         // PT duration
+  static constexpr double TN = dflt_universe::Ts;     // Nucleation temperature
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
 
