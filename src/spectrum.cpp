@@ -44,10 +44,17 @@ namespace Spectrum {
 
 // Define ctors
 PowerSpec::PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params)
-    : data_(Spectrum{K_vals, P_vals}),
+    : freq_vals_(), K_vals_(K_vals), P_vals_(P_vals),
       params_(params) {
         if (K_vals.size() != P_vals.size()) {
             throw std::invalid_argument("PowerSpec: k and P vectors must be the same size!");
+        }
+
+        // store frequency values
+        for (const auto& K : K_vals_) {
+            const auto HsRs = params_.un().Hs() * params_.Rs();
+            const auto freq_val = (2.6e-5) * (K / 10.0) * (1.0 / HsRs) * (params_.un().Ts() / 100.0) * std::pow(params_.un().gs() / 100.0, 1.0 / 6.0);
+            freq_vals_.push_back(freq_val);
         }
     }
 
@@ -62,15 +69,8 @@ void PowerSpec::write(const std::string& filename) const {
     std::ofstream file(filename);
     file << "freq,K,P\n";
 
-    const auto K_vals = data_.first;
-    const auto P_vals = data_.second;
-
-    // TN should just be T_*, not sure if this is right
-    const auto conv_fac = (2.6e-5) * (1.0 / 10.0) * (1.0 / (params_.un().Hs() * params_.Rs())) * (params_.TN() / 100.0) * std::pow(params_.un().gs() / 100.0, 1.0 / 6.0);
-
-    for (size_t i = 0; i < K_vals.size(); ++i) {
-        const auto freq_val = K_vals[i] * conv_fac;
-        file << freq_val << "," << K_vals[i] << "," << P_vals[i] << "\n";
+    for (size_t i = 0; i < K_vals_.size(); ++i) {
+        file << freq_vals_[i] << "," << K_vals_[i] << "," << P_vals_[i] << "\n";
     }
     file.close();
     std::cout << "Saved to " << filename << "!\n";
@@ -118,7 +118,8 @@ PowerSpec operator*(double scalar, const PowerSpec& spec) {
 }
 
 PowerSpec& PowerSpec::operator*=(double scalar) {
-    for (auto& p : data_.second) {
+    // for (auto& p : data_.second) {
+    for (auto& p : P_vals_ ) {
         p *= scalar;
     }
     return *this;
@@ -134,7 +135,8 @@ PowerSpec& PowerSpec::operator/=(double scalar) {
     if (scalar == 0.0)
         throw std::invalid_argument("PowerSpec: Division by zero!");
 
-    for (auto& p : data_.second) {
+    // for (auto& p : data_.second) {
+    for (auto& p : P_vals_) {
         p /= scalar;
     }
     return *this;
@@ -275,8 +277,6 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 
     const Hydrodynamics::FluidProfile profile(params); // generate fluid profile
 
-    const auto prefac = gw_prefac(kRs_vals, profile); // prefactor
-
     const auto nk = kRs_vals.size();
 
     const auto np = 1000;
@@ -326,6 +326,8 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
+    const auto prefac = gw_prefac(kRs_vals, profile); // prefactor
+
     std::vector<double> GW_P_vals(nk);
     #pragma omp parallel 
     {
@@ -356,7 +358,7 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
                         throw std::runtime_error("ptRs out of bounds in GWSpec2: " + std::to_string(ptRs) + " not in [" + std::to_string(zk_ptRs_K_min) + ", " + std::to_string(zk_ptRs_K_max) + "]");
                     }
                 
-                    const auto dlt = dlt_SSM2(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);
+                    const auto dlt = dlt_SSM2(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);      
                     const auto zk_ptRs_val = alglib::spline1dcalc(zk_ptRs_interp, ptRs);
 
                     const auto z_fac = 1.0 - z;
@@ -400,6 +402,10 @@ double dlt_SSM2(double k, double p, double pt, const double cs, const double tau
             sici(x1, Si_x1, Ci_x1);
             sici(x2, Si_x2, Ci_x2);
 
+            // use this instead if sici fails for very large x
+            // alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
+            // alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
+
             const auto dSi = Si_x1 - Si_x2;
             const auto dCi = Ci_x1 - Ci_x2;
 
@@ -414,10 +420,6 @@ double dlt_SSM2(double k, double p, double pt, const double cs, const double tau
 double ff(double tau_m, double kcs) {
     // kcs = k*cs -> ff called this way to make dlt faster
     return std::cos(kcs * tau_m); // for SSM -> NEED TO UPDATE THIS
-}
-
-double dtau_fin(double tau_fin, double tau_s) {
-    return tau_fin - tau_s;
 }
 
 // tau_vals is the same for each call of dlt() -> redundance when calling dlt() in a loop since it recalculates tau_m each time

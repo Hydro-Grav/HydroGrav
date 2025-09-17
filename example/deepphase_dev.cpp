@@ -72,7 +72,8 @@ void example_FluidProfile(const std::string& filename) {
     // const auto Hs = 3.2193e-15; // GeV
     // const auto betaHs = 588.135; // beta/Hs
     // const auto beta = betaHs * Hs;
-    // const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    // const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
+    // const auto dtau = 10.0 * Rs;
     // const auto TN = Ts;
     // const auto nuc_type = "exp";
     
@@ -81,7 +82,8 @@ void example_FluidProfile(const std::string& filename) {
     const auto gs = 106.75;
     const auto alN = 0.11384915003991744;
     const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
-    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
+    const auto dtau = 10.0 * Rs;
     const auto TN = Ts; // GeV
     const auto nuc_type = "exp";
     std::string veff_file = "thermo.csv";
@@ -197,9 +199,9 @@ void example_Kin_Spec(const std::string& filename) {
 
 // Gravitational wave power spectrum
 void example_GW_Spec(const std::string& filename) {
-    const auto vw = 0.9; // detonation
+    // const auto vw = 0.9; // detonation
     // const auto vw = 0.4; // deflagration
-    // const auto vw = 0.6; // hybrid
+    const auto vw = 0.6; // hybrid
 
     
     // Will's benchmark point:
@@ -210,7 +212,8 @@ void example_GW_Spec(const std::string& filename) {
     // const auto Hs = 3.2193e-15; // GeV
     // const auto betaHs = 588.135; // beta/Hs
     // const auto beta = betaHs * Hs;
-    // const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    // const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
+    // const auto dtau = 10.0 * Rs;
     // const auto TN = Ts;
     // const auto nuc_type = "exp";
     
@@ -220,38 +223,41 @@ void example_GW_Spec(const std::string& filename) {
 
     const auto alN = 0.11384915003991744;
     const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
-    const auto dtau = 1e+8;
+    const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
+    const auto dtau = 10.0 * Rs;
     const auto TN = Ts; // GeV
     const auto nuc_type = "exp";
+    std::string veff_file = "thermo.csv";
 
     const PhaseTransition::Universe un(Ts, gs);
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un);
+    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un);
+    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un, veff_file);
 
     un.print();
     params.print();
 
     // Define GW spectrum
-    const auto freq_vals = logspace(1e-6, 1e+4, 100); // Hz
-    std::vector<double> kRs_vals;
-    for (const auto& f : freq_vals) {
-        const auto kRs = f * (10.0) * (un.Hs() * params.Rs()) * (100.0 / un.Ts()) * std::pow(100.0 / un.gs(), 1.0 / 6.0);
-        kRs_vals.push_back(kRs);
-    }
-    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    // const auto freq_vals = logspace(1e-7, 1.0, 100); // Hz
+    // std::vector<double> kRs_vals;
+    // for (const auto& f : freq_vals) {
+    //     const auto kRs = f * (10.0 / 2.6e-5) * (un.Hs() * params.Rs()) * (100.0 / un.Ts()) * std::pow(100.0 / un.gs(), 1.0 / 6.0);
+    //     kRs_vals.push_back(kRs);
+    // }
+    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
     const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
     
     // Write/plot to disk
-    // OmegaGW.write(filename + ".csv");
+    OmegaGW.write(filename + ".csv");
     #ifdef ENABLE_MATPLOTLIB
-    // OmegaGW.plot(filename + ".png");
-    plt::figure_size(800, 600);
-    plt::loglog(freq_vals, OmegaGW.P(), "k-");
-    plt::suptitle("vw = " + to_string_with_precision(params.vw()) + ", alN = " + to_string_with_precision(params.alN()));
-    plt::xlabel("f [Hz]");
-    plt::ylabel("Omega_GW(f)");
-    plt::xlim(freq_vals.front(), freq_vals.back());
-    plt::grid(true);
-    plt::save(filename + ".png");
+    OmegaGW.plot(filename + ".png");
+    // plt::figure_size(800, 600);
+    // plt::loglog(freq_vals, OmegaGW.P(), "k-");
+    // plt::suptitle("vw = " + to_string_with_precision(params.vw()) + ", alN = " + to_string_with_precision(params.alN()));
+    // plt::xlabel("f [Hz]");
+    // plt::ylabel("Omega_GW(f)");
+    // plt::xlim(freq_vals.front(), freq_vals.back());
+    // plt::grid(true);
+    // plt::save(filename + ".png");
     #endif
 
     return;
@@ -305,9 +311,77 @@ int main() {
 
     // test_profile_params();
     // example_Kin_Spec("Ekin");
-    // example_GW_Spec("GWSpec");
-    example_FluidProfile("profile");
+    example_GW_Spec("GWSpec");
+    // example_FluidProfile("profile");
     // test_rk4_solver();
+
+    // const auto T0 = 2.41e-13; // GeV
+    // const auto Ts = 100.0; // GeV
+    // const auto H0 = 1.45e-42; // GeV
+    // const auto Hs = 1.41e-14; // GeV
+    // const auto g0 = 3.91;
+    // const auto gs = 106.75;
+
+    // const auto vw = 0.8;
+    // const auto alN = 0.1;
+    // const auto betaH = 10.0;
+    // const auto beta = betaH * Hs;
+    // const auto dtauH = 1.0;
+    // const auto dtau = dtauH * Hs;
+    // const auto wNeN_rat = 4.0 / 3.0;
+    // const auto TN = Ts;
+
+    // const auto Ts = 53.370765185008004; // GeV
+    // const auto gs = 106.75;
+
+    // const auto vw = 0.8;
+    // const auto alN = 0.11384915003991744;
+    // const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
+    // const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
+    // const auto dtau = 10.0 * Rs;
+    // const auto TN = Ts; // GeV
+    // const auto nuc_type = "exp";
+    
+    // const PhaseTransition::Universe un(Ts, gs);
+    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, "exp", un);
+
+    // un.print();
+    // params.print();
+
+    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    // const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
+    // OmegaGW.plot("GWSpec_test.png");
+
+    // const auto cs = std::sqrt(params.cpsq());
+    // const auto tau_s = params.tau_s();
+    // const auto tau_fin = params.tau_fin();
+    // const auto Rs_inv = 1.0 / params.Rs();
+
+    // const auto nk = 3;
+    // const auto np = 3;
+    // const auto nz = 3;
+
+    // const auto kRs_vals = logspace(1e-3, 1e+3, nk);
+    // const auto pRs_vals = logspace(1e-2, 1e+3, np);
+    // const auto z_vals = linspace(-1.0, 1.0, nz);
+
+    // for (size_t kk = 0; kk < nk; kk++ ) {
+    //     const auto kRs = kRs_vals[kk];
+    //     const auto k = kRs * Rs_inv;
+
+    //     for (size_t pp = 0; pp < np; pp++) {
+    //         const auto pRs = pRs_vals[pp];
+    //         const auto p = pRs * Rs_inv;
+
+    //         for (size_t zz = 0; zz < nz; zz++) {
+    //             const auto z = z_vals[zz];
+    //             const auto ptRs = Spectrum::ptilde(kRs, pRs, z);
+            
+    //             const auto dlt = Spectrum::dlt_SSM2(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);
+    //             std::cout << "dlt=" << dlt << "\n";
+    //         }
+    //     }
+    // }
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();

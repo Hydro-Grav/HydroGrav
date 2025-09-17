@@ -33,15 +33,12 @@ namespace Spectrum {
  */
 class PowerSpec {
   public:
-    // using Spectrum = std::pair<double, double>;
-    using Spectrum = std::pair<std::vector<double>, std::vector<double>>;
-
     // ctors - pass in momentum (k) and spectrum (P) since P is calculated differently for kinetic/GW
-    // PowerSpec(double k, double P);
-    PowerSpec(const std::vector<double>& kvec, std::vector<double>& Pvec, const PhaseTransition::PTParams& params);
+    PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params);
 
-    const std::vector<double>& K() const { return data_.first; }; // Momentum
-    const std::vector<double>& P() const { return data_.second; }; // Power spectrum
+    const std::vector<double>& freq() const { return freq_vals_; }; // Frequency
+    const std::vector<double>& K() const { return K_vals_; }; // Momentum
+    const std::vector<double>& P() const { return P_vals_; }; // Power spectrum
     const PhaseTransition::PTParams params() const { return params_; }; // PT parameters
 
     double max() const; // Max value of power spectrum
@@ -63,7 +60,7 @@ class PowerSpec {
     PowerSpec &operator/=(double scalar);  
 
   private:
-    Spectrum data_;
+    std::vector<double> freq_vals_, K_vals_, P_vals_;
     const PhaseTransition::PTParams params_;
 
 };
@@ -83,7 +80,6 @@ inline double ptilde(double k, double p, double z) {
 double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>& p_vals);
 
 double ff(double tau_m, double kcs);
-double dtau_fin(double tau_fin, double tau_s);
 
 std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params);
 std::vector<double> dlt_SSM(const std::vector<double>& kRs_vals, const std::vector<double>& pRs_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params);
