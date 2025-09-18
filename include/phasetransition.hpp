@@ -138,6 +138,7 @@ units:
     double TTN_min() const { return veff_TTN_vals_.front(); }
     double TTN_max() const { return veff_TTN_vals_.back(); }
 
+    double pN() const { return pN_; }
     double eN() const { return eN_; }
     double wN() const { return wN_; }
 
@@ -157,7 +158,7 @@ units:
       // for Veff eos
       std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
       alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
-      double eN_, wN_;
+      double pN_, eN_, wN_;
 
 
       bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;

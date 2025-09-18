@@ -27,6 +27,7 @@ TO DO:
 - only inputs to PTParams should be model, alpha, vw and nucleation type i think
 - change taus to 1/Hs_conformal (currently using 1/Hs since otherwise program breaks)
 - default values for veff stuff to nan if not using veff eos
+- wNeN_rat unused - can remove?
 */
 
 namespace PhaseTransition {
@@ -93,7 +94,7 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, c
       cmsq_(),
       veff_TTN_vals_(), veff_ps_vals_(), veff_pb_vals_(), veff_es_vals_(), veff_eb_vals_(), veff_ws_vals_(), veff_wb_vals_(),
       veff_ps_interp_(), veff_pb_interp_(), veff_es_interp_(), veff_eb_interp_(), veff_ws_interp_(), veff_wb_interp_(),
-      eN_(), wN_(), wNeN_rat_()
+      pN_(), eN_(), wN_(), wNeN_rat_()
     {
 
       // check valid vw
@@ -219,7 +220,12 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, c
         alglib::spline1dbuildcubic(veff_TTN_array, veff_eb_array, veff_eb_interp_);
         alglib::spline1dbuildcubic(veff_TTN_array, veff_wb_array, veff_wb_interp_);
 
-        // define nucleation energy density and enthalpy
+        // define thermo quantities at nucleation temperature (T/TN = 1)
+        pN_ = alglib::spline1dcalc(veff_ps_interp_, 1.0); // pN = p(T/TN=1)
+        if (pN_ <= 0.0) {
+          throw std::invalid_argument("Unphysical nucleation pressure passed into PTParams. Must have eN > 0.");
+        }
+
         eN_ = alglib::spline1dcalc(veff_es_interp_, 1.0); // eN = e(T/TN=1)
         if (eN_ <= 0.0) {
           throw std::invalid_argument("Unphysical nucleation energy density passed into PTParams. Must have eN > 0.");
