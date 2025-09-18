@@ -127,7 +127,7 @@ class FluidProfile {
     std::vector<double> get_alp_minmax(double vw) const;
     double get_alp_wall(double vpUF, double vw) const;
 
-    double alN_residual_func(double xi_sh, const deriv_func& dydxi) const;
+    double alN_residual_func(double xi_sh, const deriv_func& dydxi, const int n=1000) const;
     double veff_residual_func(double xi_sh, const deriv_func& dydxi) const;
 
     double get_la_behind_wall(double w) const;
@@ -140,11 +140,11 @@ class FluidProfile {
     double find_shock_veff(const deriv_func& dydxi) const;
 
     std::vector<double> test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
-    std::pair<state_type, state_type> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0) const;
+    std::pair<state_type, state_type> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0, const int n=1000) const;
 
     double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
     std::vector<double> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
-    std::vector<double> matching_eqs_shock(double v2, double T2TN, double v1, double T1TN) const;
+    std::vector<double> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
     double matching_eqs_shock2(double v2, double T2TN, double T1TN) const;
     double matching_eqs_wall2(double vp, double TpTN, double TmTN) const;
 
