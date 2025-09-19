@@ -18,6 +18,7 @@
 /*
 TO DO:
 - make vector class for vector arithmetic and include print_vector() function there so i can use vec.print()
+- clean up use of std::vector<double>: any ICs should be std::vector<double>=std::array<double,3> and vectors of xi_vals should be std::vector<double>
 */
 
 // void plot(std::vector<double> x_vals, std::vector<double> y_vals, const std::string& filename) {
@@ -470,49 +471,35 @@ std::vector<double> dSiCi(double x, double y, const size_t n) {
 
 // write my own/make this better
 // make it suitable to pass in just dvdxi (rather than only {dvdxi, dwdxi})
-std::pair<std::vector<double>, std::vector<state_type>> rk4_solver(
-    const deriv_func& dydx,
-    double x0,
-    double xf,
-    const state_type& y0,
-    size_t n
-) {
+std::pair<prof_type, std::vector<state_type>> rk4_solver(const deriv_func& dydx, double x0, double xf, const state_type& y0, size_t n) {
     assert(n >= 2 && "Number of steps must be at least 2.");
-    // assert(abs(xf - x0) > 1e-10);
 
     const double h = (xf - x0) / static_cast<double>(n - 1);
-    std::vector<double> x_vals(n);
+    prof_type x_vals(n);
     std::vector<state_type> y_vals(n);
 
     x_vals[0] = x0;
     y_vals[0] = y0;
 
-    auto add = [](const state_type& a, const state_type& b) {
-        state_type res(a.size());
-        for (size_t i = 0; i < a.size(); ++i) res[i] = a[i] + b[i];
-        return res;
-    };
-
-    auto scale = [](const state_type& v, double s) {
-        state_type res(v.size());
-        for (size_t i = 0; i < v.size(); ++i) res[i] = v[i] * s;
-        return res;
-    };
-
     double x = x0;
     state_type y = y0;
 
     for (size_t i = 1; i < n; ++i) {
-        state_type k1 = dydx(x, y);
-        state_type k2 = dydx(x + h / 2.0, add(y, scale(k1, h / 2.0)));
-        state_type k3 = dydx(x + h / 2.0, add(y, scale(k2, h / 2.0)));
-        state_type k4 = dydx(x + h, add(y, scale(k3, h)));
+        const auto k1 = dydx(x, y);
 
-        state_type incr = add(
-            add(scale(k1, 1.0), scale(k2, 2.0)),
-            add(scale(k3, 2.0), scale(k4, 1.0))
-        );
-        y = add(y, scale(incr, h / 6.0));
+        state_type y_tmp;
+        for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + 0.5*h*k1[j];
+        const auto k2 = dydx(x + 0.5*h, y_tmp);
+
+        for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + 0.5*h*k2[j];
+        const auto k3 = dydx(x + 0.5*h, y_tmp);
+
+        for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + h*k3[j];
+        const auto k4 = dydx(x + h, y_tmp);
+
+        for (int j = 0; j < 3; ++j) {
+            y[j] += (h/6.0) * (k1[j] + 2.0*k2[j] + 2.0*k3[j] + k4[j]);
+        }
 
         x += h;
         x_vals[i] = x;
@@ -569,40 +556,24 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
     throw std::runtime_error("Bisection method did not converge.");
 }
 
-std::vector<double> newton_solve(const std::function<std::vector<double>(std::vector<double>)>& F, std::vector<double> x0, double tol, int max_iter, double h) {
+std::array<double, 2> newton_solve_2d(const std::function<std::array<double, 2>(std::array<double, 2>)>& F, std::array<double, 2> x0, double tol, int max_iter, double h) {
     if (x0.size() != 2)
-        throw std::invalid_argument("newton_solve_fd requires exactly 2 variables.");
+        throw std::invalid_argument("newton_solve requires exactly 2 variables.");
 
-    auto numerical_jacobian = [&](const std::vector<double> &x) {
-        std::vector<std::vector<double>> J(2, std::vector<double>(2));
-        auto f0 = F(x);
-        if (f0.size() != 2)
-            throw std::invalid_argument("Function F must return exactly 2 values.");
-
-        for (int j = 0; j < 2; ++j) {
-            auto xh = x;
-            xh[j] += h;
-            auto fh = F(xh);
-            for (int i = 0; i < 2; ++i) {
-                J[i][j] = (fh[i] - f0[i]) / h;
-            }
-        }
-        return J;
-    };
-
-    auto solve_linear_2x2 = [](const std::vector<std::vector<double>> &A,
-                               const std::vector<double> &b) {
+    // Inline solver for 2×2 linear systems
+    auto solve_linear_2x2 = [](const std::array<std::array<double,2>,2>& A,
+                               const std::array<double,2>& b) {
         double det = A[0][0]*A[1][1] - A[0][1]*A[1][0];
         if (std::fabs(det) < 1e-14)
             throw std::runtime_error("Jacobian is singular!");
-        std::vector<double> x(2);
-        x[0] = (b[0]*A[1][1] - b[1]*A[0][1]) / det;
-        x[1] = (A[0][0]*b[1] - A[1][0]*b[0]) / det;
+        std::array<double,2> x;
+        x[0] = ( b[0]*A[1][1] - b[1]*A[0][1]) / det;
+        x[1] = ( A[0][0]*b[1] - A[1][0]*b[0]) / det;
         return x;
     };
 
     for (int iter = 0; iter < max_iter; ++iter) {
-        // std::cout << "x0[0]=" << x0[0] << ", x0[1]=" << x0[1] << "\n";
+        // Evaluate F(x) once
         auto fx = F(x0);
         if (fx.size() != 2)
             throw std::invalid_argument("Function F must return exactly 2 values.");
@@ -610,9 +581,18 @@ std::vector<double> newton_solve(const std::function<std::vector<double>(std::ve
         double norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
         if (norm < tol) return x0;
 
-        auto J = numerical_jacobian(x0);
+        // Numerical Jacobian with reuse of F(x0)
+        std::array<std::array<double,2>,2> J{};
+        for (int j = 0; j < 2; ++j) {
+            auto xh = x0;
+            xh[j] += h;
+            auto fh = F(xh);
+            for (int i = 0; i < 2; ++i) {
+                J[i][j] = (fh[i] - fx[i]) / h;
+            }
+        }
 
-        std::vector<double> minus_fx = { -fx[0], -fx[1] };
+        std::array<double,2> minus_fx = { -fx[0], -fx[1] };
         auto dx = solve_linear_2x2(J, minus_fx);
 
         x0[0] += dx[0];
@@ -623,30 +603,6 @@ std::vector<double> newton_solve(const std::function<std::vector<double>(std::ve
     }
 
     throw std::runtime_error("Newton's method solver did not converge");
-}
-
-double newton_solve_1d(const std::function<double(double)>& F, double x0, double tol, int max_iter, double h) {
-    for (int iter = 0; iter < max_iter; ++iter) {
-        // std::cout << "x0=" << x0 << "\n";
-        double fx = F(x0);
-
-        if (std::fabs(fx) < tol)
-            return x0;
-
-        // Numerical derivative (central difference for better stability)
-        double dfx = (F(x0 + h) - F(x0 - h)) / (2.0 * h);
-
-        if (std::fabs(dfx) < 1e-14)
-            throw std::runtime_error("Derivative too small (possible flat region or singularity).");
-
-        double dx = -fx / dfx;
-        x0 += dx;
-
-        if (std::fabs(dx) < tol)
-            return x0;
-    }
-
-    throw std::runtime_error("Newton's method (1D) did not converge");
 }
 
 double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol, int max_iter) {
@@ -674,6 +630,81 @@ double golden_section_minimize(std::function<double(double)> f, double a, double
     }
     double xmid = 0.5*(a + b);
     return xmid;
+}
+
+// unused
+double brent_minimize(std::function<double(double)> f, double a, double b, double tol, int max_iter) {
+    const double phi = (3.0 - std::sqrt(5.0)) / 2.0; // ~0.3819660
+    double x = a + phi * (b - a);
+    double w = x;
+    double v = x;
+    double fx = f(x);
+    double fw = fx;
+    double fv = fx;
+
+    double d = 0.0; // step size
+    double e = 0.0; // distance moved on step before last
+
+    for (int iter = 0; iter < max_iter; ++iter) {
+        double m = 0.5 * (a + b);
+        double tol1 = tol * std::fabs(x) + 1e-12;
+        double tol2 = 2.0 * tol1;
+
+        // Check convergence
+        if (std::fabs(x - m) <= tol2 - 0.5 * (b - a)) {
+            return x;
+        }
+
+        bool accept_parabolic = false;
+        double p = 0.0, q = 0.0, r = 0.0;
+
+        if (std::fabs(e) > tol1) {
+            // Fit parabola
+            r = (x - w) * (fx - fv);
+            q = (x - v) * (fx - fw);
+            p = (x - v) * q - (x - w) * r;
+            q = 2.0 * (q - r);
+            if (q > 0.0) p = -p;
+            q = std::fabs(q);
+
+            if (std::fabs(p) < std::fabs(0.5 * q * e) &&
+                p > q * (a - x) &&
+                p < q * (b - x)) {
+                // Parabolic step
+                d = p / q;
+                accept_parabolic = true;
+            }
+        }
+
+        if (!accept_parabolic) {
+            // Golden-section step
+            if (x < m) e = b - x;
+            else e = a - x;
+            d = phi * e;
+        }
+
+        double u = x + (std::fabs(d) >= tol1 ? d : (d > 0 ? tol1 : -tol1));
+        double fu = f(u);
+
+        // Update points
+        if (fu <= fx) {
+            if (u < x) b = x; else a = x;
+            v = w; fv = fw;
+            w = x; fw = fx;
+            x = u; fx = fu;
+        } else {
+            if (u < x) a = u; else b = u;
+            if (fu <= fw || w == x) {
+                v = w; fv = fw;
+                w = u; fw = fu;
+            } else if (fu <= fv || v == x || v == w) {
+                v = u; fv = fu;
+            }
+        }
+    }
+
+    // If max_iter reached
+    return x;
 }
 
 alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec) {

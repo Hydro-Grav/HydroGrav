@@ -3,6 +3,7 @@
 #define INCLUDE_PROFILE_HPP_H
 
 #include <vector>
+#include <array>
 #include <string>
 
 #include "ap.h"
@@ -67,8 +68,6 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params);
 //   double dw_dtau(double xi, double v, double w, const double csq);
 // };
 
-using state_type = std::vector<double>;
-
 /**
  * @class FluidProfile
  * @brief Represents the hydrodynamic profile of a bubble wall in a first-order phase transition.
@@ -82,23 +81,21 @@ class FluidProfile {
     PhaseTransition::PTParams params() const { return params_; }; // PT parameters
     std::string eos() const { return eos_; }; // Equation of state (bag or veff)
 
+    // unused
     double xi0() const { return xi0_; };
     double xif() const { return xif_; };
-    std::vector<double> init_state() const { return y0_; }; // Initial state vector {xi0, v0, w0}
     
-    state_type xi_vals() const { return xi_vals_; }; // Vector of xi=r/t
-    state_type v_vals() const { return v_vals_; }; // v(xi)
-    state_type w_vals() const { return w_vals_; }; // w(xi)
-    state_type la_vals() const { return la_vals_; }; // la(xi)
-    state_type T_vals() const { return T_vals_; }
+    prof_type xi_vals() const { return xi_vals_; }; // Vector of xi=r/t
+    prof_type v_vals() const { return v_vals_; }; // v(xi)
+    prof_type w_vals() const { return w_vals_; }; // w(xi)
+    prof_type la_vals() const { return la_vals_; }; // la(xi)
+    prof_type T_vals() const { return T_vals_; }
 
     void write(const std::string& filename = "bubble_prof.csv") const; // write bubble profile to disk
     
     #ifdef ENABLE_MATPLOTLIB
     void plot(const std::string& filename = "bubble_prof.png") const; // Plots bubble profiles
     #endif
-
-    state_type get_csq() const;
 
   private:
     std::string eos_; // bag or veff
@@ -109,9 +106,8 @@ class FluidProfile {
     
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
     double xi0_, xif_; // initial/final xi
-    std::vector<double> y0_; // initial conditions {v0, w0}
     
-    state_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
+    prof_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
     int get_mode(double vw, double cmsq, double alN) const;
     double vJ_det(double alp) const;
@@ -124,7 +120,7 @@ class FluidProfile {
 
     double xi_shock(double v1UF) const; // position of shock front
     double v1UF_from_shock(double xi_sh) const;
-    std::vector<double> get_alp_minmax(double vw) const;
+    std::array<double, 2> get_alp_minmax(double vw) const;
     double get_alp_wall(double vpUF, double vw) const;
 
     double alN_residual_func(double xi_sh, const deriv_func& dydxi, const int n=1000) const;
@@ -139,25 +135,24 @@ class FluidProfile {
     double find_shock(const deriv_func& dydxi) const;
     double find_shock_veff(const deriv_func& dydxi) const;
 
-    std::vector<double> test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
+    state_type test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
     std::pair<state_type, state_type> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0, const int n=1000) const;
 
     double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
-    std::vector<double> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
-    std::vector<double> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
+    std::array<double, 2> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
+    std::array<double, 2> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
     double matching_eqs_shock2(double v2, double T2TN, double T1TN) const;
     double matching_eqs_wall2(double vp, double TpTN, double TmTN) const;
 
     void get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& yp, state_type& ym) const;
-    std::vector<double> get_IC_detonation_veff() const;
+    state_type get_IC_detonation_veff() const;
 
     // put number of integration points in input file? seems bad to hardcode
-    std::vector<state_type> solve_profile(int n=100);
-    std::vector<state_type> solve_profile_veff(int n=100);
-    // state_type calc_lambda_vals(state_type w_vals) const;
+    std::vector<prof_type> solve_profile(int n=100);
+    std::vector<prof_type> solve_profile_veff(int n=100);
 
     // testing purposes ONLY
-    std::vector<state_type> read(const std::string& filename) const; // read bubble profile from disk
+    std::vector<prof_type> read(const std::string& filename) const; // read bubble profile from disk
 };
 
 } // namespace Hydrodynamics

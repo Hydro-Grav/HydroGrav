@@ -18,6 +18,8 @@
 #include <initializer_list>
 #include <functional>
 #include <streambuf>
+#include <limits>
+#include <type_traits>
 
 #include "ap.h"
 
@@ -129,10 +131,11 @@ double Ci(double x);
 std::pair<double, double> SiCi(double x, const size_t n=1000);
 std::vector<double> dSiCi(double x, double y, const size_t n);
 
-using state_type = std::vector<double>;
-using deriv_func = std::function<state_type(double, const state_type&)>;
+using prof_type = std::vector<double>;
+using state_type = std::array<double, 3>;
+using deriv_func = std::function<std::array<double, 3>(double, const std::array<double, 3>&)>;
 
-std::pair<std::vector<double>, std::vector<state_type>> rk4_solver(
+std::pair<prof_type, std::vector<state_type>> rk4_solver(
     const deriv_func& dydx,
     double x0,
     double xf,
@@ -143,13 +146,12 @@ std::pair<std::vector<double>, std::vector<state_type>> rk4_solver(
 double root_finder(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 double root_finder_new(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 
-std::vector<double> newton_solve(const std::function<std::vector<double>(std::vector<double>)> &F, std::vector<double> x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
-double newton_solve_1d(const std::function<double(double)>& F, double x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
+std::array<double, 2> newton_solve_2d(const std::function<std::array<double, 2>(std::array<double, 2>)>& F, std::array<double, 2> x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
 
-double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 200);
+double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
+double brent_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 
 alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec);
-
 // std::unordered_map<double, size_t> count_duplicates(const std::vector<double>& vec);
 
 #endif // INCLUDE_MATHS_OPS_HPP_H
