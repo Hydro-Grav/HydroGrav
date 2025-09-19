@@ -8,7 +8,7 @@ TEST_CASE("Test rk4 Coupled ODEs", "[rk4]") {
 
     // dy0/dx = y1, dy1/dx = -y0 with y(0) = [1, 0] => y0(x) = cos(x), y1(x) = -sin(x)
 
-    auto dydx = [](double x, const state_type& y) -> state_type {
+    auto dydx = [](double x, const std::vector<double>& y) -> std::vector<double> {
         return { y[1], -y[0] };
     };
 
@@ -18,7 +18,7 @@ TEST_CASE("Test rk4 Coupled ODEs", "[rk4]") {
     const double tol = 1e-3;
     const double epsilon = 1e-10; // for safe relative error denom
 
-    const state_type y0 = {1.0, 0.0};
+    const std::vector<double> y0 = {1.0, 0.0};
 
     auto [x_vals, y_vals] = rk4_solver(dydx, x0, xf, y0, steps);
 
@@ -46,7 +46,7 @@ TEST_CASE("Test rk4 Solver", "[rk4]") {
 
     // dy0/dx = y1, dy1/dx = -y0 with y(0) = [1, 0] => y0(x) = cos(x), y1(x) = -sin(x)
 
-    auto dydx = [](double x, const state_type& y) -> state_type {
+    auto dydx = [](double x, const std::vector<double>& y) -> std::vector<double> {
         return { y[1], -y[0] };
     };
 
@@ -56,7 +56,7 @@ TEST_CASE("Test rk4 Solver", "[rk4]") {
     const double tol = 1e-3;
     const double epsilon = 1e-10; // for safe relative error denom
 
-    const state_type y0 = {1.0, 0.0};
+    const std::vector<double> y0 = {1.0, 0.0};
 
     auto [x_vals, y_vals] = rk4_solver(dydx, x0, xf, y0, steps);
 

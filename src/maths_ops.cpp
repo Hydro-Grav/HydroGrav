@@ -471,43 +471,43 @@ std::vector<double> dSiCi(double x, double y, const size_t n) {
 
 // write my own/make this better
 // make it suitable to pass in just dvdxi (rather than only {dvdxi, dwdxi})
-std::pair<prof_type, std::vector<state_type>> rk4_solver(const deriv_func& dydx, double x0, double xf, const state_type& y0, size_t n) {
-    assert(n >= 2 && "Number of steps must be at least 2.");
+// std::pair<prof_type, std::vector<state_type>> rk4_solver(const deriv_func& dydx, double x0, double xf, const state_type& y0, size_t n) {
+//     assert(n >= 2 && "Number of steps must be at least 2.");
 
-    const double h = (xf - x0) / static_cast<double>(n - 1);
-    prof_type x_vals(n);
-    std::vector<state_type> y_vals(n);
+//     const double h = (xf - x0) / static_cast<double>(n - 1);
+//     prof_type x_vals(n);
+//     std::vector<state_type> y_vals(n);
 
-    x_vals[0] = x0;
-    y_vals[0] = y0;
+//     x_vals[0] = x0;
+//     y_vals[0] = y0;
 
-    double x = x0;
-    state_type y = y0;
+//     double x = x0;
+//     state_type y = y0;
 
-    for (size_t i = 1; i < n; ++i) {
-        const auto k1 = dydx(x, y);
+//     for (size_t i = 1; i < n; ++i) {
+//         const auto k1 = dydx(x, y);
 
-        state_type y_tmp;
-        for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + 0.5*h*k1[j];
-        const auto k2 = dydx(x + 0.5*h, y_tmp);
+//         state_type y_tmp;
+//         for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + 0.5*h*k1[j];
+//         const auto k2 = dydx(x + 0.5*h, y_tmp);
 
-        for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + 0.5*h*k2[j];
-        const auto k3 = dydx(x + 0.5*h, y_tmp);
+//         for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + 0.5*h*k2[j];
+//         const auto k3 = dydx(x + 0.5*h, y_tmp);
 
-        for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + h*k3[j];
-        const auto k4 = dydx(x + h, y_tmp);
+//         for (int j = 0; j < 3; ++j) y_tmp[j] = y[j] + h*k3[j];
+//         const auto k4 = dydx(x + h, y_tmp);
 
-        for (int j = 0; j < 3; ++j) {
-            y[j] += (h/6.0) * (k1[j] + 2.0*k2[j] + 2.0*k3[j] + k4[j]);
-        }
+//         for (int j = 0; j < 3; ++j) {
+//             y[j] += (h/6.0) * (k1[j] + 2.0*k2[j] + 2.0*k3[j] + k4[j]);
+//         }
 
-        x += h;
-        x_vals[i] = x;
-        y_vals[i] = y;
-    }
+//         x += h;
+//         x_vals[i] = x;
+//         y_vals[i] = y;
+//     }
 
-    return {x_vals, y_vals};
-}
+//     return {x_vals, y_vals};
+// }
 
 // modified bisection method only to be used for functions with exactly one root!
 double root_finder(std::function<double(double)> f, double a, double b, double tol, int max_iter) {
@@ -556,54 +556,54 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
     throw std::runtime_error("Bisection method did not converge.");
 }
 
-std::array<double, 2> newton_solve_2d(const std::function<std::array<double, 2>(std::array<double, 2>)>& F, std::array<double, 2> x0, double tol, int max_iter, double h) {
-    if (x0.size() != 2)
-        throw std::invalid_argument("newton_solve requires exactly 2 variables.");
+// std::array<double, 2> newton_solve_2d(const std::function<std::array<double, 2>(std::array<double, 2>)>& F, std::array<double, 2> x0, double tol, int max_iter, double h) {
+//     if (x0.size() != 2)
+//         throw std::invalid_argument("newton_solve requires exactly 2 variables.");
 
-    // Inline solver for 2×2 linear systems
-    auto solve_linear_2x2 = [](const std::array<std::array<double,2>,2>& A,
-                               const std::array<double,2>& b) {
-        double det = A[0][0]*A[1][1] - A[0][1]*A[1][0];
-        if (std::fabs(det) < 1e-14)
-            throw std::runtime_error("Jacobian is singular!");
-        std::array<double,2> x;
-        x[0] = ( b[0]*A[1][1] - b[1]*A[0][1]) / det;
-        x[1] = ( A[0][0]*b[1] - A[1][0]*b[0]) / det;
-        return x;
-    };
+//     // Inline solver for 2×2 linear systems
+//     auto solve_linear_2x2 = [](const std::array<std::array<double,2>,2>& A,
+//                                const std::array<double,2>& b) {
+//         double det = A[0][0]*A[1][1] - A[0][1]*A[1][0];
+//         if (std::fabs(det) < 1e-14)
+//             throw std::runtime_error("Jacobian is singular!");
+//         std::array<double,2> x;
+//         x[0] = ( b[0]*A[1][1] - b[1]*A[0][1]) / det;
+//         x[1] = ( A[0][0]*b[1] - A[1][0]*b[0]) / det;
+//         return x;
+//     };
 
-    for (int iter = 0; iter < max_iter; ++iter) {
-        // Evaluate F(x) once
-        auto fx = F(x0);
-        if (fx.size() != 2)
-            throw std::invalid_argument("Function F must return exactly 2 values.");
+//     for (int iter = 0; iter < max_iter; ++iter) {
+//         // Evaluate F(x) once
+//         auto fx = F(x0);
+//         if (fx.size() != 2)
+//             throw std::invalid_argument("Function F must return exactly 2 values.");
 
-        double norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
-        if (norm < tol) return x0;
+//         double norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
+//         if (norm < tol) return x0;
 
-        // Numerical Jacobian with reuse of F(x0)
-        std::array<std::array<double,2>,2> J{};
-        for (int j = 0; j < 2; ++j) {
-            auto xh = x0;
-            xh[j] += h;
-            auto fh = F(xh);
-            for (int i = 0; i < 2; ++i) {
-                J[i][j] = (fh[i] - fx[i]) / h;
-            }
-        }
+//         // Numerical Jacobian with reuse of F(x0)
+//         std::array<std::array<double,2>,2> J{};
+//         for (int j = 0; j < 2; ++j) {
+//             auto xh = x0;
+//             xh[j] += h;
+//             auto fh = F(xh);
+//             for (int i = 0; i < 2; ++i) {
+//                 J[i][j] = (fh[i] - fx[i]) / h;
+//             }
+//         }
 
-        std::array<double,2> minus_fx = { -fx[0], -fx[1] };
-        auto dx = solve_linear_2x2(J, minus_fx);
+//         std::array<double,2> minus_fx = { -fx[0], -fx[1] };
+//         auto dx = solve_linear_2x2(J, minus_fx);
 
-        x0[0] += dx[0];
-        x0[1] += dx[1];
+//         x0[0] += dx[0];
+//         x0[1] += dx[1];
 
-        if (std::sqrt(dx[0]*dx[0] + dx[1]*dx[1]) < tol)
-            return x0;
-    }
+//         if (std::sqrt(dx[0]*dx[0] + dx[1]*dx[1]) < tol)
+//             return x0;
+//     }
 
-    throw std::runtime_error("Newton's method solver did not converge");
-}
+//     throw std::runtime_error("Newton's method solver did not converge");
+// }
 
 double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol, int max_iter) {
     const double gr = (std::sqrt(5.0) - 1.0) / 2.0; // 0.618...
