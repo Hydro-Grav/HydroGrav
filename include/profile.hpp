@@ -23,6 +23,10 @@ TO DO:
 
 namespace Hydrodynamics {
 
+using prof_type = std::vector<double>;
+using state_type = std::array<double, 3>;
+using deriv_func = std::function<std::array<double, 3>(double, const std::array<double, 3>&)>;
+
 /**
  * @brief Computes the Lorentz factor between the wall frame and the universe frame.
  *
@@ -36,6 +40,7 @@ double mu(double xi, double v);
 double dvdxi(double xi, double v, const double csq);
 double dwdxi(double xi, double v, double w, const double csq);
 double dTdxi(double xi, double v, double T, const double csq);
+state_type dydxi_vec(double xi, const state_type& y, double vw, double cmsq, double cpsq);
 
 double dxidv(double xi, double v, const double csq);
 double dxidw(double xi, double v, double w, const double csq);
@@ -43,30 +48,6 @@ double dxidT(double xi, double v, double T, const double csq);
 
 void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pts, int y_pts, const std::string& filename);
 void generate_streamplot_data(const PhaseTransition::PTParams& params);
-
-// struct FluidState {
-//     double v;   // velocity
-//     double w;   // enthalpy
-//     // double T;   // temperature
-
-//     FluidState operator+(const FluidState& other) const {
-//         // return {v + other.v, w + other.w, T + other.T};
-//         return {v + other.v, w + other.w};
-//     }
-//     FluidState operator*(double scalar) const {
-//         // return {v * scalar, w * scalar, T * scalar};
-//         return {v * scalar, w * scalar};
-//     }
-// };
-
-// struct FluidODE {
-//   double dvdxi(double xi, double v, const double csq);
-//   double dwdxi(double xi, double v, double w, const double csq);
-
-//   double dxi_dtau(double xi, double v, const double csq);
-//   double dv_dtau(double xi, double v, const double csq);
-//   double dw_dtau(double xi, double v, double w, const double csq);
-// };
 
 /**
  * @class FluidProfile
@@ -80,10 +61,6 @@ class FluidProfile {
     // are these needed?
     PhaseTransition::PTParams params() const { return params_; }; // PT parameters
     std::string eos() const { return eos_; }; // Equation of state (bag or veff)
-
-    // unused
-    double xi0() const { return xi0_; };
-    double xif() const { return xif_; };
     
     prof_type xi_vals() const { return xi_vals_; }; // Vector of xi=r/t
     prof_type v_vals() const { return v_vals_; }; // v(xi)
@@ -105,20 +82,18 @@ class FluidProfile {
     double alp_min_, alp_max_;
     
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
-    double xi0_, xif_; // initial/final xi
     
     prof_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
-    int get_mode(double vw, double cmsq, double alN) const;
+    int get_mode_bag(double vw, double cmsq, double alN) const;
     double vJ_det(double alp) const;
 
-    double calc_vm(double vp, double alpha_p) const;
-    double calc_vp(double vm, double alpha_p) const;
-    double calc_wm(double wp, double vp, double vm) const;
-    double calc_w1wN(double xi_sh) const;
-    double calc_ToTN(double wowN, double cpsq, double cmsq) const;
+    double vm_from_matching(double vp, double alpha_p) const;
+    double vp_from_matching(double vm, double alpha_p) const;
+    double wm_from_matching(double wp, double vp, double vm) const;
+    double w1wN_from_matching(double xi_sh) const;
+    double ToTN(double wowN, double cpsq, double cmsq) const;
 
-    double xi_shock(double v1UF) const; // position of shock front
     double v1UF_from_shock(double xi_sh) const;
     std::array<double, 2> get_alp_minmax(double vw) const;
     double get_alp_wall(double vpUF, double vw) const;
@@ -126,14 +101,17 @@ class FluidProfile {
     double alN_residual_func(double xi_sh, const deriv_func& dydxi, const int n=1000) const;
     double veff_residual_func(double xi_sh, const deriv_func& dydxi) const;
 
-    double get_la_behind_wall(double w) const;
-    double get_la_front_wall(double w) const;
+    double lambda_b(double wowN) const;
+    double lambda_s(double wowN) const;
 
-    double lambda_s(double ToTN, const double eN, const double wN_inv) const;
-    double lambda_b(double ToTN, const double eN, const double wN_inv) const;
+    double lambda_s_veff(double ToTN, const double eN, const double wN_inv) const;
+    double lambda_b_veff(double ToTN, const double eN, const double wN_inv) const;
 
     double find_shock(const deriv_func& dydxi) const;
     double find_shock_veff(const deriv_func& dydxi) const;
+
+    std::pair<double, state_type> get_IC_deflagration(const deriv_func& dydxi) const;
+    state_type get_IC_detonation() const;
 
     state_type test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
     std::pair<state_type, state_type> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0, const int n=1000) const;
@@ -141,18 +119,13 @@ class FluidProfile {
     double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
     std::array<double, 2> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
     std::array<double, 2> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
-    double matching_eqs_shock2(double v2, double T2TN, double T1TN) const;
-    double matching_eqs_wall2(double vp, double TpTN, double TmTN) const;
 
     void get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& yp, state_type& ym) const;
     state_type get_IC_detonation_veff() const;
 
     // put number of integration points in input file? seems bad to hardcode
-    std::vector<prof_type> solve_profile(int n=100);
-    std::vector<prof_type> solve_profile_veff(int n=100);
-
-    // testing purposes ONLY
-    std::vector<prof_type> read(const std::string& filename) const; // read bubble profile from disk
+    std::vector<prof_type> solve_profile(int n=5000);
+    std::vector<prof_type> solve_profile_veff(int n=5000);
 };
 
 } // namespace Hydrodynamics

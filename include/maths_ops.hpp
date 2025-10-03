@@ -131,36 +131,15 @@ double Ci(double x);
 std::pair<double, double> SiCi(double x, const size_t n=1000);
 std::vector<double> dSiCi(double x, double y, const size_t n);
 
-using prof_type = std::vector<double>;
-using state_type = std::array<double, 3>;
-using deriv_func = std::function<std::array<double, 3>(double, const std::array<double, 3>&)>;
-
-// std::pair<prof_type, std::vector<state_type>> rk4_solver(
-//     const deriv_func& dydx,
-//     double x0,
-//     double xf,
-//     const state_type& y0,
-//     size_t n
-// );
-
 double root_finder(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 double root_finder_new(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
-
-// std::array<double, 2> newton_solve_2d(const std::function<std::array<double, 2>(std::array<double, 2>)>& F, std::array<double, 2> x0, double tol = 1e-8, int max_iter = 100, double h = 1e-8);
 
 double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 double brent_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 
 alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec);
-// std::unordered_map<double, size_t> count_duplicates(const std::vector<double>& vec);
 
 // solvers
-// template <typename T, typename State>
-// std::pair<std::vector<T>, std::vector<State>> rk4_solver(const std::function<State(T, const State&)>& dydx, T x0, T xf, const State& y0, size_t n=1000);
-
-// template <typename T>
-// std::array<T,2> newton_solve_2d(const std::function<std::array<T,2>(const std::array<T,2>&)>& F, std::array<T,2> x0, T tol=1e-8, int max_iter=100, T h=1e-8);
-
 template <typename T, typename State, typename Func>
 std::pair<std::vector<T>, std::vector<State>> rk4_solver(const Func& dydx, T x0, T xf, const State& y0, size_t n=1000);
 
