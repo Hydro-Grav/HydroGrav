@@ -316,28 +316,47 @@ double FluidProfile::vJ_det(double alp) const {
     return vp_from_matching(std::sqrt(cmsq_), alp); // vJ(alp) = vp(|vm|=cm, alp)
 }
 
+// update for mu nu - done
+// need to check sign convention - see arXiv:1909.10040 eq B.6
 double FluidProfile::vp_from_matching(double vm, double alp) const { // vp(vm,alp) from matching eqs
-    const auto sgn = 1.0; 
-    const auto fac1 = 1.0 / (2.0 * (1.0 + alp));
+    const auto sgn = 1.0;
+    // const auto fac1 = 1.0 / (2.0 * (1.0 + alp));
+    const auto fac1 = 1.0 / (2.0 * (1.0 / (3.0 * cmsq_) + alp));
     const auto fac2 = 1.0 / (3.0 * vm);
 
-    return fac1 * (fac2 + vm + sgn * std::sqrt((fac2 - vm) * (fac2 - vm) + 4.0 * alp * alp + 8.0 * alp / 3.0));
+    // const auto vp = fac1 * (fac2 + vm + sgn * std::sqrt((fac2 - vm) * (fac2 - vm) + 4.0 * alp * alp + 8.0 * alp / 3.0));
+    const auto vp = fac1 * (fac2 + vm / (3.0 * cmsq_) + sgn * std::sqrt((fac2 - vm / (3.0 * cmsq_)) * (fac2 - vm / (3.0 * cmsq_)) + 4.0 * alp * alp + 4.0 * (1.0/cmsq_ - 1.0) * alp / 3.0));
+
+    std::cout << "vp_from_matching: vp=" << vp << "\n";
+
+    return vp;
 }
 
+// update for mu nu - done
+// need to check sign convention - see arXiv:1909.10040 eq B.7
 double FluidProfile::vm_from_matching(double vp, double alp) const { // inverse of vp(vm,alp)
     const auto vp_abs = abs(vp);
     const auto sgn = 1.0; // not sure when to use which sign
-    const auto fac = (1.0 + alp) * vp_abs + (1.0 - 3.0 * alp) / (3.0 * vp_abs);
+    // const auto fac = (1.0 + alp) * vp_abs + (1.0 - 3.0 * alp) / (3.0 * vp_abs);
+    const auto nu = 1.0 + 1.0 / cmsq_;
+    const auto fac = (1.0 + 3.0 * alp / (nu - 1.0)) * vp_abs + (1.0 - 3.0 * alp) / ((nu - 1.0) * vp_abs);
 
-    return 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 / 3.0));
+    // const auto vm = 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 / 3.0));
+    const auto vm = 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 / (nu - 1.0)));
+
+    std::cout << "vm_from_matching: vm=" << vm << "\n";
+
+    return vm;
 }
 
+// update for mu nu (?)
 double FluidProfile::w1wN_from_matching(double xi_sh) const { // w1/wN
     // alpha_1 w1 = alpha_N wN
     const auto xi_sh_sq = xi_sh * xi_sh;
     return (9.0 * xi_sh_sq - 1.0) / (3.0 * (1.0 - xi_sh_sq));
 }
 
+// update for mu nu
 double FluidProfile::ToTN(double wowN, double cpsq, double cmsq) const {
     // w=(4/3)*a*T^4 -> w/wN = (a/aN) * (T/TN)^4
     const auto fac = wowN * (1.0 + cpsq) / (1.0 + cmsq); // not sure if (1+cpsq)/(1+cmsq) is correct
@@ -355,6 +374,7 @@ double FluidProfile::v1UF_from_shock(double xi_sh) const {
     return (3.0 * xi_sh * xi_sh - 1.0) / (2.0 * xi_sh);
 }
 
+// update for mu nu
 // might need to fix al_min = 0 if numerical precision causes it to be slightly negative
 std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     const auto cp = std::sqrt(cpsq_);
@@ -374,11 +394,13 @@ std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     return {al_min, al_max};
 }
 
+// update for mu nu
 // alpha_+ from wall condition
 double FluidProfile::get_alp_wall(double vpUF, double vw) const {
     return gammaSq(vpUF) * vpUF * (2.0 * vw * vpUF + 1.0 - 3.0 * vw * vw) / (3.0 * vw);
 }
 
+// update for mu nu
 double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi, const int n) const {
     // initial conditions
     const auto xi0 = xi_sh - 0.001;
@@ -402,11 +424,13 @@ double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi, co
     return std::log(std::abs(alN_wall / alN_)); // doesn't always work for some vw, alN
 }
 
+// update for mu nu
 double FluidProfile::lambda_b(double wowN) const {
     // la(xi)=(3/4)*(w(xi)/wN - 1 - alN) behind bubble wall (detonations)
     return 0.75 * (wowN - 1.0 - alN_);
 }
 
+// update for mu nu
 double FluidProfile::lambda_s(double wowN) const {
     // la(xi)=(3/4)*(w(xi)/wN - 1) in front of bubble wall (deflagrations)
     return 0.75 * (wowN - 1.0);
