@@ -355,7 +355,6 @@ double FluidProfile::v1UF_from_shock(double xi_sh) const {
     return (3.0 * xi_sh * xi_sh - 1.0) / (2.0 * xi_sh);
 }
 
-// might need to fix al_min = 0 if numerical precision causes it to be slightly negative
 std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     const auto cp = std::sqrt(cpsq_);
 
@@ -370,6 +369,8 @@ std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     
     const auto al_max = get_alp(vp_min, vm);
     const auto al_min = get_alp(vp_max, vm);
+
+    if (al_min < 0.0) return {0.0, al_max}; // numerical precision issue
 
     return {al_min, al_max};
 }
