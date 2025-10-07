@@ -9,6 +9,7 @@
 // #include <gperftools/profiler.h>
 #include <omp.h>
 #include <streambuf>
+#include <random>
 
 // modify include list when testing of program finished - currently includes everything
 #include "hydrodynamics.hpp"
@@ -233,61 +234,64 @@ void example_GW_Spec(const std::string& filename) {
     return;
 }
 
-void test_FluidProfile() {
-    // effects profile
-    const auto alN = 0.11384915003991744;
-    const auto TN = 53.370765185008004; // GeV
+// Tests parameter space (vw, alN) for fluid profile calculation
+void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
+    std::cout << "Running fluid profiles tests for (vw, alN) parameter space...\n";
 
-    // profile independent vars
-    const auto Ts = 53.370765185008004; // GeV
-    const auto gs = 106.75;
-    const PhaseTransition::Universe un(Ts, gs);
+    const int n = 30000;
+    // const int n = 100;
+
+    const auto vw_min = 0.001;
+    const auto vw_max = 0.999;
+    const auto alN_min = 1e-6;
+    const auto alN_max = 2.0;
+
+    std::random_device rd; // obtain a random number from hardware
+    std::mt19937 gen(rd()); // seed the generator
     
-    const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
-    const auto nuc_type = "exp";
+    std::uniform_real_distribution<double> vw_distr(vw_min, vw_max);
+    std::uniform_real_distribution<double> alN_distr(alN_min, alN_max);
 
-    const auto vw_vals = linspace(0.01, 0.99, 50);
-    const auto alN_vals = linspace(0.01, 10, 10);
+    const std::array<std::string, 3> unphysical_exception = {"alN too small for shock!", "alpha_+ too small for shock", "alpha_+ too large for shock"};
+    int pass_count = 0;
 
-    const std::string alp_err1 = "alpha_+ too large for shock";
-    const std::string alp_err2 = "alpha_+ too small for shock";
+    std::ofstream file(filename);
+    file << "vw,alN,mode\n";
 
+    // Suppress console output during testing
     std::streambuf* original_cout_buffer = std::cout.rdbuf();
+    std::cout.rdbuf(nullptr);
 
-    int num_failed = 0;
-    for (const auto& vw : vw_vals) {
-        // for (const auto& alN : alN_vals) {
-            std::cout.rdbuf(nullptr); // suppress cout
+    for (int i = 0; i < n; ++i) {
+        const auto vw = vw_distr(gen);
+        const auto alN = alN_distr(gen);
 
-            const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
-            const auto dtau = 10.0 * Rs;
-            const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un); // bag model
-            // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un, "thermo.csv"); // veff
+        const PhaseTransition::PTParams params(vw, alN);
+        
+        file << vw << "," << alN << ",";
 
-            // construct profiles
-            try {
-                const Hydrodynamics::FluidProfile profile(params);
-            } catch (const std::exception& e) {
-                if (e.what() == alp_err1 || e.what() == alp_err2) continue; // unphysical choice of alN
-
-                std::cout.rdbuf(original_cout_buffer); // restore cout
-                std::cout << "vw=" << vw << ", alN=" << alN << " failed: " << e.what() << "\n";
-
-                num_failed++;
+        try {
+            const Hydrodynamics::FluidProfile profile(params);
+            pass_count++;
+            file << profile.mode_str() << "\n";
+        } catch (const std::exception& e) {
+            // flags unphysical parameter choices
+            if (e.what() == unphysical_exception[0] || e.what() == unphysical_exception[1] || e.what() == unphysical_exception[2]) {
+                file << "unphysical\n";
+            } else {
+                file << "fail\n";
             }
-        // }
-    }
-
-    std::cout.rdbuf(original_cout_buffer); // restore cout
-
-    if (num_failed == 0) {
-        std::cout << "Fluid Profile test passed!\n";
-        return;
+        }
     }
     
-    // const auto test_count = vw_vals.size() * alN_vals.size();
-    const auto test_count = vw_vals.size();
-    std::cout << num_failed << "/" << test_count << " tests failed!\n";
+    // Restore console output
+    std::cout.rdbuf(original_cout_buffer);
+
+    file.close();
+    std::cout << "Fluid profile test complete: " << pass_count << "/" << n << " cases passed.\n";
+    std::cout << "Results saved to '" << filename << "'.\n";
+
+    return;
 }
 
 void test_dSiCi_accuracy() {
@@ -339,8 +343,8 @@ int main() {
     // test_profile_params();
     // example_Kin_Spec("Ekin");
     // example_GW_Spec("GWSpec");
-    example_FluidProfile("profile");
-    // test_FluidProfile();
+    // example_FluidProfile("profile");
+    test_FluidProfile();
     // test_rk4_solver();
 
     /************************ CLOCK / PROFILER *************************/
