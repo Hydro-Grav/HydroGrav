@@ -240,6 +240,13 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
     }
 
 // Public functions
+std::string FluidProfile::mode_str() const {
+    if (mode_ == 0) return "deflagration";
+    else if (mode_ == 1) return "hybrid";
+    else if (mode_ == 2) return "detonation";
+    else return "unknown";
+}
+
 void FluidProfile::write(const std::string& filename) const {
     std::cout << "Writing fluid profile to disk... ";
 

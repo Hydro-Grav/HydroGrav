@@ -56,7 +56,6 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params);
 class FluidProfile {
   public:
     FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000);
-    // write dflt ctor?
 
     // are these needed?
     PhaseTransition::PTParams params() const { return params_; }; // PT parameters
@@ -67,6 +66,9 @@ class FluidProfile {
     prof_type w_vals() const { return w_vals_; }; // w(xi)
     prof_type la_vals() const { return la_vals_; }; // la(xi)
     prof_type T_vals() const { return T_vals_; }
+
+    int mode() const { return mode_; }; // Hydrodynamic mode (0=deflagration, 1=hybrid, 2=detonation)
+    std::string mode_str() const;
 
     void write(const std::string& filename = "bubble_prof.csv") const; // write bubble profile to disk
     
