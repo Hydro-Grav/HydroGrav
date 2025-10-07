@@ -101,6 +101,7 @@ units:
   public:
     // ctors
     PTParams();
+    PTParams(double vw, double alN);
     PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un);
     PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un, const std::string& eos);
 

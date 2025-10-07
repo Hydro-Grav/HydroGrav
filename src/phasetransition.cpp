@@ -70,10 +70,12 @@ const Universe& default_universe() {
 }
 
 // PTParams
-// make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
     : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::TN, dflt_PTParams::nuc_type, default_universe()) {}
+
+PTParams::PTParams(double vw, double alN) // Fluid profile only uses vw and alN
+    : PTParams(vw, alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::TN, dflt_PTParams::nuc_type, default_universe()) {}
 
 PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un)
     : PTParams(vw, alN, beta, dtau, TN, nuc_type, un, "") {}
