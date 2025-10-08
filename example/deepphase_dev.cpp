@@ -33,7 +33,9 @@ namespace plt = matplotlibcpp;
 void example_FluidProfile(const std::string& filename) {
     // const auto vw = 0.9; // detonation
     // const auto vw = 0.4; // deflagration
-    const auto vw = 0.6; // hybrid
+    // const auto vw = 0.6; // hybrid
+    const auto vw = 0.0378243;
+    const auto alN = 0.183018;
     
     // Will's benchmark point:
     // std::string veff_file = "flynn_eos.csv";
@@ -51,7 +53,7 @@ void example_FluidProfile(const std::string& filename) {
     // Xiao's benchmark point:
     const auto Ts = 53.370765185008004; // GeV
     const auto gs = 106.75;
-    const auto alN = 0.11384915003991744;
+    // const auto alN = 0.11384915003991744;
     const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
     const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
     const auto dtau = 10.0 * Rs;
@@ -244,13 +246,15 @@ void example_GW_Spec(const std::string& filename) {
 void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     std::cout << "Running fluid profiles tests for (vw, alN) parameter space...\n";
 
-    const int n = 30000;
-    // const int n = 100;
+    // const int n = 30000;
+    const int n = 100;
 
     const auto vw_min = 0.001;
-    const auto vw_max = 0.999;
+    // const auto vw_max = 0.999;
+    const auto vw_max = 0.2;
     const auto alN_min = 1e-6;
-    const auto alN_max = 2.0;
+    // const auto alN_max = 2.0;
+    const auto alN_max = 0.2;
 
     std::random_device rd; // obtain a random number from hardware
     std::mt19937 gen(rd()); // seed the generator
@@ -273,6 +277,7 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
         const auto alN = alN_distr(gen);
 
         const PhaseTransition::PTParams params(vw, alN);
+        // const PhaseTransition::PTParams params(vw, alN, "thermo.csv");
         
         file << vw << "," << alN << ",";
 
@@ -350,7 +355,7 @@ int main() {
     // example_Kin_Spec("Ekin");
     // example_GW_Spec("GWSpec");
     example_FluidProfile("profile");
-    // test_FluidProfile();
+    // test_FluidProfile("profile_test_bag.csv");
     // test_rk4_solver();
 
     /************************ CLOCK / PROFILER *************************/

@@ -444,8 +444,22 @@ double FluidProfile::find_shock(const deriv_func& dydxi) const {
 
     // cp < xi_sh < 1 (shock must be supersonic and less than speed of light)
     const double xi_sh_min = std::max(std::sqrt(cpsq_), vw_); // xi_sh > cp > xi_w (deflag), xi_sh > xi_w > cp (hybrid)
-    // const double xi_sh_max = 1.0 - 1e-5; // need to make this closer to 1 for extreme case of hybrids with xi_sh very close to 1
-    const double xi_sh_max = 1.0 - 1e-15;
+    const double xi_sh_max = 1.0 - 1e-15; // xi_sh_max = 1 will cause residual to diverge (note: for extreme cases of hybrids, xi-sh can be very close to 1)
+
+    // const size_t n = 500;
+    // const auto xi_sh_vals = linspace(xi_sh_min, 0.6, n);
+    // std::vector<double> res_vals;
+    // for (const auto xi_sh : xi_sh_vals) {
+    //     res_vals.push_back(residual(xi_sh));
+    // }
+
+    // plt::figure_size(800, 800);
+    // plt::plot(xi_sh_vals, res_vals);
+    // plt::xlabel("xi_sh");
+    // plt::ylabel("residual");
+    // plt::xlim(0.4, 0.6);
+    // plt::grid(true);
+    // plt::save("shock_residual.png");
 
     return root_finder(residual, xi_sh_min, xi_sh_max, 1e-7, 100);
 }
@@ -639,10 +653,6 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
 // keep as void or output just xi_sh and y0={v1UF, w1wN, T1TN}?
 // better error handling - change catch (...) to specific throws
 void FluidProfile::get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& yp, state_type& ym) const {
-    /************************ CLOCK / PROFILER *************************/
-    const auto ti = std::chrono::high_resolution_clock::now();
-    /******************************************************************/
-
     const double xi_sh_min = std::max(std::sqrt(cpsq_), vw_); // xi_sh > cp > xi_w (deflag), xi_sh > xi_w > cp (hybrid)
     const double xi_sh_max = 1.0;
 
