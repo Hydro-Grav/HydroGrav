@@ -55,12 +55,14 @@ void example_FluidProfile(const std::string& filename) {
     const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
     const auto dtau = 10.0 * Rs;
     const auto TN = Ts; // GeV
+    const auto cpsq = 1.0 / 3.0;
+    const auto cmsq = cpsq;
     const auto nuc_type = "exp";
     std::string veff_file = "thermo.csv";
 
     const PhaseTransition::Universe un(Ts, gs);
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un);
-    const PhaseTransition::PTParams params_veff(vw, alN, beta, dtau, TN, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
+    const PhaseTransition::PTParams params_veff(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, veff_file);
 
     un.print();
     params.print();
@@ -135,9 +137,11 @@ void example_Kin_Spec(const std::string& filename) {
     const auto beta = PhaseTransition::dflt_PTParams::beta;
     const auto dtau = PhaseTransition::dflt_PTParams::dtau;
     const auto TN = PhaseTransition::dflt_PTParams::TN;
+    const auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
+    const auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
 
-    const PhaseTransition::PTParams params1(vw, alN, beta, dtau, TN, "exp", un);
-    const PhaseTransition::PTParams params2(vw, alN, beta, dtau, TN, "sim", un);
+    const PhaseTransition::PTParams params1(vw, alN, beta, dtau, TN, cpsq, cmsq, "exp", un);
+    const PhaseTransition::PTParams params2(vw, alN, beta, dtau, TN, cpsq, cmsq, "sim", un);
 
     // Momentum values
     const auto kRs_vals = logspace(1e-1, 1e+3, 500);
@@ -196,12 +200,14 @@ void example_GW_Spec(const std::string& filename) {
     const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
     const auto dtau = 10.0 * Rs;
     const auto TN = Ts; // GeV
+    const auto cpsq = 1.0 / 3.0;
+    const auto cmsq = cpsq;
     const auto nuc_type = "exp";
     std::string veff_file = "thermo.csv";
 
     const PhaseTransition::Universe un(Ts, gs);
-    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un);
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un, veff_file);
+    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
+    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, veff_file);
 
     un.print();
     params.print();
@@ -237,6 +243,8 @@ void test_FluidProfile() {
     // effects profile
     const auto alN = 0.11384915003991744;
     const auto TN = 53.370765185008004; // GeV
+    const auto cpsq = 1.0 / 3.0;
+    const auto cmsq = cpsq;
 
     // profile independent vars
     const auto Ts = 53.370765185008004; // GeV
@@ -261,8 +269,8 @@ void test_FluidProfile() {
 
             const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
             const auto dtau = 10.0 * Rs;
-            const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un); // bag model
-            // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, nuc_type, un, "thermo.csv"); // veff
+            const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un); // bag model
+            // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, "thermo.csv"); // veff
 
             // construct profiles
             try {

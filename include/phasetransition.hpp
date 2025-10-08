@@ -78,6 +78,8 @@ struct dflt_PTParams {
   static constexpr double Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;   
   static constexpr double dtau = 10.0 * Rs;         // PT duration
   static constexpr double TN = dflt_universe::Ts;     // Nucleation temperature
+  static constexpr double cpsq = 1.0 / 3.0;      // speed of sound squared (symmetric phase)
+  static constexpr double cmsq = cpsq;           // speed of sound squared (broken phase
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
 
@@ -101,8 +103,8 @@ units:
   public:
     // ctors
     PTParams();
-    PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un);
-    PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un, const std::string& eos);
+    PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un, const std::string& eos);
 
     Universe un() const { return universe_; } // universe parameters
 

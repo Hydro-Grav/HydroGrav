@@ -73,12 +73,12 @@ const Universe& default_universe() {
 // make new ctor for reading in Veff since we calculate all the params
 // alpha only exists for Bag model, maybe change how it is input/stored in PTParams
 PTParams::PTParams()
-    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::TN, dflt_PTParams::nuc_type, default_universe()) {}
+    : PTParams(dflt_PTParams::vw, dflt_PTParams::alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::TN, dflt_PTParams::cpsq, dflt_PTParams::cmsq, dflt_PTParams::nuc_type, default_universe()) {}
 
-PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un)
-    : PTParams(vw, alN, beta, dtau, TN, nuc_type, un, "") {}
+PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un)
+    : PTParams(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, "") {}
 
-PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
+PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
     : universe_(un),
       eos_model_(),
       nuc_type_(),
@@ -90,8 +90,8 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, c
       tau_fin_(),
       dtau_(dtau),
       TN_(TN),
-      cpsq_(),
-      cmsq_(),
+      cpsq_(cpsq),
+      cmsq_(cmsq),
       veff_TTN_vals_(), veff_ps_vals_(), veff_pb_vals_(), veff_es_vals_(), veff_eb_vals_(), veff_ws_vals_(), veff_wb_vals_(),
       veff_ps_interp_(), veff_pb_interp_(), veff_es_interp_(), veff_eb_interp_(), veff_ws_interp_(), veff_wb_interp_(),
       pN_(), eN_(), wN_(), wNeN_rat_()
@@ -153,10 +153,6 @@ PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, c
       // tau_s_ = 1.0 / Hs_conformal;
       tau_s_ = 1.0 / universe_.Hs();
       tau_fin_ = tau_s_ + dtau_;
-
-      // define speed of sound in both phases
-      cpsq_ = 1.0 / 3.0; // move inside eos definition below once cs(T) stuff added
-      cmsq_ = cpsq_;
 
       // define eos
       if (!veff_eos_filename.empty()) {
