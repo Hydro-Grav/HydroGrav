@@ -92,7 +92,9 @@ class FluidProfile {
     double vp_from_matching(double vm, double alpha_p) const;
     double wm_from_matching(double wp, double vp, double vm) const;
     double w1wN_from_matching(double xi_sh) const;
-    double ToTN(double wowN, double cpsq, double cmsq) const;
+  
+    double get_T1TN(double w1wN) const;
+    double get_TmTN(double wmwN) const;
 
     double v1UF_from_shock(double xi_sh) const;
     std::array<double, 2> get_alp_minmax(double vw) const;

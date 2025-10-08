@@ -316,53 +316,48 @@ double FluidProfile::vJ_det(double alp) const {
     return vp_from_matching(std::sqrt(cmsq_), alp); // vJ(alp) = vp(|vm|=cm, alp)
 }
 
-// update for mu nu - done
 // need to check sign convention - see arXiv:1909.10040 eq B.6
 double FluidProfile::vp_from_matching(double vm, double alp) const { // vp(vm,alp) from matching eqs
     const auto sgn = 1.0;
-    // const auto fac1 = 1.0 / (2.0 * (1.0 + alp));
+
     const auto fac1 = 1.0 / (2.0 * (1.0 / (3.0 * cmsq_) + alp));
     const auto fac2 = 1.0 / (3.0 * vm);
+    const auto fac3 = fac2 - vm / (3.0 * cmsq_);
 
-    // const auto vp = fac1 * (fac2 + vm + sgn * std::sqrt((fac2 - vm) * (fac2 - vm) + 4.0 * alp * alp + 8.0 * alp / 3.0));
-    const auto vp = fac1 * (fac2 + vm / (3.0 * cmsq_) + sgn * std::sqrt((fac2 - vm / (3.0 * cmsq_)) * (fac2 - vm / (3.0 * cmsq_)) + 4.0 * alp * alp + 4.0 * (1.0/cmsq_ - 1.0) * alp / 3.0));
-
-    std::cout << "vp_from_matching: vp=" << vp << "\n";
-
-    return vp;
+    return fac1 * (fac2 + vm / (3.0 * cmsq_) + sgn * std::sqrt(fac3 * fac3 + 4.0 * alp * alp + 4.0 * (1.0/cmsq_ - 1.0) * alp / 3.0));
 }
 
-// update for mu nu - done
 // need to check sign convention - see arXiv:1909.10040 eq B.7
 double FluidProfile::vm_from_matching(double vp, double alp) const { // inverse of vp(vm,alp)
     const auto vp_abs = abs(vp);
     const auto sgn = 1.0; // not sure when to use which sign
-    // const auto fac = (1.0 + alp) * vp_abs + (1.0 - 3.0 * alp) / (3.0 * vp_abs);
-    const auto nu = 1.0 + 1.0 / cmsq_;
-    const auto fac = (1.0 + 3.0 * alp / (nu - 1.0)) * vp_abs + (1.0 - 3.0 * alp) / ((nu - 1.0) * vp_abs);
+    const auto fac = vp_abs + cmsq_ * (1.0 - 3.0 * alp * (1.0 - vp_abs * vp_abs)) / vp_abs;
 
-    // const auto vm = 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 / 3.0));
-    const auto vm = 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 / (nu - 1.0)));
-
-    std::cout << "vm_from_matching: vm=" << vm << "\n";
-
-    return vm;
+    return 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 * cmsq_)); // mu nu
 }
 
-// update for mu nu (?)
 double FluidProfile::w1wN_from_matching(double xi_sh) const { // w1/wN
     // alpha_1 w1 = alpha_N wN
     const auto xi_sh_sq = xi_sh * xi_sh;
-    return (9.0 * xi_sh_sq - 1.0) / (3.0 * (1.0 - xi_sh_sq));
+    return (xi_sh_sq - cpsq_ * cpsq_) / (cpsq_ * (1.0 - xi_sh_sq)); // mu nu
 }
 
-// update for mu nu
-double FluidProfile::ToTN(double wowN, double cpsq, double cmsq) const {
-    // w=(4/3)*a*T^4 -> w/wN = (a/aN) * (T/TN)^4
-    const auto fac = wowN * (1.0 + cpsq) / (1.0 + cmsq); // not sure if (1+cpsq)/(1+cmsq) is correct
-    return std::pow(fac, 0.25);
+double FluidProfile::get_T1TN(double w1wN) const {
+    const auto mu = 1.0 + 1.0 / cpsq_;
+    return std::pow(w1wN, 1.0 / mu);
 }
 
+// TO DO: update ap/am ratio calculation
+double FluidProfile::get_TmTN(double wmwN) const {
+    const auto mu = 1.0 + 1.0 / cpsq_;
+    const auto nu = 1.0 + 1.0 / cmsq_;
+    const auto r = 1.0; // ap/am ratio
+
+    const auto fac = (mu / nu) * r * wmwN;
+    return std::pow(fac, 1.0 / nu) * std::pow(params_.TN(), mu / nu - 1.0);
+}
+
+// update for mu nu - done
 double FluidProfile::v1UF_from_shock(double xi_sh) const {
     if (xi_sh < std::sqrt(cpsq_) || xi_sh > 1.0) {
         // shock condition (cp < xi_sh < 1) relaxed here since for some vw & alN, xi_shock VERY close to bounds
@@ -371,11 +366,9 @@ double FluidProfile::v1UF_from_shock(double xi_sh) const {
     }
 
     if (xi_sh == std::sqrt(cpsq_)) return 1e-10; // avoid numerical precision errors
-    return (3.0 * xi_sh * xi_sh - 1.0) / (2.0 * xi_sh);
+    return (xi_sh * xi_sh - cpsq_) / ((1.0 - cpsq_) * xi_sh);
 }
 
-// update for mu nu
-// might need to fix al_min = 0 if numerical precision causes it to be slightly negative
 std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     const auto cp = std::sqrt(cpsq_);
 
@@ -384,8 +377,8 @@ std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     const auto vp_max = vm; // |v+| < |v-|
     
     // same as get_alp_wall but using vp, vm
-    auto get_alp = [] (double vp, double vm) {
-        return gammaSq(vp) * (vp * vp - vp * vm - vp / (3.0 * vm) + 1.0 / 3.0);
+    auto get_alp = [this] (double vp, double vm) {
+        return gammaSq(vp) * (vp * vp / cmsq_ - vp * vm / cmsq_ - vp / vm + 1.0) / 3.0; // mu nu 
     };
     
     const auto al_max = get_alp(vp_min, vm);
@@ -394,13 +387,11 @@ std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     return {al_min, al_max};
 }
 
-// update for mu nu
 // alpha_+ from wall condition
 double FluidProfile::get_alp_wall(double vpUF, double vw) const {
-    return gammaSq(vpUF) * vpUF * (2.0 * vw * vpUF + 1.0 - 3.0 * vw * vw) / (3.0 * vw);
+    return gammaSq(vpUF) * vpUF * (1.0 + (1.0 / cmsq_ - 1.0) * vw * vpUF - vw * vw / cmsq_) / (3.0 * vw); // mu nu
 }
 
-// update for mu nu
 double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi, const int n) const {
     // initial conditions
     const auto xi0 = xi_sh - 0.001;
@@ -424,16 +415,14 @@ double FluidProfile::alN_residual_func(double xi_sh, const deriv_func& dydxi, co
     return std::log(std::abs(alN_wall / alN_)); // doesn't always work for some vw, alN
 }
 
-// update for mu nu
 double FluidProfile::lambda_b(double wowN) const {
-    // la(xi)=(3/4)*(w(xi)/wN - 1 - alN) behind bubble wall (detonations)
-    return 0.75 * (wowN - 1.0 - alN_);
+    // la(xi) behind bubble wall (detonations)
+    return (wowN - (1.0 + 3.0 * cmsq_ * alN_)) / (1.0 + cmsq_);
 }
 
-// update for mu nu
 double FluidProfile::lambda_s(double wowN) const {
-    // la(xi)=(3/4)*(w(xi)/wN - 1) in front of bubble wall (deflagrations)
-    return 0.75 * (wowN - 1.0);
+    // la(xi) in front of bubble wall (deflagrations)
+    return (wowN - 1.0) / (1.0 + cpsq_);
 }
 
 double FluidProfile::find_shock(const deriv_func& dydxi) const {
@@ -461,7 +450,8 @@ std::pair<double, state_type> FluidProfile::get_IC_deflagration(const deriv_func
     const auto w1wN = w1wN_from_matching(xi_sh);
     if (w1wN <= 0.0) throw std::invalid_argument("Deflagration IC failed: w1wN must be >0!");
 
-    const auto T1TN = ToTN(w1wN, cpsq_, cpsq_); // c1sq = c2sq = cpsq
+    // const auto T1TN = ToTN(w1wN, cpsq_, cpsq_); // c1sq = c2sq = cpsq
+    const auto T1TN = get_T1TN(w1wN);
     if (T1TN <= 0.0) throw std::invalid_argument("Deflagration IC failed: T1TN must be >0!");
 
     const std::array<double, 3> y1 = {v1UF, w1wN, T1TN};
@@ -489,7 +479,8 @@ state_type FluidProfile::get_IC_detonation() const {
     const auto wmwN = wm_from_matching(wpwN, vp, vm);
     if (wmwN <= wpwN) throw std::invalid_argument("Detonation IC failed: wm>wp required!");
 
-    const auto TmTN = ToTN(wmwN, cpsq_, cmsq_);
+    // const auto TmTN = ToTN(wmwN, cpsq_, cmsq_);
+    const auto TmTN = get_TmTN(wmwN);
     if (TmTN <= TpTN) throw std::invalid_argument("Detonation IC failed: Tm>Tp required!");
     
     return {vmUF, wmwN, TmTN};
@@ -855,7 +846,8 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             const auto wpwN = w_sol_tmp.back(); // w(xi_w + dlt) = w+/wN
 
             w_end_val = wm_from_matching(wpwN, vp, vm); // wm/wN, from matching condition at wall
-            T_end_val = ToTN(w_end_val, cpsq_, cmsq_); // Tm/TN
+            // T_end_val = ToTN(w_end_val, cpsq_, cmsq_); // Tm/TN
+            T_end_val = get_TmTN(w_end_val);
             la_end_val = lambda_b(w_end_val);
 
         } else { // hybrid
@@ -875,7 +867,8 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             const auto wmwN = wm_from_matching(wpwN, vp, vm);
             y0_rf[1] = wmwN;
 
-            const auto TmTN = ToTN(wmwN, cpsq_, cmsq_);
+            // const auto TmTN = ToTN(wmwN, cpsq_, cmsq_);
+            const auto TmTN = get_TmTN(wmwN);
             y0_rf[2] = TmTN;
 
             const auto [xi_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydxi, xi0_rf, xif_rf, y0_rf, n);
