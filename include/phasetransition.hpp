@@ -105,6 +105,7 @@ units:
     PTParams();
     PTParams(double vw, double alN);
     PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, const std::string& eos);
     PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un, const std::string& eos);
 
     Universe un() const { return universe_; } // universe parameters

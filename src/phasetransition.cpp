@@ -80,6 +80,9 @@ PTParams::PTParams(double vw, double alN) // Fluid profile only uses vw and alN
 PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un)
     : PTParams(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, "") {}
 
+PTParams::PTParams(double vw, double alN, const std::string& veff_eos_filename) // Fluid profile only uses vw and alN
+    : PTParams(vw, alN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::TN, dflt_PTParams::cpsq, dflt_PTParams::cmsq, dflt_PTParams::nuc_type, default_universe(), veff_eos_filename) {}
+
 PTParams::PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
     : universe_(un),
       eos_model_(),
