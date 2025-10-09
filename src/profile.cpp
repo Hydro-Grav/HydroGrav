@@ -360,6 +360,8 @@ double FluidProfile::get_TmTN(double wmwN) const {
     const auto nu = 1.0 + 1.0 / cmsq_;
     const auto r = 1.0; // ap/am ratio
 
+    if (cpsq_ == cmsq_) return std::pow(r * wmwN, 1.0 / mu);
+
     const auto fac = (mu / nu) * r * wmwN;
     return std::pow(fac, 1.0 / nu) * std::pow(params_.TN(), mu / nu - 1.0);
 }
