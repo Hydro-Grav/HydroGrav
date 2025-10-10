@@ -32,10 +32,10 @@ namespace plt = matplotlibcpp;
 // Fluid profile
 void example_FluidProfile(const std::string& filename) {
     // const auto vw = 0.9; // detonation
-    // const auto vw = 0.4; // deflagration
+    const auto vw = 0.4; // deflagration
     // const auto vw = 0.6; // hybrid
-    const auto vw = 0.0378243;
-    const auto alN = 0.183018;
+    // const auto vw = 0.0378243;
+    // const auto alN = 0.183018;
     
     // Will's benchmark point:
     // std::string veff_file = "flynn_eos.csv";
@@ -53,7 +53,7 @@ void example_FluidProfile(const std::string& filename) {
     // Xiao's benchmark point:
     const auto Ts = 53.370765185008004; // GeV
     const auto gs = 106.75;
-    // const auto alN = 0.11384915003991744;
+    const auto alN = 0.11384915003991744;
     const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
     const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
     const auto dtau = 10.0 * Rs;
@@ -71,7 +71,7 @@ void example_FluidProfile(const std::string& filename) {
     params.print();
 
     const Hydrodynamics::FluidProfile profile_bag(params); // bag model
-    profile_bag.plot("profile_bag.png");
+    // profile_bag.plot("profile_bag.png");
     // profile_bag.write("prof_bag.csv");
     const auto xi_bag = profile_bag.xi_vals();
     const auto v_bag = profile_bag.v_vals();
@@ -127,7 +127,9 @@ void example_FluidProfile(const std::string& filename) {
     plt::grid(true);
 
     plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
-    plt::save("profile_combined.png");
+    plt::save(filename);
+
+    std::cout << "Fluid profile saved to " << filename << "\n";
 }
 // Kinetic power spectrum
 void example_Kin_Spec(const std::string& filename) {
@@ -354,7 +356,7 @@ int main() {
     // test_profile_params();
     // example_Kin_Spec("Ekin");
     // example_GW_Spec("GWSpec");
-    example_FluidProfile("profile");
+    example_FluidProfile("profile_combined.png");
     // test_FluidProfile("profile_test_bag.csv");
     // test_rk4_solver();
 

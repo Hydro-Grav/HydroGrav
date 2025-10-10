@@ -13,12 +13,8 @@
 
 /*
 TO DO:
-- add option to input a Veff -> derive fluid dynamics from this?
-- change PTParams to single ctor with default arguments (see slide 23, wk 4)
-- initialise all the new variables i've added in ctor
-- add deflag, hybrid, detonation type in PTParams
-- add vp, vm, wp, wm as parameters in PTParams? currently uses function to calculate since they depend on Veff
-  - these are calculated from a specific matching condition using bag model - generalise to other models in future
+- remove alN from PTParams base class and move to PTParams_Bag (need to change how get_mode() works in FluidProfile first)
+- TN only used for mu nu and Veff (not bag) - write ctor without TN for bag?
 */
 
 namespace PhaseTransition {
@@ -99,7 +95,8 @@ units:
  * This class encapsulates the parameters needed to describe the phase transition dynamics,
  * including speeds of sound, wall velocity, strength of the transition, and bubble nucleation type.
  */
- class PTParams { // will probably need to update this later
+
+class PTParams { // will probably need to update this later
   public:
     // ctors
     PTParams();
@@ -167,7 +164,104 @@ units:
 
       bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
       bool is_valid_csq(double csq) const;
-    };
+  };
+
+ class PTParams2 {
+  public:
+    // ctor
+    PTParams2(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un);
+
+    Universe un() const { return un_; } // universe parameters
+
+    // Fluid parameters
+    double vw() const { return vw_; } // wall velocity
+    double alN() const { return alN_; } // strength parameter at nuc temp (alN_N)
+    double TN() const { return TN_; } // nucleation temperature
+    double wNeN_rat() const { return wNeN_rat_; } // ratio of nucleation enthalpy and energy density
+
+    // GW parameters
+    double beta() const { return beta_; } // inverse PT duration
+    double Rs() const { return Rs_; } // characteristic length scale R_*
+    double tau_s() const { return tau_s_; } // start time of PT
+    double tau_fin() const { return tau_fin_; } // end time of PT
+    double dtau() const { return dtau_; } // PT duration
+    const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
+
+    // friend std::ostream& operator<<(std::ostream& os, const PTParams2& p);
+    // void print() const;
+    
+    virtual double cpsq(double T = -1.0) const = 0; // speed of sound squared (symmetric phase)
+    virtual double cmsq(double T = -1.0) const = 0; // speed of sound squared (broken phase)
+
+  protected:
+    const Universe un_;
+    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_, dtau_;
+    const char *nuc_type_;
+
+    virtual void print() const;
+  
+  private:
+    bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
+ };
+
+ class PTParams2_Bag : public PTParams2 {
+  public:
+    // ctors
+    PTParams2_Bag(double vw, double alN);
+    PTParams2_Bag(double vw, double alN, double TN, double cpsq, double cmsq);
+    PTParams2_Bag(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
+
+    double cpsq(double T = -1.0) const override { return cpsq_; }
+    double cmsq(double T = -1.0) const override { return cmsq_; }
+
+    void print() const override;
+
+  private:
+    const double cpsq_, cmsq_;
+    bool is_valid_csq(double csq) const;
+ };
+
+ class PTParams2_Veff : public PTParams2 {
+  public:
+    // ctors
+    PTParams2_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
+    PTParams2_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
+
+    std::vector<double> veff_TTN_vals() const { return veff_TTN_vals_; }
+    std::vector<double> veff_ps_vals() const { return veff_ps_vals_; }
+    std::vector<double> veff_pb_vals() const { return veff_pb_vals_; }
+    std::vector<double> veff_es_vals() const { return veff_es_vals_; }
+    std::vector<double> veff_eb_vals() const { return veff_eb_vals_; }
+
+    double ps_val(double TTN) const { return alglib::spline1dcalc(veff_ps_interp_, TTN); }
+    double pb_val(double TTN) const { return alglib::spline1dcalc(veff_pb_interp_, TTN); }
+    double es_val(double TTN) const { return alglib::spline1dcalc(veff_es_interp_, TTN); }
+    double eb_val(double TTN) const { return alglib::spline1dcalc(veff_eb_interp_, TTN); }
+    double ws_val(double TTN) const { return alglib::spline1dcalc(veff_ws_interp_, TTN); }
+    double wb_val(double TTN) const { return alglib::spline1dcalc(veff_wb_interp_, TTN); }
+
+    double TTN_min() const { return veff_TTN_vals_.front(); }
+    double TTN_max() const { return veff_TTN_vals_.back(); }
+
+    double cpsq(double T = -1.0) const override { return cpsq_; }
+    double cmsq(double T = -1.0) const override { return cmsq_; }
+
+    double pN() const { return pN_; }
+    double eN() const { return eN_; }
+    double wN() const { return wN_; }
+
+    #ifdef ENABLE_MATPLOTLIB
+    void plot_thermo(const std::string& filename) const; // Plots e(T), p(T), w(T)
+    #endif
+
+    void print() const override;
+
+  private:
+    const double cpsq_, cmsq_; // remove when cs(T) implemented
+    std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
+    alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
+    double pN_, eN_, wN_;
+ };
 
 } // namespace PhaseTransition
 
