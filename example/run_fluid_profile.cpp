@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     }
 
     const PhaseTransition::Universe un;
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
+    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
     if(argc == 5) {
         params.print();
     }

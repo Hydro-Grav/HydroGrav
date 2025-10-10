@@ -178,7 +178,7 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
     /***************************************************************************/
 
 FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t n)
-    : params_(params),
+    : params_(&params),
       cpsq_(params.cpsq()), cmsq_(params.cmsq()),
       cp_(std::sqrt(cpsq_)), cm_(std::sqrt(cmsq_)),
       vw_(params.vw()), alN_(params.alN()),
@@ -189,45 +189,36 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
     {
         std::vector<prof_type> profiles;
 
-        if (params.eos_model() == "veff") { // veff eos
-            std::cout << "Calculating fluid profile using generic equation of state from Veff\n";
-            std::cout << "Warning: alN stored in PTParams is not used for Veff EoS!\n";
+        // define hydrodynamic mode
+        mode_ = get_mode_bag(vw_, cmsq_, alN_);
 
-            // replace with get_mode_veff when implemented!!
-            mode_ = get_mode_bag(vw_, cmsq_, alN_); // placeholder for now!!
+        // check alN large enough for shock (deflag/hybrid only)
+        if (mode_ == 0 || mode_ == 1) {
+            const auto alp_minmax = get_alp_minmax(vw_);
+            alp_min_ = alp_minmax[0];
+            alp_max_ = alp_minmax[1];
 
-            // delete when get_mode_veff is implemented
-            if (mode_ == 0 || mode_ == 1) {
-                const auto alp_minmax = get_alp_minmax(vw_);
-                alp_min_ = alp_minmax[0];
-                alp_max_ = alp_minmax[1];
+            std::cout << "alp_min=" << alp_min_ << ", alp_max=" << alp_max_ << "\n";
 
-                // alN > alp > alp_min (can't properly constrain from above since we need alp)
-                if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
-            }
+            // alN > alp > alp_min (can't properly constrain from above since we need alp)
+            if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
+        }
 
-            // calculate fluid profiles v(xi), w(xi), la(xi) (remove from conditional when solve_profile finished)
-            profiles = solve_profile_veff(n);
-        } else {
-            std::cout << "Calculating fluid profile using Bag equation of state\n";
-
-            // define hydrodynamic mode
-            mode_ = get_mode_bag(vw_, cmsq_, alN_);
-
-            // check alN large enough for shock (deflag/hybrid only)
-            if (mode_ == 0 || mode_ == 1) {
-                const auto alp_minmax = get_alp_minmax(vw_);
-                alp_min_ = alp_minmax[0];
-                alp_max_ = alp_minmax[1];
-
-                std::cout << "alp_min=" << alp_min_ << ", alp_max=" << alp_max_ << "\n";
-
-                // alN > alp > alp_min (can't properly constrain from above since we need alp)
-                if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
-            }
-
-            // calculate fluid profiles v(xi), w(xi), la(xi) (remove from conditional when solve_profile finished)
-            profiles = solve_profile(n);
+        // calculate fluid profiles v(xi), w(xi), la(xi)
+        switch (params.eos()) {
+            case PhaseTransition::PTParams::ModelType::Bag:
+                std::cout << "Calculating fluid profile using Bag equation of state\n";
+                bag_params_ = &dynamic_cast<const PhaseTransition::PTParams_Bag&>(params);
+                profiles = solve_profile(n);
+                break;
+            case PhaseTransition::PTParams::ModelType::Veff:
+                std::cout << "Calculating fluid profile using generic equation of state from Veff\n";
+                std::cout << "Warning: alN stored in PTParams is not used for Veff EoS!\n";
+                veff_params_ = &dynamic_cast<const PhaseTransition::PTParams_Veff&>(params);
+                profiles = solve_profile_veff(n);
+                break;
+            default:
+                throw std::runtime_error("Unknown EOS type");
         }
 
         xi_vals_ = profiles[0];
@@ -363,7 +354,7 @@ double FluidProfile::get_TmTN(double wmwN) const {
     if (cpsq_ == cmsq_) return std::pow(r * wmwN, 1.0 / mu);
 
     const auto fac = (mu / nu) * r * wmwN;
-    return std::pow(fac, 1.0 / nu) * std::pow(params_.TN(), mu / nu - 1.0);
+    return std::pow(fac, 1.0 / nu) * std::pow(bag_params_->TN(), mu / nu - 1.0);
 }
 
 // update for mu nu - done
@@ -517,13 +508,13 @@ state_type FluidProfile::get_IC_detonation() const {
 // change these to lambda functions in solve?
 double FluidProfile::lambda_s_veff(double ToTN, const double eN, const double wN_inv) const {
     // la(xi) = (es(T(xi)) - eN) / wN
-    const auto es_T = params_.es_val(ToTN); // es(T/TN)
+    const auto es_T = veff_params_->es_val(ToTN); // es(T/TN)
     return (es_T - eN) * wN_inv;
 }
 
 double FluidProfile::lambda_b_veff(double ToTN, const double eN, const double wN_inv) const {
     // la(xi) = (eb(T(xi)) - eN) / wN
-    const auto eb_T = params_.eb_val(ToTN); // eb(T/TN)
+    const auto eb_T = veff_params_->eb_val(ToTN); // eb(T/TN)
     return (eb_T - eN) * wN_inv;
 }
 
@@ -533,8 +524,8 @@ state_type FluidProfile::test_shock_matching(const deriv_func& dydxi, double xi_
     const auto w2wN = 1.0;
     const auto T2TN = 1.0;
 
-    const auto pN = params_.pN();
-    const auto eN = params_.eN();
+    const auto pN = veff_params_->pN();
+    const auto eN = veff_params_->eN();
 
     // matching across shock
     std::function<std::array<double, 2>(std::array<double, 2>)> shock_matching_helper = [this, v2, pN, eN] (std::array<double, 2> y0) {
@@ -612,17 +603,17 @@ std::pair<state_type, state_type> FluidProfile::test_wall_matching(const deriv_f
 }
 
 std::array<double, 2> FluidProfile::matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const {    
-    if (T1TN < params_.TTN_min() || T1TN > params_.TTN_max()) {
+    if (T1TN < veff_params_->TTN_min() || T1TN > veff_params_->TTN_max()) {
         throw std::out_of_range("T1/TN is called out of bounds for spline!");
     }
 
-    // const auto p2 = params_.ps_val(T2TN); // p_2, e_2
-    // const auto e2 = params_.es_val(T2TN);
+    // const auto p2 = veff_params_->ps_val(T2TN); // p_2, e_2
+    // const auto e2 = veff_params_->es_val(T2TN);
     const auto p2 = pN;
     const auto e2 = eN;
 
-    const auto p1 = params_.ps_val(T1TN); // p_1, e_1
-    const auto e1 = params_.es_val(T1TN);
+    const auto p1 = veff_params_->ps_val(T1TN); // p_1, e_1
+    const auto e1 = veff_params_->es_val(T1TN);
 
     // const auto eq1 = v2 * v1 * (e1 - e2) - (p1 - p2);
     // const auto eq2 = v1 * (e1 + p2) - v2 * (e2 + p1);
@@ -633,15 +624,15 @@ std::array<double, 2> FluidProfile::matching_eqs_shock(double pN, double eN, dou
 }
 
 std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const {        
-    if (TmTN < params_.TTN_min() || TmTN > params_.TTN_max()) {
+    if (TmTN < veff_params_->TTN_min() || TmTN > veff_params_->TTN_max()) {
         throw std::out_of_range("Tm/TN is called out of bounds for spline!");
     }
 
-    const auto pp = params_.ps_val(TpTN); // p_+, e_+
-    const auto ep = params_.es_val(TpTN);
+    const auto pp = veff_params_->ps_val(TpTN); // p_+, e_+
+    const auto ep = veff_params_->es_val(TpTN);
 
-    const auto pm = params_.pb_val(TmTN); // p_-, e_-
-    const auto em = params_.eb_val(TmTN);
+    const auto pm = veff_params_->pb_val(TmTN); // p_-, e_-
+    const auto em = veff_params_->eb_val(TmTN);
 
     // using regular form seems to make detonation IC calculation go out of bounds for Tm
     const auto eq1 = vp * vm * (em - ep) - (pm - pp);
@@ -1044,8 +1035,8 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
     //     return dydv_vec(xi, y, vw_, cpsq_, cmsq_);
     // };
 
-    const auto eN = params_.eN();
-    const auto wN_inv = 1.0 / params_.wN();
+    const auto eN = veff_params_->eN();
+    const auto wN_inv = 1.0 / veff_params_->wN();
 
     double xi0, xif;
     const auto dlt = 0.001; // wall and shocks are discontinuities so start integration just before them

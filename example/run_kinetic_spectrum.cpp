@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
     auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
+    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
 
     // Create hydrodynamic profile of bubble
     const Hydrodynamics::FluidProfile profile(params);

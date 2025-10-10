@@ -43,7 +43,7 @@ namespace Spectrum {
 /***** PowerSpec class *****/
 
 // Define ctors
-PowerSpec::PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params)
+PowerSpec::PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams* params)
     : freq_vals_(), K_vals_(K_vals), P_vals_(P_vals),
       params_(params) {
         if (K_vals.size() != P_vals.size()) {
@@ -52,8 +52,8 @@ PowerSpec::PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_v
 
         // store frequency values
         for (const auto& K : K_vals_) {
-            const auto HsRs = params_.un().Hs() * params_.Rs();
-            const auto freq_val = (2.6e-5) * (K / 10.0) * (1.0 / HsRs) * (params_.un().Ts() / 100.0) * std::pow(params_.un().gs() / 100.0, 1.0 / 6.0);
+            const auto HsRs = params_->un().Hs() * params_->Rs();
+            const auto freq_val = (2.6e-5) * (K / 10.0) * (1.0 / HsRs) * (params_->un().Ts() / 100.0) * std::pow(params_->un().gs() / 100.0, 1.0 / 6.0);
             freq_vals_.push_back(freq_val);
         }
     }
@@ -84,7 +84,7 @@ void PowerSpec::plot(const std::string& filename) const {
 
     plt::figure_size(800, 600);
     plt::loglog(K(), P(), "k-");
-    plt::suptitle("vw = " + to_string_with_precision(params_.vw()) + ", alN = " + to_string_with_precision(params_.alN()));
+    plt::suptitle("vw = " + to_string_with_precision(params_->vw()) + ", alN = " + to_string_with_precision(params_->alN()));
     plt::xlabel("K=kRs");
     plt::ylabel("Omega_GW(K)");
     plt::xlim(K().front(), K().back());
@@ -171,100 +171,6 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
 }
 
 /*** GW power spectrum ***/
-// add option for inputing pRs_vals, Ttilde_vals and z_vals?
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
-    /***************************** CLOCK ******************************/
-    const auto ti = std::chrono::high_resolution_clock::now();
-    /******************************************************************/
-    
-    const Hydrodynamics::FluidProfile profile(params); // generate fluid profile
-    const auto prefac = gw_prefac(kRs_vals, profile); // prefactor
-
-    const auto nk = kRs_vals.size();
-
-    const auto pRs_vals = logspace(1e-2, 1e+3, 1000); // P = p*Rs
-    const auto np = pRs_vals.size();
-
-    std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
-    for (size_t i = 0; i < np; i++) {
-        const auto pRs = pRs_vals[i];
-        pRs2_vals[i] = pRs * pRs;
-    }
-
-    const auto z_vals = linspace(-1.0, 1.0, 1000); // logspace gives nan over this domain
-    const auto nz = z_vals.size();    
-
-    /********** precompute normalised kinetic spectrum **********/
-    // NOTE: this is currently a bit buggy and domain of interpolating function requires fine tuning depending on range of k,p,z
-    // zetaKin(ptRs) can't be precomputed since ptRs = ptRs(k,p,z) -> use interpolator (much faster than constructing PowerSpec objects inside loops)
-
-    // calc temp ptRs vals for interpolating func
-    const auto pRs_max = pRs_vals.back();
-    const auto kRs_max = kRs_vals.back();
-    const auto ptRs_max = 15.0 * (kRs_max + pRs_max); // max of pt=sqrt(k^2-2kpz+p^2)
-    const auto ptRs_min = 1e-8; // not sure how to choose best min val - update later
-
-    const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2.0*np);
-
-    const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
-    const auto zk_pRs_vals = zk_pRs_spec.P(); // store zetaKin(pRs) vals (quicker than calling interpolator)
-
-    const auto zk_ptRs_spec = zetaKin(ptRs_vals_tmp, profile);    
-    const auto zk_ptRs_interp = zk_ptRs_spec.interpolate(); // interpolating function for zetaKin(ptRs)
-    /************************************************************/
-
-    std::cout << "Calculating gravitational wave power spectrum...\n";
-
-    // precompute dlt
-    const auto delta = dlt_SSM(kRs_vals, pRs_vals, z_vals, params);
-    std::vector<double> GW_P_vals(nk);
-
-    #pragma omp parallel for schedule(static)
-    for (size_t kk = 0; kk < nk; kk++ ) {
-        const auto kRs = kRs_vals[kk];
-        const auto kRs3 = kRs * kRs * kRs;
-
-        std::vector<std::vector<double>> integrand(np, std::vector<double>(nz));
-        for (size_t pp = 0; pp < np; pp++) {
-            const auto pRs = pRs_vals[pp];
-            const auto zk_pRs_fac = kRs3 * zk_pRs_vals[pp] * pRs2_vals[pp]; // kRs^3 * zetaKin(pRs) * pRs^2
-
-            for (size_t zz = 0; zz < nz; zz++) {
-                const auto z = z_vals[zz];
-                const auto ptRs = ptilde(kRs, pRs, z);
-
-                if (ptRs == 0.0) { // careful! need to check this converges properly for pt=0!
-                    integrand[pp][zz] = 0.0;
-                    continue;
-                }
-
-                const auto z_fac = 1.0 - z;
-                const auto z_fac2 = z_fac * z_fac;
-                const auto ptRs4_inv = 1.0 / (ptRs * ptRs * ptRs * ptRs);
-                
-                // const auto dlt = delta[kk][pp][zz];
-                const auto dlt = delta[kk * np * nz + pp * nz + zz];
-
-                // integrand[pp][zz] = (ptRs != 0.0) ? z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_interp(ptRs) * dlt : 0.0;
-                integrand[pp][zz] = z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_interp(ptRs) * dlt;
-            }
-        }
-
-        GW_P_vals[kk] = prefac * simpson_2d_integrate(pRs_vals, z_vals, integrand);
-        // GW_P_vals[kk] = simpson_2d_integrate(pRs_vals, z_vals, integrand);
-    }
-
-    std::cout << "Gravitational power spectrum constructed!\n";
-
-    /***************************** CLOCK ******************************/
-    const auto tf = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = tf - ti;
-    std::cout << "Timer (GWSpec): " << duration.count() << " s" << std::endl;
-    /******************************************************************/
-
-    return PowerSpec(kRs_vals, GW_P_vals, params);
-}
-
 PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
     /***************************** CLOCK ******************************/
     const auto ti = std::chrono::high_resolution_clock::now();
@@ -381,7 +287,7 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
     std::cout << "Timer (GWSpec2): " << duration.count() << " s" << std::endl;
     /******************************************************************/
 
-    return PowerSpec(kRs_vals, GW_P_vals, params);
+    return PowerSpec(kRs_vals, GW_P_vals, &params);
 }
 /***************************/
 
@@ -618,9 +524,9 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const PhaseTransition::PTPar
 }
 
 PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof) {
-    const auto beta = prof.params().beta();
-    const auto Rs = prof.params().Rs();
-    const auto nuc_type = prof.params().nuc_type();
+    const auto beta = prof.params()->beta();
+    const auto Rs = prof.params()->Rs();
+    const auto nuc_type = prof.params()->nuc_type();
 
     auto lt_dist = Hydrodynamics::lifetime_dist_func(nuc_type);
 
@@ -710,11 +616,11 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
 
 double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile) {
     const auto params = profile.params();
-    const auto un = params.un();
+    const auto un = params->un();
 
     const auto Ek = Ekin(kRs_vals, profile);
 
-    return gw_prefac(Ek.max(), params.Rs(), params.wNeN_rat(), un.T0(), un.Ts(), un.H0(), un.Hs(), un.g0(), un.gs());
+    return gw_prefac(Ek.max(), params->Rs(), params->wNeN_rat(), un.T0(), un.Ts(), un.H0(), un.Hs(), un.g0(), un.gs());
 }
 
 } // namespace Spectrum
