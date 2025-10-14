@@ -1022,7 +1022,8 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 
     // wrapper for hydrodynamic EoM
     auto dydxi = [this] (double xi, const state_type& y) -> state_type {
-        return dydxi_vec(xi, y, vw_, cpsq_, cmsq_);
+        // return dydxi_vec(xi, y, vw_, cpsq_, cmsq_);
+        return dydxi_vec(xi, y, vw_, veff_params_->csq_s(y[2]), veff_params_->csq_b(y[2]));
     };
 
     // uncomment this if det/hyb fluid profile looks wrong/discontinuous
