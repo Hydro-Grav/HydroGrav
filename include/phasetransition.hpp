@@ -122,8 +122,8 @@ units:
     // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
     // void print() const;
     
-    virtual double cpsq(double T = -1.0) const = 0; // speed of sound squared (symmetric phase)
-    virtual double cmsq(double T = -1.0) const = 0; // speed of sound squared (broken phase)
+    virtual double cpsq(double TTN = -1.0) const = 0; // speed of sound squared (symmetric phase)
+    virtual double cmsq(double TTN = -1.0) const = 0; // speed of sound squared (broken phase)
 
   protected:
     const Universe un_;
@@ -145,8 +145,8 @@ units:
 
     ModelType eos() const override { return ModelType::Bag; }
 
-    double cpsq(double T = -1.0) const override { return cpsq_; }
-    double cmsq(double T = -1.0) const override { return cmsq_; }
+    double cpsq(double TTN = -1.0) const override { return cpsq_; }
+    double cmsq(double TTN = -1.0) const override { return cmsq_; }
 
     void print() const override;
 
@@ -181,6 +181,8 @@ units:
 
     double cpsq(double T = -1.0) const override { return cpsq_; }
     double cmsq(double T = -1.0) const override { return cmsq_; }
+    double csq_s(double TTN) const { return alglib::spline1dcalc(cpsq_interp_, TTN); } // WARNING: spline can go out of bounds
+    double csq_b(double TTN) const { return alglib::spline1dcalc(cmsq_interp_, TTN); }
 
     double pN() const { return pN_; }
     double eN() const { return eN_; }

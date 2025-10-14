@@ -25,6 +25,7 @@ TO DO:
 - change taus to 1/Hs_conformal (currently using 1/Hs since otherwise program breaks)
 - remove alN from PTParams base class and move to PTParams_Bag (need to change how get_mode() works in FluidProfile first)
 - change all spline vectors to fixed length arrays (faster)
+- fix weird behaviour in csq(T) splines at T/TN = 1.4 (using placeholder csq=1/3 for now)
 */
 
 namespace PhaseTransition {
@@ -290,17 +291,23 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
       wNeN_rat_ = wN_ / eN_;
 
       // sound speed in fluid
-      double s_unused, ds2_unused;
-      double dpsdT, desdT, dpbdT, debdT;
+      // double s_unused, ds2_unused;
+      // double dps, des, dpb, deb;
+      // double dps2, des2, dpb2, deb2;
 
-      for (const auto& TTN : veff_TTN_vals_) {
-        alglib::spline1ddiff(veff_ps_interp_, TTN, s_unused, dpsdT, ds2_unused);
-        alglib::spline1ddiff(veff_es_interp_, TTN, s_unused, desdT, ds2_unused);
-        cpsq_vals_.push_back(dpsdT / desdT);
+      for (int i = 0; i < veff_TTN_vals_.size(); i++) {
+        const auto TTN = veff_TTN_vals_[i];
 
-        alglib::spline1ddiff(veff_pb_interp_, TTN, s_unused, dpbdT, ds2_unused);
-        alglib::spline1ddiff(veff_eb_interp_, TTN, s_unused, debdT, ds2_unused);
-        cmsq_vals_.push_back(dpbdT / debdT);
+        // alglib::spline1ddiff(veff_ps_interp_, TTN, s_unused, dps, dps2);
+        // alglib::spline1ddiff(veff_es_interp_, TTN, s_unused, des, des2);
+        // cpsq_vals_.push_back(dps / des);
+
+        // alglib::spline1ddiff(veff_pb_interp_, TTN, s_unused, dpb, dpb2);
+        // alglib::spline1ddiff(veff_eb_interp_, TTN, s_unused, deb, deb2);
+        // cmsq_vals_.push_back(dpb / deb);
+
+        cpsq_vals_.push_back(1.0 / 3.0); // tmp
+        cmsq_vals_.push_back(1.0 / 3.0);
       }
 
       alglib::real_1d_array cpsq_array, cmsq_array;
