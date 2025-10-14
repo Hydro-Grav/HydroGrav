@@ -85,7 +85,7 @@ class FluidProfile {
 
     std::string eos_; // bag or veff
     
-    const double cpsq_, cp_, cmsq_, cm_, vw_, alN_;
+    const double cpsq_, cmsq_, vw_, alN_;
     double alp_min_, alp_max_;
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
     prof_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
