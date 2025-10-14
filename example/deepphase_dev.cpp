@@ -10,6 +10,7 @@
 #include <omp.h>
 #include <streambuf>
 #include <random>
+#include <memory>
 
 // modify include list when testing of program finished - currently includes everything
 #include "hydrodynamics.hpp"
@@ -209,8 +210,8 @@ void example_GW_Spec(const std::string& filename) {
     std::string veff_file = "thermo.csv";
 
     const PhaseTransition::Universe un(Ts, gs);
-    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
+    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, veff_file);
 
     un.print();
     params.print();
@@ -224,6 +225,8 @@ void example_GW_Spec(const std::string& filename) {
     // }
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
     const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
+    // const Hydrodynamics::FluidProfile profile(params);
+    // const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, profile);
     
     // Write/plot to disk
     OmegaGW.write(filename + ".csv");
@@ -246,24 +249,18 @@ void example_GW_Spec(const std::string& filename) {
 void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     std::cout << "Running fluid profiles tests for (vw, alN) parameter space...\n";
 
-    // const int n = 30000;
-    const int n = 100;
-
-    const auto vw_min = 0.001;
-    // const auto vw_max = 0.999;
-    const auto vw_max = 0.2;
-    const auto alN_min = 1e-6;
-    // const auto alN_max = 2.0;
-    const auto alN_max = 0.2;
+    const int n = 30000;
+    // const int n = 100;
 
     std::random_device rd; // obtain a random number from hardware
     std::mt19937 gen(rd()); // seed the generator
     
-    std::uniform_real_distribution<double> vw_distr(vw_min, vw_max);
-    std::uniform_real_distribution<double> alN_distr(alN_min, alN_max);
+    std::uniform_real_distribution<double> vw_distr(0.001, 0.999);
+    std::uniform_real_distribution<double> log_alN_distr(-6.0, 0.0);
 
     const std::array<std::string, 3> unphysical_exception = {"alN too small for shock!", "alpha_+ too small for shock", "alpha_+ too large for shock"};
     int pass_count = 0;
+    int unphysical_count = 0;
 
     std::ofstream file(filename);
     file << "vw,alN,mode\n";
@@ -274,7 +271,7 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
 
     for (int i = 0; i < n; ++i) {
         const auto vw = vw_distr(gen);
-        const auto alN = alN_distr(gen);
+        const auto alN = std::pow(10.0, log_alN_distr(gen));
 
         const PhaseTransition::PTParams params(vw, alN);
         // const PhaseTransition::PTParams params(vw, alN, "thermo.csv");
@@ -289,6 +286,7 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
             // flags unphysical parameter choices
             if (e.what() == unphysical_exception[0] || e.what() == unphysical_exception[1] || e.what() == unphysical_exception[2]) {
                 file << "unphysical\n";
+                unphysical_count++;
             } else {
                 file << "fail\n";
             }
@@ -299,7 +297,92 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     std::cout.rdbuf(original_cout_buffer);
 
     file.close();
-    std::cout << "Fluid profile test complete: " << pass_count << "/" << n << " cases passed.\n";
+    std::cout << "Fluid profile test complete: " << pass_count << "/" << n << " cases passed (" << unphysical_count << " unphysical).\n";
+    std::cout << "Results saved to '" << filename << "'.\n";
+
+    return;
+}
+
+// Tests parameter space (vw, alN) for fluid profile calculation
+void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
+    std::cout << "Running GW spectrum tests for (vw, alN) parameter space...\n";
+
+    const int n = 5000;
+    // const int n = 1;
+
+    // fixed params
+    const auto gs = PhaseTransition::dflt_universe::gs;
+    const auto Ts = PhaseTransition::dflt_universe::Ts; // vary this param too?
+    const PhaseTransition::Universe un(Ts, gs);
+    const auto Hs = un.Hs();
+
+    const auto cpsq = 1.0 / 3.0;
+    const auto cmsq = cpsq;
+    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+    const auto TN = Ts;
+
+    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+
+    // parameter range
+    std::uniform_real_distribution<double> vw_distr(0.001, 0.999);
+    std::uniform_real_distribution<double> log_alN_distr(-6, 0.0);
+    std::uniform_real_distribution<double> log_betaH_distr(1.75, 3.75);
+
+    std::random_device rd; // obtain a random number from hardware
+    std::mt19937 gen(rd()); // seed the generator
+
+    const std::array<std::string, 3> unphysical_exception = {"alN too small for shock!", "alpha_+ too small for shock", "alpha_+ too large for shock"};
+    const std::string profile_failed = "Fluid profile construction failed, aborting GW calculation!";
+    int pass_count = 0;
+    int unphysical_count = 0;
+
+    std::ofstream file(filename);
+    file << "vw,alN,beta,mode\n";
+
+    // Suppress console output during testing
+    std::streambuf* original_cout_buffer = std::cout.rdbuf();
+    std::cout.rdbuf(nullptr);
+
+    for (int i = 0; i < n; ++i) {
+        const auto vw = vw_distr(gen);
+        const auto alN = std::pow(10.0, log_alN_distr(gen));
+        const auto beta = Hs * std::pow(10.0, log_betaH_distr(gen));
+        
+        const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
+        // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, "thermo.csv");
+        
+        file << vw << "," << alN << "," << beta << ",";
+
+        // attempt to construct fluid profile
+        std::unique_ptr<Hydrodynamics::FluidProfile> profile;
+        try {
+            profile = std::make_unique<Hydrodynamics::FluidProfile>(params);
+        } catch (const std::exception& e) {
+            if (e.what() == unphysical_exception[0] || e.what() == unphysical_exception[1] || e.what() == unphysical_exception[2]) {
+                file << "unphysical\n";
+                unphysical_count++;
+            } else {
+                file << "profile failed\n";
+            }
+            continue;
+        }
+
+        // attempt to construct GW spectrum
+        try {         
+            const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, *profile);
+            pass_count++;
+            file << OmegaGW.profile().mode_str() << "\n";
+        } catch (const std::exception& e) {
+            file << "GWSpec failed\n";
+        }
+    }
+    
+    // Restore console output
+    std::cout.rdbuf(original_cout_buffer);
+
+    file.close();
+    std::cout << "Fluid profile test complete: " << pass_count << "/" << n << " cases passed (" << unphysical_count << " unphysical).\n";
     std::cout << "Results saved to '" << filename << "'.\n";
 
     return;
@@ -354,8 +437,9 @@ int main() {
     // test_profile_params();
     // example_Kin_Spec("Ekin");
     // example_GW_Spec("GWSpec");
-    example_FluidProfile("profile");
+    // example_FluidProfile("profile");
     // test_FluidProfile("profile_test_bag.csv");
+    test_GWSpec("GWSpec_test_bag.csv");
     // test_rk4_solver();
 
     /************************ CLOCK / PROFILER *************************/
