@@ -181,8 +181,8 @@ units:
 
     double cpsq(double T = -1.0) const override { return cpsq_; }
     double cmsq(double T = -1.0) const override { return cmsq_; }
-    double csq_s(double TTN) const { return alglib::spline1dcalc(cpsq_interp_, TTN); } // WARNING: spline can go out of bounds
-    double csq_b(double TTN) const { return alglib::spline1dcalc(cmsq_interp_, TTN); }
+    double csq_s(double TTN) const { return alglib::spline1dcalc(cpsq_fit_, TTN); } // WARNING: spline can go out of bounds
+    double csq_b(double TTN) const { return alglib::spline1dcalc(cmsq_fit_, TTN); }
 
     double pN() const { return pN_; }
     double eN() const { return eN_; }
@@ -190,6 +190,7 @@ units:
 
     #ifdef ENABLE_MATPLOTLIB
     void plot_thermo(const std::string& filename) const; // Plots e(T), p(T), w(T)
+    // void plot_thermo_splines(const std::string& filename) const;
     void plot_csq(const std::string& filename) const; // Plots cs^2(T)
     #endif
 
@@ -200,7 +201,7 @@ units:
     std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
     std::vector<double> cpsq_vals_, cmsq_vals_; // cs^2(T) values
     alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
-    alglib::spline1dinterpolant cpsq_interp_, cmsq_interp_; // cs^2(T) interpolants
+    alglib::spline1dinterpolant cpsq_fit_, cmsq_fit_; // cs^2(T)
     double pN_, eN_, wN_;
  };
 

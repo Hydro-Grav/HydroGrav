@@ -254,8 +254,9 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
       }
 
       // construct interpolating functions p(T/TN), e(T/TN) in s/b phases
-      const auto nT = veff_TTN_vals_.size();
       alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_ws_array, veff_pb_array, veff_eb_array, veff_wb_array;
+
+      const auto nT = veff_TTN_vals_.size();
       veff_TTN_array.setcontent(nT, veff_TTN_vals_.data());
 
       veff_ps_array.setcontent(nT, veff_ps_vals_.data()); // symmetric phase
@@ -291,32 +292,35 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
       wNeN_rat_ = wN_ / eN_;
 
       // sound speed in fluid
-      // double s_unused, ds2_unused;
-      // double dps, des, dpb, deb;
-      // double dps2, des2, dpb2, deb2;
+      // using smooth spline here needed to remove numerical instabilities in thermo splines (refer to csq(T) plots)
+      double s_unused, ds2_unused;
+      double dps, des, dpb, deb;
+      double dps2, des2, dpb2, deb2;
 
       for (int i = 0; i < veff_TTN_vals_.size(); i++) {
         const auto TTN = veff_TTN_vals_[i];
 
-        // alglib::spline1ddiff(veff_ps_interp_, TTN, s_unused, dps, dps2);
-        // alglib::spline1ddiff(veff_es_interp_, TTN, s_unused, des, des2);
-        // cpsq_vals_.push_back(dps / des);
+        alglib::spline1ddiff(veff_ps_interp_, TTN, s_unused, dps, dps2);
+        alglib::spline1ddiff(veff_es_interp_, TTN, s_unused, des, des2);
+        cpsq_vals_.push_back(dps / des);
 
-        // alglib::spline1ddiff(veff_pb_interp_, TTN, s_unused, dpb, dpb2);
-        // alglib::spline1ddiff(veff_eb_interp_, TTN, s_unused, deb, deb2);
-        // cmsq_vals_.push_back(dpb / deb);
-
-        cpsq_vals_.push_back(1.0 / 3.0); // tmp
-        cmsq_vals_.push_back(1.0 / 3.0);
+        alglib::spline1ddiff(veff_pb_interp_, TTN, s_unused, dpb, dpb2);
+        alglib::spline1ddiff(veff_eb_interp_, TTN, s_unused, deb, deb2);
+        cmsq_vals_.push_back(dpb / deb);
       }
 
       alglib::real_1d_array cpsq_array, cmsq_array;
+      alglib::spline1dfitreport rep;
+      const double smooth_fac = 0.01; // higher means more smooth/slightly worse fit
+      const int basis_size = 100;
 
       cpsq_array.setcontent(nT, cpsq_vals_.data());
-      alglib::spline1dbuildcubic(veff_TTN_array, cpsq_array, cpsq_interp_);
+      // alglib::spline1dbuildcubic(veff_TTN_array, cpsq_array, cpsq_fit_);
+      alglib::spline1dfit(veff_TTN_array, cpsq_array, basis_size, smooth_fac, cpsq_fit_, rep);
 
       cmsq_array.setcontent(nT, cmsq_vals_.data());
-      alglib::spline1dbuildcubic(veff_TTN_array, cmsq_array, cmsq_interp_);
+      // alglib::spline1dbuildcubic(veff_TTN_array, cmsq_array, cmsq_fit_);
+      alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
 
       std::cout << "Equation of state read successfully!\n";
     }
@@ -324,43 +328,78 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
 // Public:
 #ifdef ENABLE_MATPLOTLIB
 void PTParams_Veff::plot_thermo(const std::string& filename) const {
+    const auto n = veff_TTN_vals_.size();
+    std::vector<double> es_spline_vals(n), eb_spline_vals(n), ps_spline_vals(n), pb_spline_vals(n), ws_spline_vals(n), wb_spline_vals(n);
+
+    for (int i = 0; i < n; i++) {
+      const auto TTN = veff_TTN_vals_[i];
+
+      es_spline_vals[i] = alglib::spline1dcalc(veff_es_interp_, TTN);
+      eb_spline_vals[i] = alglib::spline1dcalc(veff_eb_interp_, TTN);
+
+      ps_spline_vals[i] = alglib::spline1dcalc(veff_ps_interp_, TTN);
+      pb_spline_vals[i] = alglib::spline1dcalc(veff_pb_interp_, TTN);
+
+      ws_spline_vals[i] = alglib::spline1dcalc(veff_ws_interp_, TTN);
+      wb_spline_vals[i] = alglib::spline1dcalc(veff_wb_interp_, TTN);
+    }  
+
+    std::map<std::string, std::string> data;
+    data["label"] = "data";
+
+    std::map<std::string, std::string> spline;
+    spline["label"] = "spline";
+
+
     plt::figure_size(2400, 1600);
 
     plt::subplot2grid(3, 2, 0, 0);
-    plt::plot(veff_TTN_vals_, veff_es_vals_);
+    plt::plot(veff_TTN_vals_, veff_es_vals_, data);
+    plt::plot(veff_TTN_vals_, es_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("es(T/TN)");
+    plt::ylabel("es");
     plt::grid(true);
+    plt::legend();
 
     plt::subplot2grid(3, 2, 0, 1);
-    plt::plot(veff_TTN_vals_, veff_eb_vals_);
+    plt::plot(veff_TTN_vals_, veff_eb_vals_, data);
+    plt::plot(veff_TTN_vals_, eb_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("eb(T/TN)");
+    plt::ylabel("eb");
     plt::grid(true);
+    plt::legend();
 
     plt::subplot2grid(3, 2, 1, 0);
-    plt::plot(veff_TTN_vals_, veff_ps_vals_);
+    plt::plot(veff_TTN_vals_, veff_ps_vals_, data);
+    plt::plot(veff_TTN_vals_, ps_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("ps(T/TN)");
+    plt::ylabel("ps");
     plt::grid(true);
+    plt::legend();
 
     plt::subplot2grid(3, 2, 1, 1);
-    plt::plot(veff_TTN_vals_, veff_pb_vals_);
+    plt::plot(veff_TTN_vals_, veff_pb_vals_, data);
+    plt::plot(veff_TTN_vals_, pb_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("pb(T/TN)");
+    plt::ylabel("pb");
     plt::grid(true);
+    plt::legend();
 
     plt::subplot2grid(3, 2, 2, 0);
-    plt::plot(veff_TTN_vals_, veff_ws_vals_);
+    plt::plot(veff_TTN_vals_, veff_ws_vals_, data);
+    plt::plot(veff_TTN_vals_, ws_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("ws(T/TN)");
+    plt::ylabel("ws");
     plt::grid(true);
+    plt::legend();
 
     plt::subplot2grid(3, 2, 2, 1);
-    plt::plot(veff_TTN_vals_, veff_wb_vals_);
+    plt::plot(veff_TTN_vals_, veff_wb_vals_, data);
+    plt::plot(veff_TTN_vals_, wb_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("wb(T/TN)");
+    plt::ylabel("wb");
     plt::grid(true);
+    plt::legend();
 
     plt::save(filename);
 
@@ -368,19 +407,37 @@ void PTParams_Veff::plot_thermo(const std::string& filename) const {
 }
 
 void PTParams_Veff::plot_csq(const std::string& filename) const {
+  const auto n = veff_TTN_vals_.size();
+  std::vector<double> cpsq_spline_vals(n), cmsq_spline_vals(n);
+  for (int i = 0; i < n; i++) {
+    const auto TTN = veff_TTN_vals_[i];
+    cpsq_spline_vals[i] = alglib::spline1dcalc(cpsq_fit_, TTN);
+    cmsq_spline_vals[i] = alglib::spline1dcalc(cmsq_fit_, TTN);
+  }  
+
+  std::map<std::string, std::string> data;
+  data["label"] = "data";
+
+  std::map<std::string, std::string> spline;
+  spline["label"] = "spline";
+
   plt::figure_size(1600, 800);
 
   plt::subplot2grid(1, 2, 0, 0);
-  plt::plot(veff_TTN_vals_, cpsq_vals_);
+  plt::plot(veff_TTN_vals_, cpsq_vals_, data);
+  plt::plot(veff_TTN_vals_, cpsq_spline_vals, spline);
   plt::xlabel("T/TN");
-  plt::ylabel("cpsq(T/TN)");
+  plt::ylabel("cpsq");
   plt::grid(true);
+  plt::legend();
 
   plt::subplot2grid(1, 2, 0, 1);
-  plt::plot(veff_TTN_vals_, cmsq_vals_);
+  plt::plot(veff_TTN_vals_, cmsq_vals_, data);
+  plt::plot(veff_TTN_vals_, cmsq_spline_vals, spline);
   plt::xlabel("T/TN");
-  plt::ylabel("cmsq(T/TN)");
+  plt::ylabel("cmsq");
   plt::grid(true);
+  plt::legend();
 
   plt::save(filename);
 }
@@ -396,14 +453,14 @@ void PTParams_Veff::print() const {
 //   if (TTN < TTN_min() || TTN > TTN_max()) {
 //     throw std::out_of_range("Temperature T/TN out of range for Veff eos. Must have " + std::to_string(TTN_min()) + " < T/TN < " + std::to_string(TTN_max()));
 //   }
-//   return alglib::spline1dcalc(cpsq_interp_, TTN);
+//   return alglib::spline1dcalc(cpsq_fit_, TTN);
 // }
 
 // double PTParams_Veff::cmsq(double TTN) const {
 //   if (TTN < TTN_min() || TTN > TTN_max()) {
 //     throw std::out_of_range("Temperature T/TN out of range for Veff eos. Must have " + std::to_string(TTN_min()) + " < T/TN < " + std::to_string(TTN_max()));
 //   }
-//   return alglib::spline1dcalc(cmsq_interp_, TTN);
+//   return alglib::spline1dcalc(cmsq_fit_, TTN);
 // }
 
 
