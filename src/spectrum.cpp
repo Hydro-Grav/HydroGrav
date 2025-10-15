@@ -53,8 +53,8 @@ PowerSpec::PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_v
 
         // store frequency values
         for (const auto& K : K_vals_) {
-            const auto HsRs = params_.un().Hs() * params_.Rs();
-            const auto freq_val = (2.6e-5) * (K / 10.0) * (1.0 / HsRs) * (params_.un().Ts() / 100.0) * std::pow(params_.un().gs() / 100.0, 1.0 / 6.0);
+            const auto HsRs = params_->un().Hs() * params_->Rs();
+            const auto freq_val = (2.6e-5) * (K / 10.0) * (1.0 / HsRs) * (params_->un().Ts() / 100.0) * std::pow(params_->un().gs() / 100.0, 1.0 / 6.0);
             freq_vals_.push_back(freq_val);
         }
     }
@@ -85,7 +85,7 @@ void PowerSpec::plot(const std::string& filename) const {
 
     plt::figure_size(800, 600);
     plt::loglog(K(), P(), "k-");
-    plt::suptitle("vw = " + to_string_with_precision(params_.vw()) + ", alN = " + to_string_with_precision(params_.alN()));
+    plt::suptitle("vw = " + to_string_with_precision(params_->vw()) + ", alN = " + to_string_with_precision(params_->alN()));
     plt::xlabel("K=kRs");
     plt::ylabel("Omega_GW(K)");
     plt::xlim(K().front(), K().back());
@@ -525,9 +525,9 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const PhaseTransition::PTPar
 }
 
 PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof) {
-    const auto beta = prof.params().beta();
-    const auto Rs = prof.params().Rs();
-    const auto nuc_type = prof.params().nuc_type();
+    const auto beta = prof.params()->beta();
+    const auto Rs = prof.params()->Rs();
+    const auto nuc_type = prof.params()->nuc_type();
 
     auto lt_dist = Hydrodynamics::lifetime_dist_func(nuc_type);
 
@@ -617,11 +617,11 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
 
 double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile) {
     const auto params = profile.params();
-    const auto un = params.un();
+    const auto un = params->un();
 
     const auto Ek = Ekin(kRs_vals, profile);
 
-    return gw_prefac(Ek.max(), params.Rs(), params.wNeN_rat(), un.T0(), un.Ts(), un.H0(), un.Hs(), un.g0(), un.gs());
+    return gw_prefac(Ek.max(), params->Rs(), params->wNeN_rat(), un.T0(), un.Ts(), un.H0(), un.Hs(), un.g0(), un.gs());
 }
 
 } // namespace Spectrum

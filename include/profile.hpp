@@ -57,8 +57,10 @@ class FluidProfile {
   public:
     FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000);
 
-    // are these needed?
-    PhaseTransition::PTParams params() const { return params_; }; // PT parameters
+    // return pointer to base class
+    const PhaseTransition::PTParams* params() const { return params_; }; // PT parameters
+
+    // unused?
     std::string eos() const { return eos_; }; // Equation of state (bag or veff)
     
     prof_type xi_vals() const { return xi_vals_; }; // Vector of xi=r/t
@@ -77,14 +79,15 @@ class FluidProfile {
     #endif
 
   private:
-    std::string eos_; // bag or veff
+    const PhaseTransition::PTParams* params_; // local copy of PT parameters  
+    const PhaseTransition::PTParams_Bag* bag_params_ = nullptr;
+    const PhaseTransition::PTParams_Veff* veff_params_ = nullptr;
 
-    const PhaseTransition::PTParams params_; // local copy of PT parameters
-    const double cpsq_, cp_, cmsq_, cm_, vw_, alN_;
+    std::string eos_; // bag or veff
+    
+    const double cpsq_, cmsq_, vw_, alN_;
     double alp_min_, alp_max_;
-    
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
-    
     prof_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
     int get_mode_bag(double vw, double cmsq, double alN) const;

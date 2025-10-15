@@ -5,7 +5,7 @@
 
 TEST_CASE("Tests the FluidProfile class for correct behavior and integration.", "[fluidProfile]") {
 
-    PhaseTransition::PTParams params;
+    PhaseTransition::PTParams_Bag params(0.9, 0.1); // (vw, alN)
     Hydrodynamics::FluidProfile profile(params);
 
     auto xi_vals = profile.xi_vals();

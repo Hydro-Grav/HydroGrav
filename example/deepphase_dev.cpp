@@ -33,10 +33,10 @@ namespace plt = matplotlibcpp;
 // Fluid profile
 void example_FluidProfile(const std::string& filename) {
     // const auto vw = 0.9; // detonation
-    // const auto vw = 0.4; // deflagration
+    const auto vw = 0.4; // deflagration
     // const auto vw = 0.6; // hybrid
-    const auto vw = 0.0378243;
-    const auto alN = 0.183018;
+    // const auto vw = 0.0378243;
+    // const auto alN = 0.183018;
     
     // Will's benchmark point:
     // std::string veff_file = "flynn_eos.csv";
@@ -54,7 +54,7 @@ void example_FluidProfile(const std::string& filename) {
     // Xiao's benchmark point:
     const auto Ts = 53.370765185008004; // GeV
     const auto gs = 106.75;
-    // const auto alN = 0.11384915003991744;
+    const auto alN = 0.11384915003991744;
     const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
     const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
     const auto dtau = 10.0 * Rs;
@@ -65,14 +65,14 @@ void example_FluidProfile(const std::string& filename) {
     std::string veff_file = "thermo.csv";
 
     const PhaseTransition::Universe un(Ts, gs);
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
-    const PhaseTransition::PTParams params_veff(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, dtau, nuc_type, un, veff_file);
 
     un.print();
     params.print();
 
     const Hydrodynamics::FluidProfile profile_bag(params); // bag model
-    profile_bag.plot("profile_bag.png");
+    // profile_bag.plot("profile_bag.png");
     // profile_bag.write("prof_bag.csv");
     const auto xi_bag = profile_bag.xi_vals();
     const auto v_bag = profile_bag.v_vals();
@@ -128,54 +128,56 @@ void example_FluidProfile(const std::string& filename) {
     plt::grid(true);
 
     plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
-    plt::save("profile_combined.png");
+    plt::save(filename);
+
+    std::cout << "Fluid profile saved to " << filename << "\n";
 }
 // Kinetic power spectrum
-void example_Kin_Spec(const std::string& filename) {
-    // Create default universe parameters (temperature, Hubble and DoF today and at PT)
-    const PhaseTransition::Universe un;
+// void example_Kin_Spec(const std::string& filename) {
+//     // Create default universe parameters (temperature, Hubble and DoF today and at PT)
+//     const PhaseTransition::Universe un;
 
-    // define PT parameters
-    const auto vw = PhaseTransition::dflt_PTParams::vw;
-    const auto alN = PhaseTransition::dflt_PTParams::alN;
-    const auto beta = PhaseTransition::dflt_PTParams::beta;
-    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
-    const auto TN = PhaseTransition::dflt_PTParams::TN;
-    const auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
-    const auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
+//     // define PT parameters
+//     const auto vw = PhaseTransition::dflt_PTParams::vw;
+//     const auto alN = PhaseTransition::dflt_PTParams::alN;
+//     const auto beta = PhaseTransition::dflt_PTParams::beta;
+//     const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+//     const auto TN = PhaseTransition::dflt_PTParams::TN;
+//     const auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
+//     const auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
 
-    const PhaseTransition::PTParams params1(vw, alN, beta, dtau, TN, cpsq, cmsq, "exp", un);
-    const PhaseTransition::PTParams params2(vw, alN, beta, dtau, TN, cpsq, cmsq, "sim", un);
+//     const PhaseTransition::PTParams params1(vw, alN, beta, dtau, TN, cpsq, cmsq, "exp", un);
+//     const PhaseTransition::PTParams params2(vw, alN, beta, dtau, TN, cpsq, cmsq, "sim", un);
 
-    // Momentum values
-    const auto kRs_vals = logspace(1e-1, 1e+3, 500);
+//     // Momentum values
+//     const auto kRs_vals = logspace(1e-1, 1e+3, 500);
 
-    // Kinetic spectrum (exponential bubble nucleation)
-    const auto Ek1 = Spectrum::Ekin(kRs_vals, params1);
-    const auto Eks1 = Spectrum::norm_spec(Ek1); // Normalised spectrum
-    // Eks1.write(filename + ".csv");
+//     // Kinetic spectrum (exponential bubble nucleation)
+//     const auto Ek1 = Spectrum::Ekin(kRs_vals, params1);
+//     const auto Eks1 = Spectrum::norm_spec(Ek1); // Normalised spectrum
+//     // Eks1.write(filename + ".csv");
 
-    // Kinetic spectrum (simultaneous bubble nucleation)
-    const auto Ek2 = Spectrum::Ekin(kRs_vals, params2);
-    const auto Eks2 = Spectrum::norm_spec(Ek2); // Normalised spectrum
-    // Eks2.write(filename + ".csv");
+//     // Kinetic spectrum (simultaneous bubble nucleation)
+//     const auto Ek2 = Spectrum::Ekin(kRs_vals, params2);
+//     const auto Eks2 = Spectrum::norm_spec(Ek2); // Normalised spectrum
+//     // Eks2.write(filename + ".csv");
 
-    // Plot spectrum (alternatively, use Ek.plot())
-    // plt::figure_size(800, 600);
-    // plt::loglog(Eks1.K(), Eks1.P(), "k-"); // exp
-    // plt::loglog(Eks2.K(), Eks2.P(), "r-"); // sim
-    // plt::suptitle("vw = " + to_string_with_precision(vw) + ", alN = " + to_string_with_precision(alN));
-    // plt::xlabel("K=kRs");
-    // plt::ylabel("Ekin(K)");
-    // plt::xlim(kRs_vals.front(), kRs_vals.back());
-    // plt::ylim(1e-5, 1e+0);
-    // plt::grid(true);
-    // plt::save(filename + ".png");
+//     // Plot spectrum (alternatively, use Ek.plot())
+//     // plt::figure_size(800, 600);
+//     // plt::loglog(Eks1.K(), Eks1.P(), "k-"); // exp
+//     // plt::loglog(Eks2.K(), Eks2.P(), "r-"); // sim
+//     // plt::suptitle("vw = " + to_string_with_precision(vw) + ", alN = " + to_string_with_precision(alN));
+//     // plt::xlabel("K=kRs");
+//     // plt::ylabel("Ekin(K)");
+//     // plt::xlim(kRs_vals.front(), kRs_vals.back());
+//     // plt::ylim(1e-5, 1e+0);
+//     // plt::grid(true);
+//     // plt::save(filename + ".png");
 
-    return;
-}
+//     return;
+// }
 
-// Gravitational wave power spectrum
+// // Gravitational wave power spectrum
 void example_GW_Spec(const std::string& filename) {
     // const auto vw = 0.9; // detonation
     // const auto vw = 0.4; // deflagration
@@ -210,8 +212,8 @@ void example_GW_Spec(const std::string& filename) {
     std::string veff_file = "thermo.csv";
 
     const PhaseTransition::Universe un(Ts, gs);
-    const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
-    // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, veff_file);
+    // const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, dtau, nuc_type, un, veff_file);
 
     un.print();
     params.print();
@@ -245,7 +247,7 @@ void example_GW_Spec(const std::string& filename) {
     return;
 }
 
-// Tests parameter space (vw, alN) for fluid profile calculation
+// // Tests parameter space (vw, alN) for fluid profile calculation
 void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     std::cout << "Running fluid profiles tests for (vw, alN) parameter space...\n";
 
@@ -273,8 +275,8 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
         const auto vw = vw_distr(gen);
         const auto alN = std::pow(10.0, log_alN_distr(gen));
 
-        const PhaseTransition::PTParams params(vw, alN);
-        // const PhaseTransition::PTParams params(vw, alN, "thermo.csv");
+        const PhaseTransition::PTParams_Bag params(vw, alN);
+        // const PhaseTransition::PTParams_Veff params(vw, alN, "thermo.csv");
         
         file << vw << "," << alN << ",";
 
@@ -436,8 +438,8 @@ int main() {
 
     // test_profile_params();
     // example_Kin_Spec("Ekin");
-    // example_GW_Spec("GWSpec");
-    // example_FluidProfile("profile");
+    example_GW_Spec("GWSpec");
+    // example_FluidProfile("profile_combined.png");
     // test_FluidProfile("profile_test_bag.csv");
     test_GWSpec("GWSpec_test_bag.csv");
     // test_rk4_solver();

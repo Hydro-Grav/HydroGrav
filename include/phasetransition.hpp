@@ -13,12 +13,8 @@
 
 /*
 TO DO:
-- add option to input a Veff -> derive fluid dynamics from this?
-- change PTParams to single ctor with default arguments (see slide 23, wk 4)
-- initialise all the new variables i've added in ctor
-- add deflag, hybrid, detonation type in PTParams
-- add vp, vm, wp, wm as parameters in PTParams? currently uses function to calculate since they depend on Veff
-  - these are calculated from a specific matching condition using bag model - generalise to other models in future
+- remove alN from PTParams base class and move to PTParams_Bag (need to change how get_mode() works in FluidProfile first)
+- TN only used for mu nu and Veff (not bag) - write ctor without TN for bag?
 */
 
 namespace PhaseTransition {
@@ -99,33 +95,74 @@ units:
  * This class encapsulates the parameters needed to describe the phase transition dynamics,
  * including speeds of sound, wall velocity, strength of the transition, and bubble nucleation type.
  */
- class PTParams { // will probably need to update this later
+ class PTParams {
   public:
-    // ctors
-    PTParams();
-    PTParams(double vw, double alN);
-    PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un);
-    PTParams(double vw, double alN, const std::string& eos);
-    PTParams(double vw, double alN, double beta, double dtau, double TN, double cpsq, double cmsq, const char* nuc_type, const Universe& un, const std::string& eos);
+    // ctor
+    PTParams(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un);
 
-    Universe un() const { return universe_; } // universe parameters
+    enum class ModelType { Bag, Veff }; // equation of state model
+    virtual ModelType eos() const = 0;
 
-    double cpsq() const { return cpsq_; } // speed of sound squared (symmetric phase)
-    double cmsq() const { return cmsq_; } // speed of sound squared (broken phase)
+    Universe un() const { return un_; } // universe parameters
+
+    // Fluid parameters
     double vw() const { return vw_; } // wall velocity
     double alN() const { return alN_; } // strength parameter at nuc temp (alN_N)
+    double TN() const { return TN_; } // nucleation temperature
+    double wNeN_rat() const { return wNeN_rat_; } // ratio of nucleation enthalpy and energy density
+
+    // GW parameters
     double beta() const { return beta_; } // inverse PT duration
     double Rs() const { return Rs_; } // characteristic length scale R_*
     double tau_s() const { return tau_s_; } // start time of PT
     double tau_fin() const { return tau_fin_; } // end time of PT
     double dtau() const { return dtau_; } // PT duration
-    double TN() const { return TN_; } // nucleation temperature
-    double wNeN_rat() const { return wNeN_rat_; } // ratio of nucleation enthalpy and energy density
-
     const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
-    const std::string eos_model() const { return eos_model_; } // equation of state model (bag or Veff)
 
-    // for Veff eos
+    // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
+    // void print() const;
+    
+    virtual double cpsq(double TTN = -1.0) const = 0; // speed of sound squared (symmetric phase)
+    virtual double cmsq(double TTN = -1.0) const = 0; // speed of sound squared (broken phase)
+
+  protected:
+    const Universe un_;
+    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_, dtau_;
+    const char *nuc_type_;
+
+    virtual void print() const;
+  
+  private:
+    bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
+ };
+
+ class PTParams_Bag : public PTParams {
+  public:
+    // ctors
+    PTParams_Bag(double vw, double alN);
+    PTParams_Bag(double vw, double alN, double TN, double cpsq, double cmsq);
+    PTParams_Bag(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
+
+    ModelType eos() const override { return ModelType::Bag; }
+
+    double cpsq(double TTN = -1.0) const override { return cpsq_; }
+    double cmsq(double TTN = -1.0) const override { return cmsq_; }
+
+    void print() const override;
+
+  private:
+    const double cpsq_, cmsq_;
+    bool is_valid_csq(double csq) const;
+ };
+
+ class PTParams_Veff : public PTParams {
+  public:
+    // ctors
+    PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
+    PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
+
+    ModelType eos() const override { return ModelType::Veff; }
+
     std::vector<double> veff_TTN_vals() const { return veff_TTN_vals_; }
     std::vector<double> veff_ps_vals() const { return veff_ps_vals_; }
     std::vector<double> veff_pb_vals() const { return veff_pb_vals_; }
@@ -142,32 +179,31 @@ units:
     double TTN_min() const { return veff_TTN_vals_.front(); }
     double TTN_max() const { return veff_TTN_vals_.back(); }
 
+    double cpsq(double T = -1.0) const override { return cpsq_; }
+    double cmsq(double T = -1.0) const override { return cmsq_; }
+    double csq_s(double TTN) const { return alglib::spline1dcalc(cpsq_fit_, TTN); } // WARNING: spline can go out of bounds
+    double csq_b(double TTN) const { return alglib::spline1dcalc(cmsq_fit_, TTN); }
+
     double pN() const { return pN_; }
     double eN() const { return eN_; }
     double wN() const { return wN_; }
 
-    friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
-    void print() const;
-
     #ifdef ENABLE_MATPLOTLIB
     void plot_thermo(const std::string& filename) const; // Plots e(T), p(T), w(T)
+    // void plot_thermo_splines(const std::string& filename) const;
+    void plot_csq(const std::string& filename) const; // Plots cs^2(T)
     #endif
-  
+
+    void print() const override;
+
   private:
-      const Universe universe_;
-      std::string eos_model_; // equation of state model (bag or Veff)
-      const char *nuc_type_;
-      double vw_, alN_, beta_, Rs_, tau_s_, tau_fin_, dtau_, TN_, wNeN_rat_, cpsq_, cmsq_;
-
-      // for Veff eos
-      std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
-      alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
-      double pN_, eN_, wN_;
-
-
-      bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
-      bool is_valid_csq(double csq) const;
-    };
+    const double cpsq_, cmsq_; // remove when cs(T) implemented
+    std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
+    std::vector<double> cpsq_vals_, cmsq_vals_; // cs^2(T) values
+    alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
+    alglib::spline1dinterpolant cpsq_fit_, cmsq_fit_; // cs^2(T)
+    double pN_, eN_, wN_;
+ };
 
 } // namespace PhaseTransition
 

@@ -42,7 +42,7 @@ class PowerSpec {
     const std::vector<double>& P() const { return P_vals_; }; // Power spectrum
 
     const Hydrodynamics::FluidProfile profile() const { return profile_; }; // fluid profile
-    const PhaseTransition::PTParams params() const { return params_; }; // PT parameters
+    const PhaseTransition::PTParams* params() const { return params_; }; // PT parameters
 
     double max() const; // Max value of power spectrum
 
@@ -65,7 +65,7 @@ class PowerSpec {
   private:
     std::vector<double> freq_vals_, K_vals_, P_vals_;
     const Hydrodynamics::FluidProfile profile_; // fluid profile
-    const PhaseTransition::PTParams params_;
+    const PhaseTransition::PTParams* params_;
 
 };
 
