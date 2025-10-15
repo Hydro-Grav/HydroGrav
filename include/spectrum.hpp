@@ -34,11 +34,14 @@ namespace Spectrum {
 class PowerSpec {
   public:
     // ctors - pass in momentum (k) and spectrum (P) since P is calculated differently for kinetic/GW
-    PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params);
+    // PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params);
+    PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const Hydrodynamics::FluidProfile& profile);
 
     const std::vector<double>& freq() const { return freq_vals_; }; // Frequency
     const std::vector<double>& K() const { return K_vals_; }; // Momentum
     const std::vector<double>& P() const { return P_vals_; }; // Power spectrum
+
+    const Hydrodynamics::FluidProfile profile() const { return profile_; }; // fluid profile
     const PhaseTransition::PTParams params() const { return params_; }; // PT parameters
 
     double max() const; // Max value of power spectrum
@@ -61,6 +64,7 @@ class PowerSpec {
 
   private:
     std::vector<double> freq_vals_, K_vals_, P_vals_;
+    const Hydrodynamics::FluidProfile profile_; // fluid profile
     const PhaseTransition::PTParams params_;
 
 };
