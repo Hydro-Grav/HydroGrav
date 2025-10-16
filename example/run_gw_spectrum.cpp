@@ -22,7 +22,6 @@ int main(int argc, char* argv[]) {
     if(argc == 5) {
         params.print();
     }
-    const Hydrodynamics::FluidProfile profile(params);
 
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
     Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec2(kRs_vals, params);

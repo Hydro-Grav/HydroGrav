@@ -189,9 +189,9 @@ units:
     double wN() const { return wN_; }
 
     #ifdef ENABLE_MATPLOTLIB
-    void plot_thermo(const std::string& filename) const; // Plots e(T), p(T), w(T)
+    void plot_thermo(const std::string& filename="thermo.png") const; // Plots e(T), p(T), w(T)
     // void plot_thermo_splines(const std::string& filename) const;
-    void plot_csq(const std::string& filename) const; // Plots cs^2(T)
+    void plot_csq(const std::string& filename="csq_veff.png") const; // Plots cs^2(T)
     #endif
 
     void print() const override;

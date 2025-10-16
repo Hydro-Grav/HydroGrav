@@ -32,8 +32,8 @@ namespace plt = matplotlibcpp;
 
 // Fluid profile
 void example_FluidProfile(const std::string& filename) {
-    // const auto vw = 0.9; // detonation
-    const auto vw = 0.4; // deflagration
+    const auto vw = 0.9; // detonation
+    // const auto vw = 0.4; // deflagration
     // const auto vw = 0.6; // hybrid
     // const auto vw = 0.0378243;
     // const auto alN = 0.183018;
@@ -70,6 +70,9 @@ void example_FluidProfile(const std::string& filename) {
 
     un.print();
     params.print();
+
+    params_veff.plot_thermo();
+    params_veff.plot_csq();
 
     const Hydrodynamics::FluidProfile profile_bag(params); // bag model
     // profile_bag.plot("profile_bag.png");
@@ -132,56 +135,12 @@ void example_FluidProfile(const std::string& filename) {
 
     std::cout << "Fluid profile saved to " << filename << "\n";
 }
-// Kinetic power spectrum
-// void example_Kin_Spec(const std::string& filename) {
-//     // Create default universe parameters (temperature, Hubble and DoF today and at PT)
-//     const PhaseTransition::Universe un;
-
-//     // define PT parameters
-//     const auto vw = PhaseTransition::dflt_PTParams::vw;
-//     const auto alN = PhaseTransition::dflt_PTParams::alN;
-//     const auto beta = PhaseTransition::dflt_PTParams::beta;
-//     const auto dtau = PhaseTransition::dflt_PTParams::dtau;
-//     const auto TN = PhaseTransition::dflt_PTParams::TN;
-//     const auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
-//     const auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
-
-//     const PhaseTransition::PTParams params1(vw, alN, beta, dtau, TN, cpsq, cmsq, "exp", un);
-//     const PhaseTransition::PTParams params2(vw, alN, beta, dtau, TN, cpsq, cmsq, "sim", un);
-
-//     // Momentum values
-//     const auto kRs_vals = logspace(1e-1, 1e+3, 500);
-
-//     // Kinetic spectrum (exponential bubble nucleation)
-//     const auto Ek1 = Spectrum::Ekin(kRs_vals, params1);
-//     const auto Eks1 = Spectrum::norm_spec(Ek1); // Normalised spectrum
-//     // Eks1.write(filename + ".csv");
-
-//     // Kinetic spectrum (simultaneous bubble nucleation)
-//     const auto Ek2 = Spectrum::Ekin(kRs_vals, params2);
-//     const auto Eks2 = Spectrum::norm_spec(Ek2); // Normalised spectrum
-//     // Eks2.write(filename + ".csv");
-
-//     // Plot spectrum (alternatively, use Ek.plot())
-//     // plt::figure_size(800, 600);
-//     // plt::loglog(Eks1.K(), Eks1.P(), "k-"); // exp
-//     // plt::loglog(Eks2.K(), Eks2.P(), "r-"); // sim
-//     // plt::suptitle("vw = " + to_string_with_precision(vw) + ", alN = " + to_string_with_precision(alN));
-//     // plt::xlabel("K=kRs");
-//     // plt::ylabel("Ekin(K)");
-//     // plt::xlim(kRs_vals.front(), kRs_vals.back());
-//     // plt::ylim(1e-5, 1e+0);
-//     // plt::grid(true);
-//     // plt::save(filename + ".png");
-
-//     return;
-// }
 
 // // Gravitational wave power spectrum
 void example_GW_Spec(const std::string& filename) {
-    // const auto vw = 0.9; // detonation
+    const auto vw = 0.9; // detonation
     // const auto vw = 0.4; // deflagration
-    const auto vw = 0.6; // hybrid
+    // const auto vw = 0.6; // hybrid
 
     
     // Will's benchmark point:
@@ -351,15 +310,14 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
         const auto alN = std::pow(10.0, log_alN_distr(gen));
         const auto beta = Hs * std::pow(10.0, log_betaH_distr(gen));
         
-        const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un);
-        // const PhaseTransition::PTParams params(vw, alN, beta, dtau, TN, cpsq, cmsq, nuc_type, un, "thermo.csv");
-        
+        const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
+        // const PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, dtau, nuc_type, un, "thermo.csv");
+
         file << vw << "," << alN << "," << beta << ",";
 
         // attempt to construct fluid profile
-        std::unique_ptr<Hydrodynamics::FluidProfile> profile;
         try {
-            profile = std::make_unique<Hydrodynamics::FluidProfile>(params);
+            const Hydrodynamics::FluidProfile profile(params);
         } catch (const std::exception& e) {
             if (e.what() == unphysical_exception[0] || e.what() == unphysical_exception[1] || e.what() == unphysical_exception[2]) {
                 file << "unphysical\n";
@@ -372,7 +330,7 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
 
         // attempt to construct GW spectrum
         try {         
-            const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, *profile);
+            const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
             pass_count++;
             file << OmegaGW.profile().mode_str() << "\n";
         } catch (const std::exception& e) {
@@ -438,10 +396,10 @@ int main() {
 
     // test_profile_params();
     // example_Kin_Spec("Ekin");
-    example_GW_Spec("GWSpec");
-    // example_FluidProfile("profile_combined.png");
+    // example_GW_Spec("GWSpec");
+    example_FluidProfile("profile_combined.png");
     // test_FluidProfile("profile_test_bag.csv");
-    test_GWSpec("GWSpec_test_bag.csv");
+    // test_GWSpec("GWSpec_test_bag.csv");
     // test_rk4_solver();
 
     /************************ CLOCK / PROFILER *************************/
