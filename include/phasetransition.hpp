@@ -43,7 +43,9 @@ class Universe {
     // ctors
     Universe();
     Universe(double Ts, double gs);
+    Universe(double Ts, double gs, double Hs);
     Universe(double T0, double Ts, double g0, double gs, double H0);
+    Universe(double T0, double Ts, double g0, double gs, double H0, double Hs);
 
     // params today (0) and at start of PT (s)
     double T0() const { return T0_; } // temperature of universe

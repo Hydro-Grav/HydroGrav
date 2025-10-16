@@ -36,6 +36,9 @@ Universe::Universe()
 Universe::Universe(double Ts, double gs)
     : Universe(dflt_universe::T0, Ts, dflt_universe::g0, gs, dflt_universe::H0) {}
 
+Universe::Universe(double Ts, double gs, double Hs)
+    : Universe(dflt_universe::T0, Ts, dflt_universe::g0, gs, dflt_universe::H0, Hs) {}
+
 Universe::Universe(double T0, double Ts, double g0, double gs, double H0)
     : T0_(T0), 
       Ts_(Ts), 
@@ -43,6 +46,14 @@ Universe::Universe(double T0, double Ts, double g0, double gs, double H0)
       gs_(gs), 
       H0_(H0), 
       Hs_(std::pow(4.0 * std::pow(M_PI, 3) * gs * std::pow(Ts, 4) / (45.0 * mP * mP), 0.5)) {}
+
+Universe::Universe(double T0, double Ts, double g0, double gs, double H0, double Hs)
+    : T0_(T0), 
+      Ts_(Ts), 
+      g0_(g0), 
+      gs_(gs), 
+      H0_(H0), 
+      Hs_(Hs) {}
 
 std::ostream& operator<<(std::ostream& os, const Universe& un) {
     os << "************** Universe parameters **************\n"
