@@ -155,9 +155,37 @@ units:
     bool is_valid_csq(double csq) const;
  };
 
- class PTParams_Veff : public PTParams {
+  struct EquationOfState 
+  {
+    std::vector<double> T_vals;
+    std::vector<double> ps_vals;
+    std::vector<double> pb_vals;
+    std::vector<double> es_vals;
+    std::vector<double> eb_vals;
+
+    EquationOfState(
+      const std::vector<double>& T,
+      const std::vector<double>& ps,
+      const std::vector<double>& pb,
+      const std::vector<double>& es,
+      const std::vector<double>& eb);
+
+    static EquationOfState from_file(const std::string& filename);
+
+    bool is_valid() const;
+    size_t size() const { return T_vals.size(); }
+
+  private:
+    void validate() const;
+  };
+
+  class PTParams_Veff : public PTParams {
   public:
-    // ctors
+    // These use the new eos_data
+    PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data);
+    PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
+
+    // Backward compatibile
     PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
     PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
 
@@ -197,13 +225,14 @@ units:
     void print() const override;
 
   private:
+    void initialize_from_eos_data(const EquationOfState& eos_data);
     const double cpsq_, cmsq_; // remove when cs(T) implemented
     std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
     std::vector<double> cpsq_vals_, cmsq_vals_; // cs^2(T) values
     alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
     alglib::spline1dinterpolant cpsq_fit_, cmsq_fit_; // cs^2(T)
     double pN_, eN_, wN_;
- };
+  };
 
 } // namespace PhaseTransition
 
