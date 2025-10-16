@@ -88,14 +88,14 @@ units:
 [dtau] = 1/GeV
 */
 
-  /**
+/**
  * @class PTParams
  * @brief Class representing the parameters of the phase transition (PT).
  * 
  * This class encapsulates the parameters needed to describe the phase transition dynamics,
  * including speeds of sound, wall velocity, strength of the transition, and bubble nucleation type.
  */
- class PTParams {
+class PTParams {
   public:
     // ctor
     PTParams(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un);
@@ -134,9 +134,9 @@ units:
   
   private:
     bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
- };
+};
 
- class PTParams_Bag : public PTParams {
+class PTParams_Bag : public PTParams {
   public:
     // ctors
     PTParams_Bag(double vw, double alN);
@@ -153,86 +153,86 @@ units:
   private:
     const double cpsq_, cmsq_;
     bool is_valid_csq(double csq) const;
- };
+};
 
-  struct EquationOfState 
-  {
-    std::vector<double> T_vals;
-    std::vector<double> ps_vals;
-    std::vector<double> pb_vals;
-    std::vector<double> es_vals;
-    std::vector<double> eb_vals;
+struct EquationOfState 
+{
+  std::vector<double> T_vals;
+  std::vector<double> ps_vals;
+  std::vector<double> pb_vals;
+  std::vector<double> es_vals;
+  std::vector<double> eb_vals;
 
-    EquationOfState(
-      const std::vector<double>& T,
-      const std::vector<double>& ps,
-      const std::vector<double>& pb,
-      const std::vector<double>& es,
-      const std::vector<double>& eb);
+  EquationOfState(
+    const std::vector<double>& T,
+    const std::vector<double>& ps,
+    const std::vector<double>& pb,
+    const std::vector<double>& es,
+    const std::vector<double>& eb);
 
-    static EquationOfState from_file(const std::string& filename);
+  static EquationOfState from_file(const std::string& filename);
 
-    bool is_valid() const;
-    size_t size() const { return T_vals.size(); }
+  bool is_valid() const;
+  size_t size() const { return T_vals.size(); }
 
-  private:
-    void validate() const;
-  };
+private:
+  void validate() const;
+};
 
-  class PTParams_Veff : public PTParams {
-  public:
-    // These use the new eos_data
-    PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data);
-    PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
+class PTParams_Veff : public PTParams {
+public:
+  // These use the new eos_data
+  PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
 
-    // Backward compatibile
-    PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
-    PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
+  // Backward compatibile
+  PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
 
-    ModelType eos() const override { return ModelType::Veff; }
+  ModelType eos() const override { return ModelType::Veff; }
 
-    std::vector<double> veff_TTN_vals() const { return veff_TTN_vals_; }
-    std::vector<double> veff_ps_vals() const { return veff_ps_vals_; }
-    std::vector<double> veff_pb_vals() const { return veff_pb_vals_; }
-    std::vector<double> veff_es_vals() const { return veff_es_vals_; }
-    std::vector<double> veff_eb_vals() const { return veff_eb_vals_; }
+  std::vector<double> veff_TTN_vals() const { return veff_TTN_vals_; }
+  std::vector<double> veff_ps_vals() const { return veff_ps_vals_; }
+  std::vector<double> veff_pb_vals() const { return veff_pb_vals_; }
+  std::vector<double> veff_es_vals() const { return veff_es_vals_; }
+  std::vector<double> veff_eb_vals() const { return veff_eb_vals_; }
 
-    double ps_val(double TTN) const { return alglib::spline1dcalc(veff_ps_interp_, TTN); }
-    double pb_val(double TTN) const { return alglib::spline1dcalc(veff_pb_interp_, TTN); }
-    double es_val(double TTN) const { return alglib::spline1dcalc(veff_es_interp_, TTN); }
-    double eb_val(double TTN) const { return alglib::spline1dcalc(veff_eb_interp_, TTN); }
-    double ws_val(double TTN) const { return alglib::spline1dcalc(veff_ws_interp_, TTN); }
-    double wb_val(double TTN) const { return alglib::spline1dcalc(veff_wb_interp_, TTN); }
+  double ps_val(double TTN) const { return alglib::spline1dcalc(veff_ps_interp_, TTN); }
+  double pb_val(double TTN) const { return alglib::spline1dcalc(veff_pb_interp_, TTN); }
+  double es_val(double TTN) const { return alglib::spline1dcalc(veff_es_interp_, TTN); }
+  double eb_val(double TTN) const { return alglib::spline1dcalc(veff_eb_interp_, TTN); }
+  double ws_val(double TTN) const { return alglib::spline1dcalc(veff_ws_interp_, TTN); }
+  double wb_val(double TTN) const { return alglib::spline1dcalc(veff_wb_interp_, TTN); }
 
-    double TTN_min() const { return veff_TTN_vals_.front(); }
-    double TTN_max() const { return veff_TTN_vals_.back(); }
+  double TTN_min() const { return veff_TTN_vals_.front(); }
+  double TTN_max() const { return veff_TTN_vals_.back(); }
 
-    double cpsq(double T = -1.0) const override { return cpsq_; }
-    double cmsq(double T = -1.0) const override { return cmsq_; }
-    double csq_s(double TTN) const { return alglib::spline1dcalc(cpsq_fit_, TTN); } // WARNING: spline can go out of bounds
-    double csq_b(double TTN) const { return alglib::spline1dcalc(cmsq_fit_, TTN); }
+  double cpsq(double T = -1.0) const override { return cpsq_; }
+  double cmsq(double T = -1.0) const override { return cmsq_; }
+  double csq_s(double TTN) const { return alglib::spline1dcalc(cpsq_fit_, TTN); } // WARNING: spline can go out of bounds
+  double csq_b(double TTN) const { return alglib::spline1dcalc(cmsq_fit_, TTN); }
 
-    double pN() const { return pN_; }
-    double eN() const { return eN_; }
-    double wN() const { return wN_; }
+  double pN() const { return pN_; }
+  double eN() const { return eN_; }
+  double wN() const { return wN_; }
 
-    #ifdef ENABLE_MATPLOTLIB
-    void plot_thermo(const std::string& filename="thermo.png") const; // Plots e(T), p(T), w(T)
-    // void plot_thermo_splines(const std::string& filename) const;
-    void plot_csq(const std::string& filename="csq_veff.png") const; // Plots cs^2(T)
-    #endif
+  #ifdef ENABLE_MATPLOTLIB
+  void plot_thermo(const std::string& filename="thermo.png") const; // Plots e(T), p(T), w(T)
+  // void plot_thermo_splines(const std::string& filename) const;
+  void plot_csq(const std::string& filename="csq_veff.png") const; // Plots cs^2(T)
+  #endif
 
-    void print() const override;
+  void print() const override;
 
-  private:
-    void initialize_from_eos_data(const EquationOfState& eos_data);
-    const double cpsq_, cmsq_; // remove when cs(T) implemented
-    std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
-    std::vector<double> cpsq_vals_, cmsq_vals_; // cs^2(T) values
-    alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
-    alglib::spline1dinterpolant cpsq_fit_, cmsq_fit_; // cs^2(T)
-    double pN_, eN_, wN_;
-  };
+private:
+  void initialize_from_eos_data(const EquationOfState& eos_data);
+  const double cpsq_, cmsq_; // remove when cs(T) implemented
+  std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
+  std::vector<double> cpsq_vals_, cmsq_vals_; // cs^2(T) values
+  alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
+  alglib::spline1dinterpolant cpsq_fit_, cmsq_fit_; // cs^2(T)
+  double pN_, eN_, wN_;
+};
 
 } // namespace PhaseTransition
 
