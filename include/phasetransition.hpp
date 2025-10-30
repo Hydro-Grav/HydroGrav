@@ -190,14 +190,14 @@ units:
 
     #ifdef ENABLE_MATPLOTLIB
     void plot_thermo(const std::string& filename="thermo.png") const; // Plots e(T), p(T), w(T)
-    // void plot_thermo_splines(const std::string& filename) const;
+    void plot_thermo2(const std::string& filename="thermo.png") const;
     void plot_csq(const std::string& filename="csq_veff.png") const; // Plots cs^2(T)
     #endif
 
     void print() const override;
 
   private:
-    const double cpsq_, cmsq_; // remove when cs(T) implemented
+    const double cpsq_, cmsq_; // remove when new way of finding hydro mode for veff implemented
     std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
     std::vector<double> cpsq_vals_, cmsq_vals_; // cs^2(T) values
     alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;

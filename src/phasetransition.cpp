@@ -328,6 +328,45 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
 // Public:
 #ifdef ENABLE_MATPLOTLIB
 void PTParams_Veff::plot_thermo(const std::string& filename) const {
+    std::map<std::string, std::string> bp;
+    bp["label"] = "broken phase";
+
+    std::map<std::string, std::string> sp;
+    sp["label"] = "symmetric phase";
+
+
+    plt::figure_size(1600, 1600);
+
+    plt::subplot2grid(2, 2, 0, 0);
+    plt::plot(veff_TTN_vals_, veff_es_vals_, sp);
+    plt::plot(veff_TTN_vals_, veff_eb_vals_, bp);
+    plt::xlabel("T/TN");
+    plt::ylabel("energy density");
+    plt::grid(true);
+    plt::legend();
+
+    plt::subplot2grid(2, 2, 0, 1);
+    plt::plot(veff_TTN_vals_, veff_ps_vals_, sp);
+    plt::plot(veff_TTN_vals_, veff_pb_vals_, bp);
+    plt::xlabel("T/TN");
+    plt::ylabel("pressure");
+    plt::grid(true);
+    plt::legend();
+
+    plt::subplot2grid(2, 2, 1, 0);
+    plt::plot(veff_TTN_vals_, veff_ws_vals_, sp);
+    plt::plot(veff_TTN_vals_, veff_wb_vals_, bp);
+    plt::xlabel("T/TN");
+    plt::ylabel("enthalpy");
+    plt::grid(true);
+    plt::legend();
+
+    plt::save(filename);
+
+    return;
+}
+
+void PTParams_Veff::plot_thermo2(const std::string& filename) const {
     const auto n = veff_TTN_vals_.size();
     std::vector<double> es_spline_vals(n), eb_spline_vals(n), ps_spline_vals(n), pb_spline_vals(n), ws_spline_vals(n), wb_spline_vals(n);
 
