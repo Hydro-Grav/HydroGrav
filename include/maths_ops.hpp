@@ -144,6 +144,9 @@ template <typename T, typename State, typename Func>
 std::pair<std::vector<T>, std::vector<State>> rk4_solver(const Func& dydx, T x0, T xf, const State& y0, size_t n=1000);
 
 template <typename T, typename Func>
+T newton_solve_1d(const Func& F, T x0, T tol=1e-8, int max_iter=100, T h=1e-8);
+
+template <typename T, typename Func>
 std::array<T,2> newton_solve_2d(const Func& F, std::array<T,2> x0, T tol=1e-8, int max_iter=100, T h=1e-8);
 
 #include "solvers.tpp"

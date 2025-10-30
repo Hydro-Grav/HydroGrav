@@ -11,6 +11,38 @@
 #include <cmath>
 
 template <typename T, typename Func>
+T newton_solve_1d(
+    const Func& F,  // F(x): returns scalar
+    T x0,           // initial guess
+    T tol,          // tolerance
+    int max_iter,   // maximum iterations
+    T h             // finite difference step for derivative
+) {
+    static_assert(std::is_floating_point<T>::value,
+                  "newton_solve_1d requires floating-point T");
+
+    for (int iter = 0; iter < max_iter; ++iter) {
+        T fx = F(x0);
+        if (std::fabs(fx) < tol)
+            return x0;
+
+        // Numerical derivative via finite difference
+        T dfdx = (F(x0 + h) - fx) / h;
+        if (std::fabs(dfdx) < T(1e-14))
+            throw std::runtime_error("Derivative is near zero (Jacobian singular).");
+
+        // Newton update
+        T dx = -fx / dfdx;
+        x0 += dx;
+
+        if (std::fabs(dx) < tol)
+            return x0;
+    }
+
+    throw std::runtime_error("Newton's method did not converge");
+}
+
+template <typename T, typename Func>
 std::array<T,2> newton_solve_2d(
     const Func& F,
     std::array<T,2> x0,
