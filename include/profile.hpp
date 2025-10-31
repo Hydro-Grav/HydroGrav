@@ -95,7 +95,7 @@ class FluidProfile {
 
     double vm_from_matching(double vp, double alpha_p) const;
     double vp_from_matching(double vm, double alpha_p) const;
-    double wm_from_matching(double wp, double vp, double vm) const;
+    double w_from_matching(double wp, double vp, double vm) const;
     double w1wN_from_matching(double xi_sh) const;
   
     double get_T1TN(double w1wN) const;
@@ -115,20 +115,21 @@ class FluidProfile {
     double lambda_b_veff(double ToTN, const double eN, const double wN_inv) const;
 
     double find_shock(const deriv_func& dydxi) const;
-    double find_shock_veff(const deriv_func& dydxi) const;
 
     std::pair<double, state_type> get_IC_deflagration(const deriv_func& dydxi) const;
-    state_type get_IC_detonation() const;
+    std::pair<double, state_type> get_IC_detonation() const;
 
     state_type test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
     std::pair<state_type, state_type> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0, const int n=1000) const;
 
-    double matching_residual_veff(double vp, double pp, double ep, double TmTN) const;
+    double find_shock_veff(const deriv_func& dydxi, double TmTN, const int n) const;
+
     std::array<double, 2> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
     std::array<double, 2> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
+    std::array<double, 2> matching_eqs_shock2(double v1, double T1TN, double v2, double T2TN) const;
 
     void get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& yp, state_type& ym) const;
-    state_type get_IC_detonation_veff() const;
+    std::pair<double, state_type> get_IC_detonation_veff() const;
 
     // put number of integration points in input file? seems bad to hardcode
     std::vector<prof_type> solve_profile(int n=5000);

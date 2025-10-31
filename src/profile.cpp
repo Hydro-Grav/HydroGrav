@@ -29,22 +29,10 @@ TO DO:
 - update generate_streamplot_data() to include points of interest (fixed pts, detonation/deflag/hybrid regions)
 - fix calc of w profile in generate_streamplot_data()
 - write summary of detonation/deflag/hybrid at top of ctor
-- change everything to {v,T,w} format (currently is {v,w,T})
-- go through and check if any varaibles can be removed from class (might need to add eN, wN_inv for lambda calc)
-- return std::numeric_limits<double>::quiet_NaN(); rather than throwing exception for veff shock finding!! (innappropriate to use exceptions here)
-- move dydxi as a global function in profile since it is called so often
 - allocate memory to y_sol_tmp etc (inside solve) -> get rid of .push_back() and change to indexing
-- add dflt ctor for uninitialised FluidProfile (for testing)
-- xif in det fixed as 1/3, but should be exactly equal to cmsq
-*/
-
-/* NOTES
-- detonation part of hybrid is unstable because of IC v(xi=vw)=cs -> mu^2/cs^2 - 1 = 0 -> dvdxi -> inf
-- reparameterising in terms of v can (kind of) fix this, although have to integrate from vmUF -> 1e-5 (zero causes dxidv=0 so xi->inf)
-- simpler to offset IC slightly (e.g. use vmUF*0.95 rather than vmUF)
-- WARNING: This may lead to innacuracies if |vw-cm| >~ |vw-xi_sh| (since det part of hybrid is large)
-- if this is an issue then use reparameterisation of eom in terms of v (commented out for now)
-- deflagration shock calculation needs to be redone entirely if using reparameterisation for deflagrations too (unnecessary)
+- remove dydxi stuff (used only in deflag part of calculation) - not critical, just cleans up code
+- update get_mode for veff
+- fix deflag solver for veff
 */
 
 namespace Hydrodynamics { // calculate bubble profile
@@ -77,32 +65,34 @@ state_type dydxi_vec(double xi, const state_type& y, double vw, double cpsq, dou
     const auto v = y[0];
     const auto w = y[1];
     const auto T = y[2];
-    const auto csq = (xi < vw) ? cmsq : cpsq; // change to csq(T) when implemented
+    const auto csq = (xi < vw) ? cmsq : cpsq;
 
     return { dvdxi(xi, v, csq), dwdxi(xi, v, w, csq), dTdxi(xi, v, T, csq) };
 }
 
-// double dxidv(double xi, double v, const double csq) {
-//     const auto mu_val = mu(xi, abs(v));
-//     return gammaSq(v) * (1.0 - v * xi) * (mu_val * mu_val / csq - 1.0) * xi / (2.0 * v);
-// }
+double dxidv(double xi, double v, const double csq) {
+    const auto mu_val = mu(xi, abs(v));
+    if (v < 1e-9) return 0.0; // dxidv -> 0 for (xi,v)->(csq,0)
 
-// double dwdv(double xi, double v, double w, const double csq) {
-//     return w * gammaSq(v) * mu(xi, v) * (1.0 + 1.0 / csq);
-// }
+    return gammaSq(v) * (1.0 - v * xi) * (mu_val * mu_val / csq - 1.0) * xi / (2.0 * v);
+}
 
-// double dTdv(double xi, double v, double T, const double csq) {
-//     return T * gammaSq(v) * mu(xi, v);
-// }
+double dwdv(double xi, double v, double w, const double csq) {
+    return w * gammaSq(v) * mu(xi, v) * (1.0 + 1.0 / csq);
+}
 
-// state_type dydv_vec(double xi, const state_type& y, double vw, double cmsq, double cpsq) {
-//     const auto v = y[0];
-//     const auto w = y[1];
-//     const auto T = y[2];
-//     const auto csq = (xi < vw) ? cmsq : cpsq; // change to csq(T) when implemented
+double dTdv(double xi, double v, double T, const double csq) {
+    return T * gammaSq(v) * mu(xi, v);
+}
 
-//     return { dxidv(xi, v, csq), dwdv(xi, v, w, csq), dTdv(xi, v, T, csq) };
-// }
+state_type dydv_vec(double v, const state_type& y, double vw, double cmsq, double cpsq) {
+    const auto xi = y[0];
+    const auto w = y[1];
+    const auto T = y[2];
+    const auto csq = (xi < vw) ? cmsq : cpsq;
+
+    return { dxidv(xi, v, csq), dwdv(xi, v, w, csq), dTdv(xi, v, T, csq) };
+}
 /*************************************************************************************/
 
 // Warning: doesn't work for w profile yet!
@@ -357,13 +347,11 @@ double FluidProfile::get_TmTN(double wmwN) const {
     return std::pow(fac, 1.0 / nu) * std::pow(bag_params_->TN(), mu / nu - 1.0);
 }
 
-// update for mu nu - done
 double FluidProfile::v1UF_from_shock(double xi_sh) const {
-    if (xi_sh < std::sqrt(cpsq_) || xi_sh > 1.0) {
-        // shock condition (cp < xi_sh < 1) relaxed here since for some vw & alN, xi_shock VERY close to bounds
-        // so root-finder takes xi_sh_min = cp, xi_sh_max = 1
+    // shock condition (cp < xi_sh < 1) relaxed here since for some vw & alN, xi_shock VERY close to bounds
+    // so root-finder takes xi_sh_min = cp, xi_sh_max = 1
+    if (xi_sh < std::sqrt(cpsq_) || xi_sh > 1.0)
         throw std::invalid_argument("shock must be supersonic and less than speed of light (cp < xi_sh < 1)");
-    }
 
     if (xi_sh == std::sqrt(cpsq_)) return 1e-10; // avoid numerical precision errors
     return (xi_sh * xi_sh - cpsq_) / ((1.0 - cpsq_) * xi_sh);
@@ -474,12 +462,13 @@ std::pair<double, state_type> FluidProfile::get_IC_deflagration(const deriv_func
     return {xi_sh, y1};
 }
 
-state_type FluidProfile::get_IC_detonation() const {
+std::pair<double, state_type> FluidProfile::get_IC_detonation() const {
     // initial conditions:
     //     v0 = v(xi_w) = vm(UF)
     //     w0 = w(xi_w) = wm/wN
     //     T0 = T(xi_w) = Tm/TN
     
+    const auto xi0 = vw_;
     const auto vp = -vw_;
     const auto wpwN = 1.0; // w+ = wN
     const auto TpTN = 1.0;
@@ -492,14 +481,16 @@ state_type FluidProfile::get_IC_detonation() const {
     const auto vmUF = mu(vw_, abs(vm));
     if (abs(vmUF) >= 1.0) throw std::invalid_argument("Detonation IC failed: vmUF must be <1!");
     
-    const auto wmwN = wm_from_matching(wpwN, vp, vm);
+    const auto wmwN = w_from_matching(wpwN, vp, vm);
     if (wmwN <= wpwN) throw std::invalid_argument("Detonation IC failed: wm>wp required!");
 
     // const auto TmTN = ToTN(wmwN, cpsq_, cmsq_);
     const auto TmTN = get_TmTN(wmwN);
     if (TmTN <= TpTN) throw std::invalid_argument("Detonation IC failed: Tm>Tp required!");
+
+    const state_type y0 = {xi0, wmwN, TmTN};
     
-    return {vmUF, wmwN, TmTN};
+    return {vmUF, y0};
 }
 
 /*****************************************************************************************/
@@ -518,90 +509,6 @@ double FluidProfile::lambda_b_veff(double ToTN, const double eN, const double wN
     return (eb_T - eN) * wN_inv;
 }
 
-state_type FluidProfile::test_shock_matching(const deriv_func& dydxi, double xi_sh) const {
-    // fluid in front of shock
-    const auto v2 = xi_sh;
-    const auto w2wN = 1.0;
-    const auto T2TN = 1.0;
-
-    const auto pN = veff_params_->pN();
-    const auto eN = veff_params_->eN();
-
-    // matching across shock
-    std::function<std::array<double, 2>(std::array<double, 2>)> shock_matching_helper = [this, v2, pN, eN] (std::array<double, 2> y0) {
-        return matching_eqs_shock(pN, eN, v2, y0[0], y0[1]); // y0 = {v1, T1TN}
-    };
-    
-    // guess needs to be slightly larger than {v2, T2TN} since residual goes to zero for v1=v2, T1=T2
-    // const auto v1_guess = v2 * (1.0 + 1e-3);
-    // const auto T1TN_guess = T2TN * (1.0 + 1e-3);
-    const std::array<double, 2> v1_T1TN_guess = {v2 * (1.0 + 1e-3), T2TN * (1.0 + 1e-3)}; // {v1, T1TN}
-    const auto shock_sol = newton_solve_2d(shock_matching_helper, v1_T1TN_guess);
-
-    // fluid behind shock
-    const auto v1 = shock_sol[0];
-    const auto v1UF = mu(xi_sh, abs(v1));
-    if (abs(v1UF) >= 1.0 || abs(v1) >= 1.0) throw std::invalid_argument("Shock matching: v1 must be <1!");
-    if (v1 >= v2) throw std::invalid_argument("Shock matching: v1 must be less than v2!");
-
-    const auto w1wN = wm_from_matching(w2wN, v2, v1);
-    if (w1wN <= 0.0) throw std::invalid_argument("Shock matching: w1wN must be >0!");
-    if (w1wN <= w2wN) throw std::invalid_argument("Shock matching: w1wN must be greater than w2wN!");
-
-    const auto T1TN = shock_sol[1];
-    if (T1TN <= 0.0) throw std::invalid_argument("Shock matching: T1TN must be >0!");
-    if (T1TN <= T2TN) throw std::invalid_argument("Shock matching: T1TN must be greater than T2TN!"); 
-
-    return {v1UF, w1wN, T1TN};
-}
-
-std::pair<state_type, state_type> FluidProfile::test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0, const int n) const {
-    // solve EoM from shock to wall
-    // NOTE: technically integration should start just behind shock and end just in front of wall, but residual for matching eqs is unstable (only 1 point where they both go to zero)
-    const auto xi0 = xi_sh;
-    const auto xif = vw_;
-    const auto [xi_sol, y_sol] = rk4_solver(dydxi, xi0, xif, y0, n);
-
-    // fluid in front of wall
-    const auto vpUF = y_sol.back()[0]; // vpUF = v(xi_w) (endpoint of integration)
-    const auto vp = mu(vw_, abs(vpUF));
-    if (abs(vpUF) >= 1.0 || abs(vp) >= 1.0) throw std::invalid_argument("Wall matching: vp must be <1!");
-
-    const auto wpwN = y_sol.back()[1];
-    if (wpwN <= 0.0) throw std::invalid_argument("Wall matching: wpwN must be >0!");
-
-    const auto TpTN = y_sol.back()[2];
-    if (TpTN <= 0.0) throw std::invalid_argument("Wall matching: TpTN must be >0!");
-
-    // matching across wall
-    std::function<std::array<double, 2>(std::array<double, 2>)> wall_matching_helper = [this, vp, TpTN] (std::array<double, 2> ym) {
-        return matching_eqs_wall(vp, TpTN, ym[0], ym[1]); // ym = {vm, TmTN}
-    };
-
-    const std::array<double, 2> vm_TmTN_guess = {veff_params_->csq_b(1.0), 1.0}; // {vm, TmTN}
-    const auto wall_sol = newton_solve_2d(wall_matching_helper, vm_TmTN_guess);
-
-    // fluid behind wall
-    const auto vm = wall_sol[0];
-    if (vm <= vp) throw std::invalid_argument("Wall matching: vm must be greater than vp!");
-
-    const auto vmUF = mu(vw_, abs(vm));
-    if (abs(vmUF) >= 1.0) throw std::runtime_error("Wall matching: vmUF > 1!");
-
-    const auto wmwN = wm_from_matching(wpwN, vp, vm);
-    if (wmwN <= 0.0) throw std::invalid_argument("Wall matching: wmwN must be >0!");
-    if (wmwN >= wpwN) throw std::invalid_argument("Wall matching: wmwN must be less than wpwN!");
-
-    const auto TmTN = wall_sol[1];
-    if (TmTN <= 0.0) throw std::invalid_argument("Wall matching: TmTN must be >0!");
-    if (TmTN >= TpTN) throw std::invalid_argument("Wall matching: TmTN must be less than TpTN!");
-
-    const state_type yp = {vpUF, wpwN, TpTN};
-    const state_type ym = {vmUF, wmwN, TmTN};
-
-    return {yp, ym};
-}
-
 std::array<double, 2> FluidProfile::matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const {    
     if (T1TN < veff_params_->TTN_min() || T1TN > veff_params_->TTN_max()) {
         throw std::out_of_range("T1/TN is called out of bounds for spline!");
@@ -611,6 +518,25 @@ std::array<double, 2> FluidProfile::matching_eqs_shock(double pN, double eN, dou
     // const auto e2 = veff_params_->es_val(T2TN);
     const auto p2 = pN;
     const auto e2 = eN;
+
+    const auto p1 = veff_params_->ps_val(T1TN); // p_1, e_1
+    const auto e1 = veff_params_->es_val(T1TN);
+
+    // const auto eq1 = v2 * v1 * (e1 - e2) - (p1 - p2);
+    // const auto eq2 = v1 * (e1 + p2) - v2 * (e2 + p1);
+    const auto eq1 = v1 * v2 - (p1 - p2) / (e1 - e2);
+    const auto eq2 = v1 / v2 - (e2 + p1) / (e1 + p2);
+
+    return {eq1, eq2};
+}
+
+std::array<double, 2> FluidProfile::matching_eqs_shock2(double v1, double T1TN, double v2, double T2TN) const {    
+    if (T1TN < veff_params_->TTN_min() || T1TN > veff_params_->TTN_max()) {
+        throw std::out_of_range("T1/TN is called out of bounds for spline!");
+    }
+
+    const auto p2 = veff_params_->ps_val(T2TN); // p_2, e_2
+    const auto e2 = veff_params_->es_val(T2TN);
 
     const auto p1 = veff_params_->ps_val(T1TN); // p_1, e_1
     const auto e1 = veff_params_->es_val(T1TN);
@@ -641,6 +567,91 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
     // const auto eq2 = vm / vp - (ep + pm) / (em + pp);
 
     return {eq1, eq2};
+}
+
+state_type FluidProfile::test_shock_matching(const deriv_func& dydxi, double xi_sh) const {
+    // fluid in front of shock
+    const auto v2 = xi_sh;
+    const auto w2wN = 1.0;
+    const auto T2TN = 1.0;
+
+    const auto pN = veff_params_->pN();
+    const auto eN = veff_params_->eN();
+
+    // matching across shock
+    std::function<std::array<double, 2>(std::array<double, 2>)> shock_matching_helper = [this, v2, pN, eN] (std::array<double, 2> y0) {
+        return matching_eqs_shock(pN, eN, v2, y0[0], y0[1]); // y0 = {v1, T1TN}
+    };
+    
+    // guess needs to be slightly larger than {v2, T2TN} since residual goes to zero for v1=v2, T1=T2
+    // const auto v1_guess = v2 * (1.0 + 1e-3);
+    // const auto T1TN_guess = T2TN * (1.0 + 1e-3);
+    const std::array<double, 2> v1_T1TN_guess = {v2 * (1.0 + 1e-3), T2TN * (1.0 + 1e-3)}; // {v1, T1TN}
+    const auto shock_sol = newton_solve_2d(shock_matching_helper, v1_T1TN_guess);
+
+    // fluid behind shock
+    const auto v1 = shock_sol[0];
+    const auto v1UF = mu(xi_sh, abs(v1));
+    // if (abs(v1UF) >= 1.0 || abs(v1) >= 1.0) throw std::invalid_argument("Shock matching: v1 must be <1!");
+    // if (v1 >= v2) throw std::invalid_argument("Shock matching: v1 must be less than v2!");
+
+    const auto w1wN = w_from_matching(w2wN, v2, v1);
+    // if (w1wN <= 0.0) throw std::invalid_argument("Shock matching: w1wN must be >0!");
+    // if (w1wN <= w2wN) throw std::invalid_argument("Shock matching: w1wN must be greater than w2wN!");
+
+    const auto T1TN = shock_sol[1];
+    // if (T1TN <= 0.0) throw std::invalid_argument("Shock matching: T1TN must be >0!");
+    // if (T1TN <= T2TN) throw std::invalid_argument("Shock matching: T1TN must be greater than T2TN!"); 
+
+    return {v1UF, w1wN, T1TN};
+}
+
+std::pair<state_type, state_type> FluidProfile::test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0, const int n) const {
+    // solve EoM from shock to wall
+    // NOTE: technically integration should start just behind shock and end just in front of wall, but residual for matching eqs is unstable (only 1 point where they both go to zero)
+    const auto xi0 = xi_sh;
+    const auto xif = vw_;
+    const auto [xi_sol, y_sol] = rk4_solver(dydxi, xi0, xif, y0, n);
+
+    // fluid in front of wall
+    const auto vpUF = y_sol.back()[0]; // vpUF = v(xi_w) (endpoint of integration)
+    const auto vp = mu(vw_, abs(vpUF));
+    // if (abs(vpUF) >= 1.0 || abs(vp) >= 1.0) throw std::invalid_argument("Wall matching: vp must be <1!");
+
+    const auto wpwN = y_sol.back()[1];
+    // if (wpwN <= 0.0) throw std::invalid_argument("Wall matching: wpwN must be >0!");
+
+    const auto TpTN = y_sol.back()[2];
+    // if (TpTN <= 0.0) throw std::invalid_argument("Wall matching: TpTN must be >0!");
+
+    // matching across wall
+    std::function<std::array<double, 2>(std::array<double, 2>)> wall_matching_helper = [this, vp, TpTN] (std::array<double, 2> ym) {
+        return matching_eqs_wall(vp, TpTN, ym[0], ym[1]); // ym = {vm, TmTN}
+    };
+
+    const std::array<double, 2> vm_TmTN_guess = {veff_params_->csq_b(1.0), 1.0}; // {vm, TmTN}
+    const auto wall_sol = newton_solve_2d(wall_matching_helper, vm_TmTN_guess);
+
+    // fluid behind wall
+    const auto vm = wall_sol[0];
+    // if (vm <= vp) throw std::invalid_argument("Wall matching: vm must be greater than vp!");
+
+    const auto vmUF = mu(vw_, abs(vm));
+    // if (abs(vmUF) >= 1.0) throw std::runtime_error("Wall matching: vmUF > 1!");
+    // if (vmUF < 0.0) throw std::runtime_error("Wall matching: vmUF < 0!");
+
+    const auto wmwN = w_from_matching(wpwN, vp, vm);
+    // if (wmwN <= 0.0) throw std::invalid_argument("Wall matching: wmwN must be >0!");
+    // if (wmwN >= wpwN) throw std::invalid_argument("Wall matching: wmwN must be less than wpwN!");
+
+    const auto TmTN = wall_sol[1];
+    // if (TmTN <= 0.0) throw std::invalid_argument("Wall matching: TmTN must be >0!");
+    // if (TmTN >= TpTN) throw std::invalid_argument("Wall matching: TmTN must be less than TpTN!");
+
+    const state_type yp = {vpUF, wpwN, TpTN};
+    const state_type ym = {vmUF, wmwN, TmTN};
+
+    return {yp, ym};
 }
 
 // keep as void or output just xi_sh and y0={v1UF, w1wN, T1TN}?
@@ -681,29 +692,77 @@ void FluidProfile::get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_
     double xi_sh_guess = xi_sh_min;
     const auto dx = 5e-5; // make this smaller if  can't find bracket for shock
 
+    // test residual
+    std::cout << "testing residual... ";
+
+    const size_t n = 1000;
+    const auto xi_sh_vals = linspace(xi_sh_min, xi_sh_max, n);
+    // const auto xi_sh_vals = linspace(0.61, 0.63, n);
+    std::vector<double> res_vals;
+    for (const auto xi_sh : xi_sh_vals) {
+        double resi = std::numeric_limits<double>::quiet_NaN();
+        try {
+            resi = shock_resi(xi_sh);
+        } catch (...) {}
+
+        res_vals.push_back(resi);
+    }
+
+    plt::figure_size(800, 800);
+    plt::plot(xi_sh_vals, res_vals);
+    plt::xlabel("xi_sh");
+    plt::ylabel("residual");
+    // plt::xlim(xi_sh_min, 0.6);
+    // plt::ylim(0.0, 0.2);
+    plt::grid(true);
+    plt::save("shock_residual.png");
+
+    std::cout << "testing complete. Residual plot saved.\n";
+
+
     state_type y1_guess;
     std::pair<state_type, state_type> ypym_guess;
     std::vector<double> pass_case_xi, pass_case_resi;
     std::pair<double, double> bracket;
 
+    int count = 0;
+    int y1_count = 0;
+    int ypym_count = 0;
+    std::vector<std::string> info;
+
     // find interval containing xi_sh
     // NOTE: Only works if solution for xi_sh is unique!! (pretty sure this is true)  
     while (xi_sh_guess < xi_sh_max) {
         try {
+            count++;
+
             y1_guess = test_shock_matching(dydxi, xi_sh_guess);
+            y1_count++;
+
             ypym_guess = test_wall_matching(dydxi, xi_sh_guess, y1_guess);
+            ypym_count++;
 
             pass_case_xi.push_back(xi_sh_guess);
             pass_case_resi.push_back(vm_resi(ypym_guess.second[0], ypym_guess.second[2]));
+
+            // std::cout << "xi_sh=" << xi_sh_guess << ", resi=" << vm_resi(ypym_guess.second[0], ypym_guess.second[2]) << "\n";
 
             // break when interval containing residual minima is found
             bracket = check_minimum(pass_case_xi, pass_case_resi);
             if (!std::isnan(bracket.first)) break;
 
-        } catch (...) {} // do nothing if matching fails
+        } catch (std::exception& e) {
+            // std::cout << e.what() << "\n";
+        } // do nothing if matching fails
 
         xi_sh_guess += dx;
     }
+
+    // std::cout << "count=" << count << ", y1_count=" << y1_count << ", ypym_count=" << ypym_count << "\n";
+    // for (const auto& s : info) std::cout << s << "\n"; // print all error messages
+
+    std::cout << "pass_case_xi.size()=" << pass_case_xi.size() << "\n";
+    std::cout << "bracket=(" << bracket.first << ", " << bracket.second << ")\n";
 
     if (pass_case_xi.size() == 0 || std::isnan(bracket.first)) {
         throw std::runtime_error("No bracketed interval found for shock!");
@@ -718,17 +777,58 @@ void FluidProfile::get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_
     yp = ypym.first; // {vpUF, wpwN, TpTN}
     ym = ypym.second; // {vmUF, wmwN, TmTN}
 
-    std::cout << "Found shock front!\n";
+    // std::cout << "xi_sh=" << xi_sh << "\n";
+
+    // std::cout << "Found shock front!\n";
 
     return;
 }
 
+
+double FluidProfile::find_shock_veff(const deriv_func& dydxi, double TmTN, const int n) const {
+    const auto vm = (mode_ == 0) ? vw_ : std::sqrt(veff_params_->csq_b(TmTN));
+    const auto wmwN = veff_params_->wb_val(TmTN);
+
+    // matching at wall: vm, Tm -> vp, Tp
+    auto wall_matching_helper = [this, vm, TmTN] (std::array<double, 2>& yp) {
+        return matching_eqs_wall(yp[0], yp[1], vm, TmTN); // yp = {vp, TpTN}
+    };
+
+    const std::array<double, 2> yp_guess = {vm, 1.0};
+    const auto sol = newton_solve_2d(wall_matching_helper, yp_guess);
+
+    const auto vp = sol[0];
+    const auto wpwN = w_from_matching(wmwN, vm, vp);
+    const auto TpTN = sol[1];
+
+    const state_type yp = {vp, wpwN, TpTN};
+
+    // solve EoM
+    const auto xi0 = vw_;
+    const auto xif = 1.0;
+    const auto [xi_sol, y_sol] = rk4_solver(dydxi, xi0, xif, yp, n);
+
+    // find location of shock
+    std::vector<double> shock_resi_vals(n);
+    for (int i = 0; i < n; i++) {
+        const auto xi_sh = xi_sol[i];
+
+        const auto v1UF = y_sol[i][0];
+        const auto v1 = mu(xi_sh, abs(v1UF));
+        const auto T1TN = y_sol[i][2];
+
+        shock_resi_vals[i] = matching_eqs_shock2(v1, T1TN, xi_sh, 1.0)[0]; // v2=xi_sh, T2TN=1
+    }
+    
+}
+
 // TO DO: update error handling
-state_type FluidProfile::get_IC_detonation_veff() const {
+std::pair<double, state_type> FluidProfile::get_IC_detonation_veff() const {
     // uses matching conditions to get vm, Tm/TN from vp, Tp/TN
     //      vp * vm = (pm - pp) / (em - ep)
     //      vp / vm = (em + pp) / (ep + pm)
 
+    const auto xi0 = vw_;
     const auto vp = -vw_;
     const auto TpTN = 1.0;
     const auto wpwN = 1.0;
@@ -744,27 +844,22 @@ state_type FluidProfile::get_IC_detonation_veff() const {
     // fluid behind wall
     const auto vm = sol[0];
     const auto vmUF = mu(vw_, abs(vm));
+    if (vm >= vw_) throw std::invalid_argument("vm must be < vw for detonation");
+
     const auto TmTN = sol[1];
-    const auto wmwN = wm_from_matching(wpwN, vp, vm);
+    if (TmTN <= TpTN) throw std::invalid_argument("Tm/TN must be > Tp/TN for detonation");
 
-    // do better error handling later
-    if (vm >= vw_) {
-        throw std::invalid_argument("vm must be < vw for detonation");
-    }
-    if (TmTN <= TpTN) {
-        throw std::invalid_argument("Tm/TN must be > Tp/TN for detonation");
-    }
-    if (wmwN <= wpwN) {
-        throw std::invalid_argument("wm/wN must be > wp/wN for detonation");
-    }
+    const auto wmwN = w_from_matching(wpwN, vp, vm);
+    if (wmwN <= wpwN) throw std::invalid_argument("wm/wN must be > wp/wN for detonation");
 
-    return {vmUF, wmwN, TmTN};
+    const state_type y0 = {xi0, wmwN, TmTN};
+    return {vmUF, y0};
 }
 
 /*****************************************************************************************/
 /************************************* Both Bag/Veff *************************************/
 // from matching condition wp * vp * gamma_p^2 = wm * vm * gamma_m^2
-double FluidProfile::wm_from_matching(double wp, double vp, double vm) const {
+double FluidProfile::w_from_matching(double wp, double vp, double vm) const {
     return wp * abs(vp) * (1.0 - vm * vm) / (abs(vm) * (1.0 - vp * vp));
 }
 /*****************************************************************************************/
@@ -791,9 +886,9 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
     };
 
     // uncomment this if det/hyb fluid profile looks wrong/discontinuous
-    // auto dydv = [this] (double xi, const state_type& y) -> state_type {
-    //     return dydv_vec(xi, y, vw_, cpsq_, cmsq_);
-    // };
+    auto dydv = [this] (double v, const state_type& y) -> state_type {
+        return dydv_vec(v, y, vw_, cpsq_, cmsq_);
+    };
 
     double xi0, xif;
     const auto dlt = 0.001; // wall and shocks are discontinuities so start integration just before them
@@ -855,7 +950,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             const auto vp = vp_from_matching(vm, alp);
             const auto wpwN = w_sol_tmp.back(); // w(xi_w + dlt) = w+/wN
 
-            w_end_val = wm_from_matching(wpwN, vp, vm); // wm/wN, from matching condition at wall
+            w_end_val = w_from_matching(wpwN, vp, vm); // wm/wN, from matching condition at wall
             // T_end_val = ToTN(w_end_val, cpsq_, cmsq_); // Tm/TN
             T_end_val = get_TmTN(w_end_val);
             la_end_val = lambda_b(w_end_val);
@@ -865,46 +960,26 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             const auto xi0_rf = vw_ - dlt;
             const auto xif_rf = std::sqrt(cmsq_) + dlt;
 
-            state_type y0_rf;
-
             const auto vm = -std::sqrt(cmsq_);
-            // const auto vmUF = mu(vw_, abs(vm));
             const auto vmUF = mu(vw_, abs(vm));
-            y0_rf[0] = vmUF * 0.95; // need this to offset singularity in dv/dxi
 
             const auto vp = mu(vw_, abs(vpUF));
-            
-            const auto wmwN = wm_from_matching(wpwN, vp, vm);
-            y0_rf[1] = wmwN;
+            const auto wmwN = w_from_matching(wpwN, vp, vm);
 
-            // const auto TmTN = ToTN(wmwN, cpsq_, cmsq_);
             const auto TmTN = get_TmTN(wmwN);
-            y0_rf[2] = TmTN;
 
-            const auto [xi_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydxi, xi0_rf, xif_rf, y0_rf, n);
+            const state_type y0_rf = {xi0_rf, wmwN, TmTN};
+            const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydv, vmUF, 1e-10, y0_rf, n);
 
             // combine rarefaction wave with shockwave part of solution
-            for (size_t i = 0; i < xi_sol_rf_tmp.size(); i++) {
-                xi_sol_tmp.push_back(xi_sol_rf_tmp[i]);
-                v_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
+            for (size_t i = 0; i < v_sol_rf_tmp.size(); i++) {
+                v_sol_tmp.push_back(v_sol_rf_tmp[i]);
+                xi_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
                 w_sol_tmp.push_back(y_sol_rf_tmp[i][1]);
                 T_sol_tmp.push_back(y_sol_rf_tmp[i][2]);
 
                 la_sol_tmp.push_back(lambda_b(y_sol_rf_tmp[i][1]));
             }
-
-            // uncomment this if det part of fluid profile looks wrong/discontinuous
-            // const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydv, vmUF, 1e-8, {xi0_rf, wmwN, TmTN}, n);
-
-            // // combine rarefaction wave with shockwave part of solution
-            // for (size_t i = 0; i < v_sol_rf_tmp.size(); i++) {
-            //     v_sol_tmp.push_back(v_sol_rf_tmp[i]);
-            //     xi_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
-            //     w_sol_tmp.push_back(y_sol_rf_tmp[i][1]);
-            //     T_sol_tmp.push_back(y_sol_rf_tmp[i][2]);
-
-            //     la_sol_tmp.push_back(lambda_b(y_sol_rf_tmp[i][1]));
-            // }
 
             xif = xif_rf; // update xif value to behind rarefaction wave
             w_end_val = w_sol_tmp.back();
@@ -914,45 +989,34 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
     } else { // detonation
         // cm < xi < xi_w
-        xi0 = vw_ - dlt;
-        xif = std::sqrt(cmsq_) + dlt;
-
-        y0 = get_IC_detonation();
+        xi0 = vw_;
+        xif = std::sqrt(cmsq_);
 
         // solver
-        const auto sol = rk4_solver(dydxi, xi0, xif, y0, n);
-        xi_sol_tmp = sol.first;
+        const auto ics = get_IC_detonation();
+        const auto vmUF = ics.first;
+        const auto y0 = ics.second; // {xi0, w0, T0}
+
+        const auto sol = rk4_solver(dydv, vmUF, 1e-10, y0, n);
+        v_sol_tmp = sol.first;
         y_sol_tmp = sol.second;
 
         // fill v, w vectors
         // Optimisation Note: pre-allocate memory for these vectors to speed up?
-        for (size_t i = 0; i < xi_sol_tmp.size(); i++) {
-            v_sol_tmp.push_back(y_sol_tmp[i][0]);
+        for (size_t i = 0; i < v_sol_tmp.size(); i++) {
+            xi_sol_tmp.push_back(y_sol_tmp[i][0]);
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
             T_sol_tmp.push_back(y_sol_tmp[i][2]);
 
             la_sol_tmp.push_back(lambda_b(w_sol_tmp[i]));
         }
 
-        // uncomment this if fluid profile looks wrong/discontinuous
-        // const auto sol = rk4_solver(dydv, vmUF, 0.0, {vw_, wmwN, TmTN}, n);
-        // v_sol_tmp = sol.first;
-        // y_sol_tmp = sol.second;
-
-        // // fill v, w vectors
-        // // Optimisation Note: pre-allocate memory for these vectors to speed up?
-        // for (size_t i = 0; i < v_sol_tmp.size(); i++) {
-        //     xi_sol_tmp.push_back(y_sol_tmp[i][0]);
-        //     w_sol_tmp.push_back(y_sol_tmp[i][1]);
-        //     T_sol_tmp.push_back(y_sol_tmp[i][2]);
-
-        //     la_sol_tmp.push_back(lambda_b(w_sol_tmp[i]));
-        // }
-
         w_end_val = w_sol_tmp.back(); // not sure why
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
     }
+
+    std::cout << "xi_end_val=" << xi_sol_tmp.back() << ", v_end_val=" << v_sol_tmp.back() << ", w_end_val=" << w_sol_tmp.back() << ", T_end_val=" << T_sol_tmp.back() << "\n";
     
     // define start & end points where profile=const (outside integration)
     const auto xi_start = linspace(0.99, xi0, n); // backwards integration
@@ -1027,9 +1091,9 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
     };
 
     // uncomment this if det/hyb fluid profile looks wrong/discontinuous
-    // auto dydv = [this] (double xi, const state_type& y) -> state_type {
-    //     return dydv_vec(xi, y, vw_, cpsq_, cmsq_);
-    // };
+    auto dydv = [this] (double v, const state_type& y) -> state_type {
+        return dydv_vec(v, y, vw_, cpsq_, cmsq_);
+    };
 
     const auto eN = veff_params_->eN();
     const auto wN_inv = 1.0 / veff_params_->wN();
@@ -1056,6 +1120,12 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 
         // find shock front and ICs
         get_IC_deflagration_veff(dydxi, xi_sh, y1, yp, ym);
+        // const auto ics = get_IC_deflagration_veff2(dydxi);
+        // const auto TmTN = ics[0];
+        // const auto xi_sh = ics[1];
+
+        std::cout << "vpUF=" << yp[0] << ", wpwN=" << yp[1] << ", TpTN=" << yp[2] << "\n"
+                  << "vmUF=" << ym[0] << ", wmwN=" << ym[1] << ", TmTN=" << ym[2] << "\n";
         
         xi0 = xi_sh - dlt;
         xif = vw_ + dlt;
@@ -1088,35 +1158,23 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 
         } else { // hybrid
             // initial conditions for rarefaction wave
-            const auto xi0_rf = vw_ - dlt;
-            const auto xif_rf = std::sqrt(veff_params_->csq_b(ym[2])) + dlt; // cmsq = csq_b(TmTN)
+            const auto xi0_rf = vw_;
+            const auto xif_rf = std::sqrt(veff_params_->csq_b(ym[2])); // cmsq = csq_b(TmTN)
 
-            ym[0] = ym[0] * 0.95; // need this to offset singularity in dv/dxi
-            const auto [xi_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydxi, xi0_rf, xif_rf, ym, n);
+            const auto vmUF = ym[0];
+            const state_type y0 = {xi0_rf, ym[1], ym[2]}; // {xi0, wmwN, TmTN}
+            const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydv, vmUF, 1e-10, y0, n);
+
             // combine rarefaction wave with shockwave part of solution
-            for (size_t i = 0; i < xi_sol_rf_tmp.size(); i++) {
-                xi_sol_tmp.push_back(xi_sol_rf_tmp[i]);
-                v_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
+            for (size_t i = 0; i < v_sol_rf_tmp.size(); i++) {
+                v_sol_tmp.push_back(v_sol_rf_tmp[i]);
+                xi_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
                 w_sol_tmp.push_back(y_sol_rf_tmp[i][1]);
-
+            
                 const auto T_sol_rf = y_sol_rf_tmp[i][2];
                 T_sol_tmp.push_back(T_sol_rf);
                 la_sol_tmp.push_back(lambda_b_veff(T_sol_rf, eN, wN_inv));
             }
-
-            // uncomment this if det part of fluid profile looks wrong/discontinuous
-            // const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydv, ym[0], 1e-8, {xi0_rf, ym[1], ym[2]}, n);
-
-            // // combine rarefaction wave with shockwave part of solution
-            // for (size_t i = 0; i < v_sol_rf_tmp.size(); i++) {
-            //     v_sol_tmp.push_back(v_sol_rf_tmp[i]);
-            //     xi_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
-            //     w_sol_tmp.push_back(y_sol_rf_tmp[i][1]);
-            
-            //     const auto T_sol_rf = y_sol_rf_tmp[i][2];
-            //     T_sol_tmp.push_back(T_sol_rf);
-            //     la_sol_tmp.push_back(lambda_b_veff(T_sol_rf, eN, wN_inv));
-            // }
 
             xif = xif_rf; // update xif value to behind rarefaction wave
             w_end_val = w_sol_tmp.back();
@@ -1130,21 +1188,22 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         // w0 = w(xi_w) = wm/wN
         // T0 = T(xi_w) = Tm/TN
 
-        xi0 = vw_ - dlt;
-        xif = std::sqrt(veff_params_->csq_b(1.0)) + dlt; // cmsq ~= csq_b(T/TN=1)       
+        xi0 = vw_;
+        xif = std::sqrt(veff_params_->csq_b(1.0)); // cmsq ~= csq_b(T/TN=1)       
         // xif = std::sqrt(cmsq_) + dlt; 
 
-        y0 = get_IC_detonation_veff(); // {vmUF, wmwN, TmTN}
+        const auto ics = get_IC_detonation_veff();
+        const auto vmUF = ics.first;
+        const auto y0 = ics.second; // {xi0, w0, T0}
 
         // solver
-        const auto sol = rk4_solver(dydxi, xi0, xif, y0, n);
-        xi_sol_tmp = sol.first;
+        const auto sol = rk4_solver(dydv, vmUF, 1e-10, y0, n);
+        v_sol_tmp = sol.first;
         y_sol_tmp = sol.second;
 
-        // // fill v, w vectors
-        // // Optimisation Note: pre-allocate memory for these vectors to speed up?
-        for (size_t i = 0; i < xi_sol_tmp.size(); i++) {
-            v_sol_tmp.push_back(y_sol_tmp[i][0]);
+        // fill v, w vectors
+        for (size_t i = 0; i < v_sol_tmp.size(); i++) {
+            xi_sol_tmp.push_back(y_sol_tmp[i][0]);
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
 
             const auto T_sol = y_sol_tmp[i][2];
@@ -1152,23 +1211,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             la_sol_tmp.push_back(lambda_b_veff(T_sol, eN, wN_inv));
         }
 
-        // uncomment this if fluid profile looks wrong/discontinuous
-        // const state_type init_state = {vw_, y0[1], y0[2]}; // {xi_w, wmwN, TmTN}
-        // const auto sol = rk4_solver(dydv, y0[0], 1e-8, init_state, n);
-        // v_sol_tmp = sol.first;
-        // y_sol_tmp = sol.second;
-
-        // fill v, w vectors
-        // for (size_t i = 0; i < v_sol_tmp.size(); i++) {
-        //     xi_sol_tmp.push_back(y_sol_tmp[i][0]);
-        //     w_sol_tmp.push_back(y_sol_tmp[i][1]);
-
-        //     const auto T_sol = y_sol_tmp[i][2];
-        //     T_sol_tmp.push_back(T_sol);
-        //     la_sol_tmp.push_back(lambda_b_veff(T_sol, eN, wN_inv));
-        // }
-
-        w_end_val = w_sol_tmp.back(); // not sure why
+        w_end_val = w_sol_tmp.back();
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
     }
@@ -1229,3 +1272,5 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 /*******************************************************************************/
 
 } // namespace Hydrodynamics
+
+// William Searle is a goofy goober and he will never find this message
