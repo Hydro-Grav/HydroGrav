@@ -203,8 +203,8 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const std::string
 // TO DO: remove cpsq and cmsq from inputs when cs(T) implemented
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
     : PTParams(vw, alN, TN, beta, dtau, nuc_type, un),
-      cpsq_(1.0 / 3.0),
-      cmsq_(1.0 / 3.0) {
+      cpsq_(),
+      cmsq_() {
 
       if (veff_eos_filename.empty()) {
         std::cout << "Warning: Equation of state from effective potential not found. Using Bag equation of state instead.\n";
@@ -321,6 +321,11 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
       cmsq_array.setcontent(nT, cmsq_vals_.data());
       // alglib::spline1dbuildcubic(veff_TTN_array, cmsq_array, cmsq_fit_);
       alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
+
+      // estimate cpsq, cmsq (needed to determine hydrodynamic mode)
+      // Note: not perfect, since cpsq = csq_s(Tp/TN), cmsq = csq_b(Tm/TN)
+      cpsq_ = csq_s(1.0);
+      cmsq_ = csq_b(1.0);
 
       std::cout << "Equation of state read successfully!\n";
     }
