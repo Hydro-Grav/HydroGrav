@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
     auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    if (argc == 5) {
+    if (argc == 4) {
         alN = std::stod(argv[1]);
         beta = std::stod(argv[2]);
         vw = std::stod(argv[3]);
@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
 
     const PhaseTransition::Universe un;
     const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
-    if(argc == 5) {
+    if(argc == 4) {
         params.print();
     }
     const Hydrodynamics::FluidProfile profile(params);

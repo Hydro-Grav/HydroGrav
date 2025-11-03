@@ -36,6 +36,9 @@ Universe::Universe()
 Universe::Universe(double Ts, double gs)
     : Universe(dflt_universe::T0, Ts, dflt_universe::g0, gs, dflt_universe::H0) {}
 
+Universe::Universe(double Ts, double gs, double Hs)
+    : Universe(dflt_universe::T0, Ts, dflt_universe::g0, gs, dflt_universe::H0, Hs) {}
+
 Universe::Universe(double T0, double Ts, double g0, double gs, double H0)
     : T0_(T0), 
       Ts_(Ts), 
@@ -43,6 +46,14 @@ Universe::Universe(double T0, double Ts, double g0, double gs, double H0)
       gs_(gs), 
       H0_(H0), 
       Hs_(std::pow(4.0 * std::pow(M_PI, 3) * gs * std::pow(Ts, 4) / (45.0 * mP * mP), 0.5)) {}
+
+Universe::Universe(double T0, double Ts, double g0, double gs, double H0, double Hs)
+    : T0_(T0), 
+      Ts_(Ts), 
+      g0_(g0), 
+      gs_(gs), 
+      H0_(H0), 
+      Hs_(Hs) {}
 
 std::ostream& operator<<(std::ostream& os, const Universe& un) {
     os << "************** Universe parameters **************\n"
@@ -63,7 +74,7 @@ void Universe::print() const {
 }
 
 const Universe& default_universe() {
-    static Universe u;;
+    static Universe u;
     return u;
 }
 
@@ -197,139 +208,217 @@ bool PTParams_Bag::is_valid_csq(double csq) const {
   return (csq > 0.0 && csq < 1.0);
 }
 
-/********************************** PTParams_Veff *********************************/
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename)
-    : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), veff_eos_filename) {}
+EquationOfState::EquationOfState(
+  const std::vector<double>& T,
+  const std::vector<double>& ps,
+  const std::vector<double>& pb,
+  const std::vector<double>& es,
+  const std::vector<double>& eb
+) : T_vals(T), ps_vals(ps), pb_vals(pb), es_vals(es), eb_vals(eb) 
+{
+  validate();
+}
 
-// TO DO: remove cpsq and cmsq from inputs when cs(T) implemented
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
+EquationOfState EquationOfState::from_file(const std::string& filename) 
+{
+  if (filename.empty()) 
+  {
+    throw std::invalid_argument("Equation of state filename cannot be empty");
+  }
+
+  std::cout << "Reading equation of state from file: " << filename << "\n"
+            << "Note: File must be formatted as T, pb, ps, eb, es (comma separated) with header line\n";
+  
+  std::ifstream file(filename);
+  if (!file) 
+  {
+    throw std::runtime_error("Could not open file " + filename);
+  }
+
+  std::string line;
+  std::getline(file, line); // Skip header
+
+  std::vector<double> T_vals, ps_vals, pb_vals, es_vals, eb_vals;
+
+  while (std::getline(file, line)) 
+  {
+    std::istringstream ss(line);
+    std::array<double, 5> values;
+    std::string token;
+
+    for (auto& val : values) 
+    {
+      if (!std::getline(ss, token, ',')) 
+      {
+        throw std::runtime_error("Malformed line in " + filename + ": " + line);
+      }
+      val = std::stod(token);
+    }
+
+    T_vals.push_back(values[0]);
+    pb_vals.push_back(values[1]);
+    ps_vals.push_back(values[2]);
+    eb_vals.push_back(values[3]);
+    es_vals.push_back(values[4]);
+  }
+
+  std::cout << "Equation of state read successfully! (" << T_vals.size() << " data points)\n";
+  
+  return EquationOfState(T_vals, ps_vals, pb_vals, es_vals, eb_vals);
+}
+
+void EquationOfState::validate() const 
+{
+  const auto n = T_vals.size();
+  
+  if (n < 2) 
+  {
+    throw std::invalid_argument("Equation of state data must contain at least 2 data points");
+  }
+
+  if (ps_vals.size() != n || pb_vals.size() != n || es_vals.size() != n || eb_vals.size() != n) 
+  {
+    throw std::invalid_argument("All equation of state vectors must have the same size");
+  }
+
+  // Check temperatures are monotonically increasing
+  for (size_t i = 1; i < n; ++i) 
+  {
+    if (T_vals[i] <= T_vals[i-1]) 
+    {
+      throw std::invalid_argument("Temperature values must be strictly increasing");
+    }
+  }
+}
+
+bool EquationOfState::is_valid() const 
+{
+  try {
+    validate();
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
+/********************************** PTParams_Veff *********************************/
+// New primary constructor
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data)
+    : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
+
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
     : PTParams(vw, alN, TN, beta, dtau, nuc_type, un),
       cpsq_(),
       cmsq_() {
+    
+    initialize_from_eos_data(eos_data);
+}
 
-      if (veff_eos_filename.empty()) {
-        std::cout << "Warning: Equation of state from effective potential not found. Using Bag equation of state instead.\n";
-        throw std::invalid_argument("Must provide veff eos filename to PTParams_Veff.");
-        // call bag instead here? not sure if possible with current structure
-      }
+// Backward compatibility constructors
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename)
+    : PTParams_Veff(vw, alN, TN, EquationOfState::from_file(veff_eos_filename)) {}
 
-      std::cout << "Reading in generic equation of state from file: " << veff_eos_filename << "\n"
-                << "Note: File must be formated as T, pb, ps, eb, es (comma separated) with header line\n";
-      std::ifstream file(veff_eos_filename);
-      if (!file) {
-          throw std::runtime_error("Could not open file " + veff_eos_filename);
-      }
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
+    : PTParams_Veff(vw, alN, TN, beta, dtau, nuc_type, un, EquationOfState::from_file(veff_eos_filename)) {}
 
-      std::string line;
-      std::getline(file, line); // Skip header
+// Private initialization method
+void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
+  const double TN_inv = 1.0 / TN_;
 
-      const auto TN_inv = 1.0 / TN_;
+  // Convert to T/TN and store
+  veff_TTN_vals_.reserve(eos_data.size());
+  for (const auto& T : eos_data.T_vals) {
+      veff_TTN_vals_.push_back(T * TN_inv);
+  }
 
-      // more efficient way to read in?
-      while (std::getline(file, line)) {
-        std::istringstream ss(line);
-        std::array<double,5> values;
-        std::string token;
+  veff_ps_vals_ = eos_data.ps_vals;
+  veff_pb_vals_ = eos_data.pb_vals;
+  veff_es_vals_ = eos_data.es_vals;
+  veff_eb_vals_ = eos_data.eb_vals;
 
-        for (auto& val : values) {
-            if (!std::getline(ss, token, ',')) {
-                throw std::runtime_error("Malformed line in " + veff_eos_filename + ": " + line);
-            }
-            val = std::stod(token);
-        }
+  // Calculate w = e + p
+  const auto n = eos_data.size();
+  veff_ws_vals_.reserve(n);
+  veff_wb_vals_.reserve(n);
+  for (size_t i = 0; i < n; ++i) {
+      veff_ws_vals_.push_back(veff_es_vals_[i] + veff_ps_vals_[i]);
+      veff_wb_vals_.push_back(veff_eb_vals_[i] + veff_pb_vals_[i]);
+  }
 
-        veff_TTN_vals_.push_back(values[0] * TN_inv); // T/TN
+  // Construct interpolating functions p(T/TN), e(T/TN) in s/b phases
+  alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_ws_array, veff_pb_array, veff_eb_array, veff_wb_array;
 
-        const auto pb_val = values[1];
-        const auto ps_val = values[2];
-        const auto eb_val = values[3];
-        const auto es_val = values[4];
+  veff_TTN_array.setcontent(n, veff_TTN_vals_.data());
+  
+  veff_ps_array.setcontent(n, veff_ps_vals_.data());
+  veff_es_array.setcontent(n, veff_es_vals_.data());
+  veff_ws_array.setcontent(n, veff_ws_vals_.data());
+  alglib::spline1dbuildcubic(veff_TTN_array, veff_ps_array, veff_ps_interp_);
+  alglib::spline1dbuildcubic(veff_TTN_array, veff_es_array, veff_es_interp_);
+  alglib::spline1dbuildcubic(veff_TTN_array, veff_ws_array, veff_ws_interp_);
 
-        veff_pb_vals_.push_back(pb_val);
-        veff_ps_vals_.push_back(ps_val);
-        veff_eb_vals_.push_back(eb_val);
-        veff_es_vals_.push_back(es_val);
+  veff_pb_array.setcontent(n, veff_pb_vals_.data());
+  veff_eb_array.setcontent(n, veff_eb_vals_.data());
+  veff_wb_array.setcontent(n, veff_wb_vals_.data());
+  alglib::spline1dbuildcubic(veff_TTN_array, veff_pb_array, veff_pb_interp_);
+  alglib::spline1dbuildcubic(veff_TTN_array, veff_eb_array, veff_eb_interp_);
+  alglib::spline1dbuildcubic(veff_TTN_array, veff_wb_array, veff_wb_interp_);
 
-        veff_ws_vals_.push_back(es_val + ps_val); // w=e+p
-        veff_wb_vals_.push_back(eb_val + pb_val);
-      }
+  // Calculate thermodynamic quantities at nucleation (T/TN = 1)
+  pN_ = alglib::spline1dcalc(veff_ps_interp_, 1.0);
+  if (pN_ <= 0.0) {
+    throw std::invalid_argument("Unphysical nucleation pressure. Must have pN > 0.");
+  }
 
-      // construct interpolating functions p(T/TN), e(T/TN) in s/b phases
-      alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_ws_array, veff_pb_array, veff_eb_array, veff_wb_array;
+  eN_ = alglib::spline1dcalc(veff_es_interp_, 1.0);
+  if (eN_ <= 0.0) {
+    throw std::invalid_argument("Unphysical nucleation energy density. Must have eN > 0.");
+  }
 
-      const auto nT = veff_TTN_vals_.size();
-      veff_TTN_array.setcontent(nT, veff_TTN_vals_.data());
+  wN_ = alglib::spline1dcalc(veff_ws_interp_, 1.0);
+  if (wN_ <= 0.0) {
+    throw std::invalid_argument("Unphysical nucleation enthalpy. Must have wN > 0.");
+  }
 
-      veff_ps_array.setcontent(nT, veff_ps_vals_.data()); // symmetric phase
-      veff_es_array.setcontent(nT, veff_es_vals_.data());
-      veff_ws_array.setcontent(nT, veff_ws_vals_.data());
-      alglib::spline1dbuildcubic(veff_TTN_array, veff_ps_array, veff_ps_interp_);
-      alglib::spline1dbuildcubic(veff_TTN_array, veff_es_array, veff_es_interp_);
-      alglib::spline1dbuildcubic(veff_TTN_array, veff_ws_array, veff_ws_interp_);
+  wNeN_rat_ = wN_ / eN_;
 
-      veff_pb_array.setcontent(nT, veff_pb_vals_.data()); // broken phase
-      veff_eb_array.setcontent(nT, veff_eb_vals_.data());
-      veff_wb_array.setcontent(nT, veff_wb_vals_.data());
-      alglib::spline1dbuildcubic(veff_TTN_array, veff_pb_array, veff_pb_interp_);
-      alglib::spline1dbuildcubic(veff_TTN_array, veff_eb_array, veff_eb_interp_);
-      alglib::spline1dbuildcubic(veff_TTN_array, veff_wb_array, veff_wb_interp_);
+  // Calculate sound speeds
+  // Using smooth spline here needed to remove numerical instabilities in thermo splines
+  double s_unused, dps, des, dpb, deb, dps2_unused, des2_unused, dpb2_unused, deb2_unused;
+  cpsq_vals_.reserve(n);
+  cmsq_vals_.reserve(n);
 
-      // define thermo quantities at nucleation temperature (T/TN = 1)
-      pN_ = alglib::spline1dcalc(veff_ps_interp_, 1.0); // pN = p(T/TN=1)
-      if (pN_ <= 0.0) {
-        throw std::invalid_argument("Unphysical nucleation pressure passed into PTParams. Must have eN > 0.");
-      }
+  for (size_t i = 0; i < n; ++i) {
+    const auto TTN = veff_TTN_vals_[i];
 
-      eN_ = alglib::spline1dcalc(veff_es_interp_, 1.0); // eN = e(T/TN=1)
-      if (eN_ <= 0.0) {
-        throw std::invalid_argument("Unphysical nucleation energy density passed into PTParams. Must have eN > 0.");
-      }
+    alglib::spline1ddiff(veff_ps_interp_, TTN, s_unused, dps, dps2_unused);
+    alglib::spline1ddiff(veff_es_interp_, TTN, s_unused, des, des2_unused);
+    cpsq_vals_.push_back(dps / des);
 
-      wN_ = alglib::spline1dcalc(veff_ws_interp_, 1.0); // wN = w(T/TN=1)
-      if (wN_ <= 0.0) {
-        throw std::invalid_argument("Unphysical nucleation enthalpy passed into PTParams. Must have wN > 0.");
-      }
+    alglib::spline1ddiff(veff_pb_interp_, TTN, s_unused, dpb, dpb2_unused);
+    alglib::spline1ddiff(veff_eb_interp_, TTN, s_unused, deb, deb2_unused);
+    cmsq_vals_.push_back(dpb / deb);
+  }
 
-      wNeN_rat_ = wN_ / eN_;
+  // Fit sound speed splines
+  alglib::real_1d_array cpsq_array, cmsq_array;
+  alglib::spline1dfitreport rep;
+  const double smooth_fac = 0.01;
+  const int basis_size = 100;
 
-      // sound speed in fluid
-      // using smooth spline here needed to remove numerical instabilities in thermo splines (refer to csq(T) plots)
-      double s_unused, ds2_unused;
-      double dps, des, dpb, deb;
-      double dps2, des2, dpb2, deb2;
+  cpsq_array.setcontent(n, cpsq_vals_.data());
+  alglib::spline1dfit(veff_TTN_array, cpsq_array, basis_size, smooth_fac, cpsq_fit_, rep);
 
-      for (int i = 0; i < veff_TTN_vals_.size(); i++) {
-        const auto TTN = veff_TTN_vals_[i];
+  cmsq_array.setcontent(n, cmsq_vals_.data());
+  alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
 
-        alglib::spline1ddiff(veff_ps_interp_, TTN, s_unused, dps, dps2);
-        alglib::spline1ddiff(veff_es_interp_, TTN, s_unused, des, des2);
-        cpsq_vals_.push_back(dps / des);
+  // estimate cpsq, cmsq (needed to determine hydrodynamic mode)
+  // Note: not perfect, since cpsq = csq_s(Tp/TN), cmsq = csq_b(Tm/TN) and Tp,Tm != TN in general
+  cpsq_ = csq_s(1.0);
+  cmsq_ = csq_b(1.0);
 
-        alglib::spline1ddiff(veff_pb_interp_, TTN, s_unused, dpb, dpb2);
-        alglib::spline1ddiff(veff_eb_interp_, TTN, s_unused, deb, deb2);
-        cmsq_vals_.push_back(dpb / deb);
-      }
-
-      alglib::real_1d_array cpsq_array, cmsq_array;
-      alglib::spline1dfitreport rep;
-      const double smooth_fac = 0.01; // higher means more smooth/slightly worse fit
-      const int basis_size = 100;
-
-      cpsq_array.setcontent(nT, cpsq_vals_.data());
-      // alglib::spline1dbuildcubic(veff_TTN_array, cpsq_array, cpsq_fit_);
-      alglib::spline1dfit(veff_TTN_array, cpsq_array, basis_size, smooth_fac, cpsq_fit_, rep);
-
-      cmsq_array.setcontent(nT, cmsq_vals_.data());
-      // alglib::spline1dbuildcubic(veff_TTN_array, cmsq_array, cmsq_fit_);
-      alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
-
-      // estimate cpsq, cmsq (needed to determine hydrodynamic mode)
-      // Note: not perfect, since cpsq = csq_s(Tp/TN), cmsq = csq_b(Tm/TN)
-      cpsq_ = csq_s(1.0);
-      cmsq_ = csq_b(1.0);
-
-      std::cout << "Equation of state read successfully!\n";
-    }
+  std::cout << "Equation of state read successfully!\n";
+}
 
 // Public:
 #ifdef ENABLE_MATPLOTLIB
