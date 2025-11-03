@@ -25,7 +25,7 @@ TO DO:
 - change taus to 1/Hs_conformal (currently using 1/Hs since otherwise program breaks)
 - remove alN from PTParams base class and move to PTParams_Bag (need to change how get_mode() works in FluidProfile first)
 - change all spline vectors to fixed length arrays (faster)
-- fix weird behaviour in csq(T) splines at T/TN = 1.4 (using placeholder csq=1/3 for now)
+- fix wN/eN calc for deflag/hybrids in PTParams_Bag
 */
 
 namespace PhaseTransition {
@@ -180,6 +180,7 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
         throw std::invalid_argument("Unphysical speed of sound in broken phase passed into PTParams_Bag. Must have 0 < cmsq < 1.");
       }
 
+      // not quite right for deflag/hybrids since wN/eN=w2/e2 not wp/ep
       wNeN_rat_ = 1.0 + cpsq_; // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
     }
 
