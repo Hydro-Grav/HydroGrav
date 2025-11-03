@@ -708,14 +708,14 @@ void FluidProfile::get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_
         res_vals.push_back(resi);
     }
 
-    plt::figure_size(800, 800);
-    plt::plot(xi_sh_vals, res_vals);
-    plt::xlabel("xi_sh");
-    plt::ylabel("residual");
+    // plt::figure_size(800, 800);
+    // plt::plot(xi_sh_vals, res_vals);
+    // plt::xlabel("xi_sh");
+    // plt::ylabel("residual");
     // plt::xlim(xi_sh_min, 0.6);
     // plt::ylim(0.0, 0.2);
-    plt::grid(true);
-    plt::save("shock_residual.png");
+    // plt::grid(true);
+    // plt::save("shock_residual.png");
 
     std::cout << "testing complete. Residual plot saved.\n";
 
