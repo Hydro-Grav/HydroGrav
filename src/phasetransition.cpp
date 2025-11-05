@@ -25,7 +25,6 @@ TO DO:
 - change taus to 1/Hs_conformal (currently using 1/Hs since otherwise program breaks)
 - remove alN from PTParams base class and move to PTParams_Bag (need to change how get_mode() works in FluidProfile first)
 - change all spline vectors to fixed length arrays (faster)
-- fix wN/eN calc for deflag/hybrids in PTParams_Bag
 */
 
 namespace PhaseTransition {
@@ -178,7 +177,7 @@ PTParams_Bag::PTParams_Bag(double vw, double alN) // Bag model
 PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double cpsq, double cmsq) // mu nu model
     : PTParams_Bag(vw, alN, dflt_PTParams::TN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), cpsq, cmsq) {}
 
-PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq)
+PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq) // full ctor
     : PTParams(vw, alN, TN, beta, dtau, nuc_type, un),
       cpsq_(cpsq),
       cmsq_(cmsq) {
@@ -191,7 +190,7 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
         throw std::invalid_argument("Unphysical speed of sound in broken phase passed into PTParams_Bag. Must have 0 < cmsq < 1.");
       }
 
-      // not quite right for deflag/hybrids since wN/eN=w2/e2 not wp/ep
+      // this is fine for mu nu since csq assumed to be constant everywhere in symmetric phase (csq=cpsq in front of shock too)
       wNeN_rat_ = 1.0 + cpsq_; // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
     }
 
