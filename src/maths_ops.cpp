@@ -720,3 +720,64 @@ alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec) {
     result = oss.str().c_str();  // real_1d_array supports string assignment
     return result;
 }
+
+std::array<double, 2> find_bracket(const std::function<double(double)>& residual_func, double a, double b) {
+    constexpr int NSAMPLES = 200;      // coarse scan resolution
+    constexpr double PENALTY = 1e+5;      // anything larger than realistic residuals
+    constexpr double PAD_MULT = 2.0;      // how many sample spacings to pad the bracket
+
+    // --- 1. Sample the interval ------------------------------------------
+    std::vector<double> xs(NSAMPLES + 1), ys(NSAMPLES + 1);
+    for (int i = 0; i <= NSAMPLES; ++i) {
+        double x = a + (b - a) * (double(i) / NSAMPLES);
+        xs[i] = x;
+        double y = residual_func(x);
+        ys[i] = (std::isfinite(y) ? y : PENALTY * 10.0); // ensure numeric
+    }
+
+    // --- 2. Identify contiguous finite segments --------------------------
+    struct Segment { int i0, i1; };
+    std::vector<Segment> segs;
+    int i = 0;
+    while (i <= NSAMPLES) {
+        while (i <= NSAMPLES && ys[i] >= PENALTY) ++i;
+        if (i > NSAMPLES) break;
+        int start = i;
+        while (i <= NSAMPLES && ys[i] < PENALTY) ++i;
+        int end = i - 1;
+        segs.push_back({start, end});
+    }
+
+    if (segs.empty()) {
+        return {std::numeric_limits<double>::quiet_NaN(),
+                std::numeric_limits<double>::quiet_NaN()};
+    }
+
+    // --- 3. Find the segment with the lowest sampled residual ------------
+    int idx_min = std::min_element(ys.begin(), ys.end()) - ys.begin();
+    int chosen_seg = -1;
+    for (int k = 0; k < (int)segs.size(); ++k) {
+        if (idx_min >= segs[k].i0 && idx_min <= segs[k].i1) {
+            chosen_seg = k;
+            break;
+        }
+    }
+    if (chosen_seg == -1) {
+        // fallback: pick segment containing smallest finite residual
+        double best_val = std::numeric_limits<double>::infinity();
+        for (int k = 0; k < (int)segs.size(); ++k) {
+            for (int j = segs[k].i0; j <= segs[k].i1; ++j) {
+                if (ys[j] < best_val) { best_val = ys[j]; chosen_seg = k; }
+            }
+        }
+    }
+
+    const auto& S = segs[chosen_seg];
+
+    // --- 4. Construct bracket from that segment --------------------------
+    double dx  = (b - a) / NSAMPLES;
+    double left  = std::max(a, xs[S.i0] - PAD_MULT * dx);
+    double right = std::min(b, xs[S.i1] + PAD_MULT * dx);
+
+    return {left, right};
+}
