@@ -32,37 +32,88 @@ namespace plt = matplotlibcpp;
 
 // Fluid profile
 void example_FluidProfile(const std::string& filename) {
-    const auto vw = 0.9; // detonation
+    // BP0 (Xiao's benchmark point):
+    // const auto vw = 0.9; // detonation
     // const auto vw = 0.4; // deflagration
     // const auto vw = 0.6; // hybrid
-    // const auto vw = 0.0378243;
-    // const auto alN = 0.183018;
+
+    // const auto Ts = 53.370765185008004; // GeV
+    // const auto alN = 0.11384915003991744;
+    // const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
+    // const auto cpsq = 1.0 / 3.0;
+    // const auto cmsq = cpsq;
+    // std::string veff_file = "thermo.csv";
     
-    // Will's benchmark point:
-    // std::string veff_file = "flynn_eos.csv";
-    // const auto Ts = 46.0096;
-    // const auto gs = 106.75;
-    // const auto alN = 0.120242;
-    // const auto Hs = 3.2193e-15; // GeV
-    // const auto betaHs = 588.135; // beta/Hs
-    // const auto beta = betaHs * Hs;
-    // const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
-    // const auto dtau = 10.0 * Rs;
-    // const auto TN = Ts;
-    // const auto nuc_type = "exp";
+    // BP1
+    // const auto vw = 0.588525; // hybrid
+    // const auto vw = 0.729893; // detonation
     
-    // Xiao's benchmark point:
-    const auto Ts = 53.370765185008004; // GeV
+    // const auto Ts = 98.1547; // GeV
+    // const auto alN = 0.00821205;
+    // const auto betaHs = 1106.16; // beta/Hs
+    // const auto Hs = 1.3763e-14;
+    // const auto cp = 0.574624;
+    // const auto cm = 0.569767;
+    // const auto cpsq = cp * cp;
+    // const auto cmsq = cm * cm;
+    // std::string veff_file = "benchmark_pts/BP1/data/3deft_eos.csv";
+
+    // BP2
+    // const auto vw = 0.594842; // hybrid
+    // const auto vw = 0.754187; // detonation
+    
+    // const auto Ts = 114.579; // GeV
+    // const auto alN = 0.00386107;
+    // const auto betaHs = 1445.85; // beta/Hs
+    // const auto Hs = 1.86566e-14;
+    // const auto cp = 0.575068;
+    // const auto cm = 0.570803;
+    // const auto cpsq = cp * cp;
+    // const auto cmsq = cm * cm;
+    // std::string veff_file = "benchmark_pts/BP2/data/3deft_eos.csv";
+
+    // BP3
+    // const auto vw = 0.605811; // hybrid
+    // const auto Ts = 90.7257; // GeV
+    // const auto alN = 0.0130246;
+    // const auto betaHs = 1389.28; // beta/Hs
+    // const auto Hs = 1.18307e-14;
+    // const auto cpsq = 0.331032;
+    // const auto cmsq = 0.324375;
+    // std::string veff_file = "benchmark_pts/BP3/3deft_eos_bp2.csv";
+
+    // BP4
+    // NOTE: TmTN < 1 for veff
+    // const auto vw = 0.675122; // hybrid
+    // const auto Ts = 52.9772; // GeV
+    // const auto alN = 0.0972391;
+    // const auto betaHs = 1231.05; // beta/Hs
+    // const auto Hs = 4.34679e-15;
+    // const auto cp = 0.56705;
+    // const auto cpsq = cp * cp;
+    // const auto cm = 0.539046;
+    // const auto cmsq = cm * cm;
+    // std::string veff_file = "benchmark_pts/BP4/bp4.csv";
+
+    // BP5
+    // NOTE: TmTN < 1 for veff
+    const auto vw = 0.626002; // hybrid
+    const auto Ts = 76.2128; // GeV
+    const auto alN = 0.0283037;
+    const auto betaHs = 941.912; // beta/Hs
+    const auto Hs = 8.49472e-15;
+    const auto cp = 0.572982;
+    const auto cpsq = cp * cp;
+    const auto cm = 0.55958;
+    const auto cmsq = cm * cm;
+    std::string veff_file = "benchmark_pts/BP5/bp5.csv";
+
     const auto gs = 106.75;
-    const auto alN = 0.11384915003991744;
-    const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
+    const auto beta = betaHs * Hs;
     const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
     const auto dtau = 10.0 * Rs;
     const auto TN = Ts; // GeV
-    const auto cpsq = 1.0 / 3.0;
-    const auto cmsq = cpsq;
     const auto nuc_type = "exp";
-    std::string veff_file = "thermo.csv";
 
     const PhaseTransition::Universe un(Ts, gs);
     const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
@@ -71,8 +122,11 @@ void example_FluidProfile(const std::string& filename) {
     un.print();
     params.print();
 
-    params_veff.plot_thermo();
-    params_veff.plot_csq();
+    std::cout << "Bag: cpsq=" << params.cpsq() << ", cmsq=" << params.cmsq() << "\n"
+              << "Veff: cpsq=" << params_veff.csq_s(1.0) << ", cmsq=" << params_veff.csq_b(1.0) << "\n";
+
+    // params_veff.plot_thermo();
+    // params_veff.plot_csq();
 
     const Hydrodynamics::FluidProfile profile_bag(params); // bag model
     // profile_bag.plot("profile_bag.png");
@@ -94,19 +148,31 @@ void example_FluidProfile(const std::string& filename) {
 
     plt::figure_size(2400, 800);
 
+    std::map<std::string, std::string> opts_bag;
+    opts_bag["label"] = "Bag";
+    opts_bag["color"] = "red";
+    opts_bag["linestyle"] = "-";
+
+    std::map<std::string, std::string> opts_veff;
+    opts_veff["label"] = "Veff";
+    opts_veff["color"] = "blue";
+    opts_veff["linestyle"] = "-";
+
     // v(xi)
     plt::subplot2grid(2, 2, 0, 0);
-    plt::plot(xi_bag, v_bag, "r-");
-    plt::plot(xi_veff, v_veff, "b-");
+    plt::plot(xi_bag, v_bag, opts_bag);
+    plt::plot(xi_veff, v_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("v(xi)");
     plt::xlim(0.0, 1.0);
+    // plt::xlim(0.56, 0.61);
     plt::grid(true);
+    plt::legend();
 
     // w(xi)
     plt::subplot2grid(2, 2, 0, 1);
-    plt::plot(xi_bag, w_bag, "r-");
-    plt::plot(xi_veff, w_veff, "b-");
+    plt::plot(xi_bag, w_bag, opts_bag);
+    plt::plot(xi_veff, w_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("w(xi)");
     plt::xlim(0.0, 1.0);
@@ -114,17 +180,18 @@ void example_FluidProfile(const std::string& filename) {
 
     // T(xi)
     plt::subplot2grid(2, 2, 1, 0);
-    plt::plot(xi_bag, T_bag, "r-");
-    plt::plot(xi_veff, T_veff, "b-");
+    plt::plot(xi_bag, T_bag, opts_bag);
+    plt::plot(xi_veff, T_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("T(xi)");
     plt::xlim(0.0, 1.0);
+    // plt::xlim(0.5, 0.7);
     plt::grid(true);
 
     // la(xi)
     plt::subplot2grid(2, 2, 1, 1);
-    plt::plot(xi_bag, la_bag, "r-");
-    plt::plot(xi_veff, la_veff, "b-");
+    plt::plot(xi_bag, la_bag, opts_bag);
+    plt::plot(xi_veff, la_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("la(xi)");
     plt::xlim(0.0, 1.0);

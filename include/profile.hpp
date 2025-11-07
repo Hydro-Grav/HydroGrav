@@ -119,17 +119,16 @@ class FluidProfile {
     std::pair<double, state_type> get_IC_deflagration(const deriv_func& dydxi) const;
     std::pair<double, state_type> get_IC_detonation() const;
 
-    state_type test_shock_matching(const deriv_func& dydxi, double xi_sh) const;
-    std::pair<state_type, state_type> test_wall_matching(const deriv_func& dydxi, double xi_sh, state_type& y0, const int n=1000) const;
-
-    double find_shock_veff(const deriv_func& dydxi, double TmTN, const int n) const;
-
     std::array<double, 2> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
     std::array<double, 2> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
     std::array<double, 2> matching_eqs_shock2(double v1, double T1TN, double v2, double T2TN) const;
 
-    void get_IC_deflagration_veff(const deriv_func& dydxi, double& xi_sh, state_type& y1, state_type& yp, state_type& ym) const;
     std::pair<double, state_type> get_IC_detonation_veff() const;
+
+    double find_TmTN_veff(const deriv_func& dydv) const;
+    double T2TN_residual(const deriv_func& dydv, double TmTN, const size_t n=1000) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vm, double wmwN, double TmTN, const size_t n=1000) const;
+    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
 
     // put number of integration points in input file? seems bad to hardcode
     std::vector<prof_type> solve_profile(int n=5000);
