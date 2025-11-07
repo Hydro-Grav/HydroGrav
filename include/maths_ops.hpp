@@ -139,6 +139,8 @@ double brent_minimize(std::function<double(double)> f, double a, double b, doubl
 
 alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec);
 
+std::array<double, 2> find_bracket(const std::function<double(double)>& residual_func, double a, double b);
+
 // solvers
 template <typename T, typename State, typename Func>
 std::pair<std::vector<T>, std::vector<State>> rk4_solver(const Func& dydx, T x0, T xf, const State& y0, size_t n=1000);
