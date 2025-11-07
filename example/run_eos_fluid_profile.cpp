@@ -16,17 +16,32 @@ int main() {
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
     const PhaseTransition::Universe un;
-    const std::string eos_path = "thermo.csv";
+
+    /*
+        Mock equation of state data based on Bag model 
+        fit to above thermal params. In practice, this data
+        would come from a dedicated calculation of the
+        finite temperature effective potential.
+    */
+    std::vector<double> T, ps, pb, es, eb;
+    const double Tmin = 20;
+    const double Tmax = 100;
+    const int n_points = 300;
+    const double a_s = M_PI*M_PI/30.0 * un.gs();
+    const double a_b = 0.9 * a_s;
+    const double epsilon = alN/(1-alN) * a_s * std::pow(TN,4.);
+    for (double tt = Tmin; tt <= Tmax; tt += (Tmax - Tmin)/(n_points-1)) {
+        double tt4 = tt*tt*tt*tt;
+        T.push_back(tt);
+        ps.push_back(a_s/3.0 * tt4 - epsilon);
+        pb.push_back(a_b/3.0 * tt4);
+        es.push_back(a_s * tt4 + epsilon);
+        eb.push_back(a_b * tt4);
+    }
 
     /*
         Firstly, we create the EquationOfState object from the eos data
     */
-    std::vector<double> T  = {10.0, 20.0, 30.0, 40.0, 50.0, 60.0};
-    std::vector<double> ps = {1.0,  4.0,  9.0,  16.0, 25.0, 36.0};
-    std::vector<double> pb = {0.8,  3.2,  7.2,  12.8, 20.0, 28.8};
-    std::vector<double> es = {3.0,  12.0, 27.0, 48.0, 75.0, 108.0};
-    std::vector<double> eb = {2.4,  9.6,  21.6, 38.4, 60.0, 86.4};
-
     PhaseTransition::EquationOfState eos_data(T, ps, pb, es, eb);
 
     /* 
@@ -38,12 +53,14 @@ int main() {
         Lastly, we use this to compute the fluid profile
         Note as we use mock data above, this results in an error.
     */
-    try 
-    { 
-        const Hydrodynamics::FluidProfile profile(params);
-    } catch (...) {
-        std::cout << "!!! Expected error caught and handled. Carry on !!!\n";
-    }
+    const Hydrodynamics::FluidProfile profile_from_eos(params);
+
+    profile_from_eos.write("fluid_profile_eos_from_vectors.csv");
+
+    #ifdef ENABLE_MATPLOTLIB
+    profile_from_eos.plot("fluid_profile_eos_from_vectors.png");
+    #endif
+
 
     /*
         Alternatively, the EoS can be loaded from a precomputed file. The format should be:
@@ -55,6 +72,8 @@ int main() {
         We do this using the from_file function in EquationOfState.
     */
 
+    const std::string eos_path = "thermo.csv";
+
     PhaseTransition::EquationOfState eos_data_from_path = PhaseTransition::EquationOfState::from_file(eos_path);
 
     /*
@@ -65,10 +84,10 @@ int main() {
 
     const Hydrodynamics::FluidProfile profile_from_path(params_from_path);
 
-    profile_from_path.write("fluid_profile_eos.csv");
+    profile_from_path.write("fluid_profile_eos_from_file.csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    profile_from_path.plot("fluid_profile_eos.png");
+    profile_from_path.plot("fluid_profile_eos_from_file.png");
     #endif
 
     return 0;

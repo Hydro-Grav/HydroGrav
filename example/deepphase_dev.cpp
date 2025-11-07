@@ -71,8 +71,8 @@ void example_FluidProfile(const std::string& filename) {
     un.print();
     params.print();
 
-    params_veff.plot_thermo();
-    params_veff.plot_csq();
+    // params_veff.plot_thermo();
+    // params_veff.plot_csq();
 
     const Hydrodynamics::FluidProfile profile_bag(params); // bag model
     // profile_bag.plot("profile_bag.png");
@@ -92,46 +92,46 @@ void example_FluidProfile(const std::string& filename) {
     const auto T_veff = profile_veff.T_vals();
     const auto la_veff = profile_veff.la_vals();
 
-    plt::figure_size(2400, 800);
+    // plt::figure_size(2400, 800);
 
-    // v(xi)
-    plt::subplot2grid(2, 2, 0, 0);
-    plt::plot(xi_bag, v_bag, "r-");
-    plt::plot(xi_veff, v_veff, "b-");
-    plt::xlabel("xi");
-    plt::ylabel("v(xi)");
-    plt::xlim(0.0, 1.0);
-    plt::grid(true);
+    // // v(xi)
+    // plt::subplot2grid(2, 2, 0, 0);
+    // plt::plot(xi_bag, v_bag, "r-");
+    // plt::plot(xi_veff, v_veff, "b-");
+    // plt::xlabel("xi");
+    // plt::ylabel("v(xi)");
+    // plt::xlim(0.0, 1.0);
+    // plt::grid(true);
 
-    // w(xi)
-    plt::subplot2grid(2, 2, 0, 1);
-    plt::plot(xi_bag, w_bag, "r-");
-    plt::plot(xi_veff, w_veff, "b-");
-    plt::xlabel("xi");
-    plt::ylabel("w(xi)");
-    plt::xlim(0.0, 1.0);
-    plt::grid(true);
+    // // w(xi)
+    // plt::subplot2grid(2, 2, 0, 1);
+    // plt::plot(xi_bag, w_bag, "r-");
+    // plt::plot(xi_veff, w_veff, "b-");
+    // plt::xlabel("xi");
+    // plt::ylabel("w(xi)");
+    // plt::xlim(0.0, 1.0);
+    // plt::grid(true);
 
-    // T(xi)
-    plt::subplot2grid(2, 2, 1, 0);
-    plt::plot(xi_bag, T_bag, "r-");
-    plt::plot(xi_veff, T_veff, "b-");
-    plt::xlabel("xi");
-    plt::ylabel("T(xi)");
-    plt::xlim(0.0, 1.0);
-    plt::grid(true);
+    // // T(xi)
+    // plt::subplot2grid(2, 2, 1, 0);
+    // plt::plot(xi_bag, T_bag, "r-");
+    // plt::plot(xi_veff, T_veff, "b-");
+    // plt::xlabel("xi");
+    // plt::ylabel("T(xi)");
+    // plt::xlim(0.0, 1.0);
+    // plt::grid(true);
 
-    // la(xi)
-    plt::subplot2grid(2, 2, 1, 1);
-    plt::plot(xi_bag, la_bag, "r-");
-    plt::plot(xi_veff, la_veff, "b-");
-    plt::xlabel("xi");
-    plt::ylabel("la(xi)");
-    plt::xlim(0.0, 1.0);
-    plt::grid(true);
+    // // la(xi)
+    // plt::subplot2grid(2, 2, 1, 1);
+    // plt::plot(xi_bag, la_bag, "r-");
+    // plt::plot(xi_veff, la_veff, "b-");
+    // plt::xlabel("xi");
+    // plt::ylabel("la(xi)");
+    // plt::xlim(0.0, 1.0);
+    // plt::grid(true);
 
-    plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
-    plt::save(filename);
+    // plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
+    // plt::save(filename);
 
     std::cout << "Fluid profile saved to " << filename << "\n";
 }
