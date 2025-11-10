@@ -29,6 +29,7 @@ struct dflt_universe { // in units hbar = c = kB = 1
   // values at start of PT
   static constexpr double Ts = 50.0; // GeV
   static constexpr double gs = 106.75;
+  static constexpr double Hs = std::pow(4.0 * std::pow(M_PI, 3) * gs * std::pow(Ts, 4) / (45.0 * mP * mP), 0.5);
 };
 
 /**

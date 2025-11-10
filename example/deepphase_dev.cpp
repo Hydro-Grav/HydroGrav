@@ -78,13 +78,14 @@ void example_FluidProfile(const benchmark_point& bp) {
     const auto TN = Ts;
     const auto alN = bp.alN();
     const auto beta = bp.beta();
+    const auto Hs = bp.Hs();
     const auto cpsq = bp.cpsq();
     const auto cmsq = bp.cmsq();
     const auto gs = bp.gs();
     const auto dtau = bp.dtau();
     const auto nuc_type = bp.nuc_type();
 
-    const PhaseTransition::Universe un(Ts, gs);
+    const PhaseTransition::Universe un(Ts, gs, Hs);
 
     const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
     const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
@@ -205,13 +206,14 @@ void example_GW_Spec(const benchmark_point& bp) {
     const auto TN = Ts;
     const auto alN = bp.alN();
     const auto beta = bp.beta();
+    const auto Hs = bp.Hs();
     const auto cpsq = bp.cpsq();
     const auto cmsq = bp.cmsq();
     const auto gs = bp.gs();
     const auto dtau = bp.dtau();
     const auto nuc_type = bp.nuc_type();
 
-    const PhaseTransition::Universe un(Ts, gs);
+    const PhaseTransition::Universe un(Ts, gs, Hs);
 
     const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
     const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
@@ -321,8 +323,8 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
     // fixed params
     const auto gs = PhaseTransition::dflt_universe::gs;
     const auto Ts = PhaseTransition::dflt_universe::Ts; // vary this param too?
-    const PhaseTransition::Universe un(Ts, gs);
-    const auto Hs = un.Hs();
+    const auto Hs = PhaseTransition::dflt_universe::Hs;
+    const PhaseTransition::Universe un(Ts, gs, Hs);
 
     const auto cpsq = 1.0 / 3.0;
     const auto cmsq = cpsq;
