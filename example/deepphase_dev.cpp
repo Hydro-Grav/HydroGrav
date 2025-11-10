@@ -30,105 +30,71 @@
 namespace plt = matplotlibcpp;
 #endif
 
+class benchmark_point {
+    public:
+        benchmark_point(double vw, double Ts, double alN, double betaHs, double Hs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& dir)
+        : vw_(vw), Ts_(Ts), alN_(alN), betaHs_(betaHs), Hs_(Hs), cpsq_(cpsq), cmsq_(cmsq), gs_(gs), nuc_type_(nuc_type), dir_(dir) {
+            beta_ = betaHs_ * Hs_;
+            Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
+            dtau_ = 10.0 * Rs_;
+        }
+        
+        double vw() const { return vw_; }
+        double Ts() const { return Ts_; }
+        double alN() const { return alN_; }
+        double betaHs() const { return betaHs_; }
+        double Hs() const { return Hs_; }
+        double beta() const { return beta_; }
+        double cpsq() const { return cpsq_; }
+        double cmsq() const { return cmsq_; }
+        double gs() const { return gs_; }
+        double dtau() const { return dtau_; }
+        double Rs() const { return Rs_;}
+        const char* nuc_type() const { return nuc_type_; }
+        std::string dir() const { return dir_; }
+
+    private:
+        const double vw_;
+        const double Ts_;
+        const double alN_;
+        const double betaHs_;
+        const double Hs_;
+        const double cpsq_;
+        const double cmsq_;
+        const double gs_;
+        const char* nuc_type_;
+        const std::string dir_;
+
+        double beta_, Rs_, dtau_;
+};
+
 // Fluid profile
-void example_FluidProfile(const std::string& filename) {
-    // BP0 (Xiao's benchmark point):
-    // const auto vw = 0.9; // detonation
-    // const auto vw = 0.4; // deflagration
-    // const auto vw = 0.6; // hybrid
+void example_FluidProfile(const benchmark_point& bp) {
+    const auto dir = bp.dir();
+    const auto veff_file = dir + "eos.csv";
 
-    // const auto Ts = 53.370765185008004; // GeV
-    // const auto alN = 0.11384915003991744;
-    // const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
-    // const auto cpsq = 1.0 / 3.0;
-    // const auto cmsq = cpsq;
-    // std::string veff_file = "thermo.csv";
-    
-    // BP1
-    const auto vw = 0.588525; // hybrid
-    // const auto vw = 0.729893; // detonation
-    
-    const auto Ts = 98.1547; // GeV
-    const auto alN = 0.00821205;
-    const auto betaHs = 1106.16; // beta/Hs
-    const auto Hs = 1.3763e-14;
-    const auto cp = 0.574624;
-    const auto cm = 0.569767;
-    const auto cpsq = cp * cp;
-    const auto cmsq = cm * cm;
-    std::string veff_file = "benchmark_pts/BP1/data/3deft_eos.csv";
-
-    // BP2
-    // const auto vw = 0.594842; // hybrid
-    // const auto vw = 0.754187; // detonation
-    
-    // const auto Ts = 114.579; // GeV
-    // const auto alN = 0.00386107;
-    // const auto betaHs = 1445.85; // beta/Hs
-    // const auto Hs = 1.86566e-14;
-    // const auto cp = 0.575068;
-    // const auto cm = 0.570803;
-    // const auto cpsq = cp * cp;
-    // const auto cmsq = cm * cm;
-    // std::string veff_file = "benchmark_pts/BP2/data/3deft_eos.csv";
-
-    // BP3
-    // const auto vw = 0.605811; // hybrid
-    // const auto Ts = 90.7257; // GeV
-    // const auto alN = 0.0130246;
-    // const auto betaHs = 1389.28; // beta/Hs
-    // const auto Hs = 1.18307e-14;
-    // const auto cpsq = 0.331032;
-    // const auto cmsq = 0.324375;
-    // std::string veff_file = "benchmark_pts/BP3/3deft_eos_bp2.csv";
-
-    // BP4
-    // NOTE: TmTN < 1 for veff
-    // const auto vw = 0.675122; // hybrid
-    // const auto Ts = 52.9772; // GeV
-    // const auto alN = 0.0972391;
-    // const auto betaHs = 1231.05; // beta/Hs
-    // const auto Hs = 4.34679e-15;
-    // const auto cp = 0.56705;
-    // const auto cpsq = cp * cp;
-    // const auto cm = 0.539046;
-    // const auto cmsq = cm * cm;
-    // std::string veff_file = "benchmark_pts/BP4/bp4.csv";
-
-    // BP5
-    // NOTE: TmTN < 1 for veff
-    // const auto vw = 0.626002; // hybrid
-    // const auto Ts = 76.2128; // GeV
-    // const auto alN = 0.0283037;
-    // const auto betaHs = 941.912; // beta/Hs
-    // const auto Hs = 8.49472e-15;
-    // const auto cp = 0.572982;
-    // const auto cpsq = cp * cp;
-    // const auto cm = 0.55958;
-    // const auto cmsq = cm * cm;
-    // std::string veff_file = "benchmark_pts/BP5/bp5.csv";
-
-    const auto gs = 106.75;
-    const auto beta = betaHs * Hs;
-    const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
-    const auto dtau = 10.0 * Rs;
-    const auto TN = Ts; // GeV
-    const auto nuc_type = "exp";
+    const auto vw = bp.vw();
+    const auto Ts = bp.Ts();
+    const auto TN = Ts;
+    const auto alN = bp.alN();
+    const auto beta = bp.beta();
+    const auto cpsq = bp.cpsq();
+    const auto cmsq = bp.cmsq();
+    const auto gs = bp.gs();
+    const auto dtau = bp.dtau();
+    const auto nuc_type = bp.nuc_type();
 
     const PhaseTransition::Universe un(Ts, gs);
-    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
+
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
     const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, dtau, nuc_type, un, veff_file);
 
     un.print();
-    params.print();
+    params_munu.print();
 
-    std::cout << "Bag: cpsq=" << params.cpsq() << ", cmsq=" << params.cmsq() << "\n"
-              << "Veff: cpsq=" << params_veff.csq_s(1.0) << ", cmsq=" << params_veff.csq_b(1.0) << "\n";
-
-    // params_veff.plot_thermo();
-    // params_veff.plot_csq();
-
-    const Hydrodynamics::FluidProfile profile_bag(params); // bag model
+    // Write fluid profiles to disk
+    const Hydrodynamics::FluidProfile profile_bag(params_bag);
     // profile_bag.plot("profile_bag.png");
     // profile_bag.write("prof_bag.csv");
     const auto xi_bag = profile_bag.xi_vals();
@@ -136,6 +102,15 @@ void example_FluidProfile(const std::string& filename) {
     const auto w_bag = profile_bag.w_vals();
     const auto T_bag = profile_bag.T_vals();
     const auto la_bag = profile_bag.la_vals();
+
+    const Hydrodynamics::FluidProfile profile_munu(params_munu);
+    // profile_munu.plot("profile_munu.png");
+    // profile_munu.write("prof_munu.csv");
+    const auto xi_munu = profile_munu.xi_vals();
+    const auto v_munu = profile_munu.v_vals();
+    const auto w_munu = profile_munu.w_vals();
+    const auto T_munu = profile_munu.T_vals();
+    const auto la_munu = profile_munu.la_vals();
 
     const Hydrodynamics::FluidProfile profile_veff(params_veff); // veff
     // profile_veff.plot("profile_veff.png");
@@ -146,15 +121,25 @@ void example_FluidProfile(const std::string& filename) {
     const auto T_veff = profile_veff.T_vals();
     const auto la_veff = profile_veff.la_vals();
 
+    std::cout << "Bag: cpsq=" << params_bag.cpsq() << ", cmsq=" << params_bag.cmsq() << "\n"
+              << "mu nu: cpsq=" << params_munu.cpsq() << ", cmsq=" << params_munu.cmsq() << "\n"
+              << "Veff: cpsq=" << params_veff.csq_s(1.0) << ", cmsq=" << params_veff.csq_b(1.0) << "\n";
+
+    // params_veff.plot_thermo();
+    // params_veff.plot_csq();
+
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(2400, 800);
 
-    std::map<std::string, std::string> opts_bag;
+    std::map<std::string, std::string> opts_bag, opts_munu, opts_veff;
     opts_bag["label"] = "Bag";
     opts_bag["color"] = "red";
-    opts_bag["linestyle"] = "-";
+    opts_bag["linestyle"] = "--";
 
-    std::map<std::string, std::string> opts_veff;
+    opts_munu["label"] = "mu nu";
+    opts_munu["color"] = "black";
+    opts_munu["linestyle"] = "-.";
+
     opts_veff["label"] = "Veff";
     opts_veff["color"] = "blue";
     opts_veff["linestyle"] = "-";
@@ -162,6 +147,7 @@ void example_FluidProfile(const std::string& filename) {
     // v(xi)
     plt::subplot2grid(2, 2, 0, 0);
     plt::plot(xi_bag, v_bag, opts_bag);
+    plt::plot(xi_munu, v_munu, opts_munu);
     plt::plot(xi_veff, v_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("v(xi)");
@@ -173,6 +159,7 @@ void example_FluidProfile(const std::string& filename) {
     // w(xi)
     plt::subplot2grid(2, 2, 0, 1);
     plt::plot(xi_bag, w_bag, opts_bag);
+    plt::plot(xi_munu, w_munu, opts_munu);
     plt::plot(xi_veff, w_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("w(xi)");
@@ -182,16 +169,18 @@ void example_FluidProfile(const std::string& filename) {
     // T(xi)
     plt::subplot2grid(2, 2, 1, 0);
     plt::plot(xi_bag, T_bag, opts_bag);
+    plt::plot(xi_munu, T_munu, opts_munu);
     plt::plot(xi_veff, T_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("T(xi)");
     plt::xlim(0.0, 1.0);
-    // plt::xlim(0.5, 0.7);
+    // plt::xlim(0.56, 0.61);
     plt::grid(true);
 
     // la(xi)
     plt::subplot2grid(2, 2, 1, 1);
     plt::plot(xi_bag, la_bag, opts_bag);
+    plt::plot(xi_munu, la_munu, opts_munu);
     plt::plot(xi_veff, la_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("la(xi)");
@@ -199,83 +188,72 @@ void example_FluidProfile(const std::string& filename) {
     plt::grid(true);
 
     plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
-    plt::save(filename);
-    #endif
 
+    const auto filename = bp.dir() + "profile_" + profile_bag.mode_str() + ".png";
+    plt::save(filename);
     std::cout << "Fluid profile saved to " << filename << "\n";
+    #endif
 }
 
-// // Gravitational wave power spectrum
-void example_GW_Spec(const std::string& filename) {
-    const auto vw = 0.9; // detonation
-    // const auto vw = 0.4; // deflagration
-    // const auto vw = 0.6; // hybrid
+// Gravitational wave power spectrum
+void example_GW_Spec(const benchmark_point& bp) {
+    const auto dir = bp.dir();
+    const auto veff_file = dir + "eos.csv";
 
-    
-    // Will's benchmark point:
-    // const auto Ts = 46.0096;
-    // const auto gs = 106.75;
-
-    // const auto alN = 0.120242;
-    // const auto Hs = 3.2193e-15; // GeV
-    // const auto betaHs = 588.135; // beta/Hs
-    // const auto beta = betaHs * Hs;
-    // const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
-    // const auto dtau = 10.0 * Rs;
-    // const auto TN = Ts;
-    // const auto nuc_type = "exp";
-    
-    // Xiao's benchmark point:
-    const auto Ts = 53.370765185008004; // GeV
-    const auto gs = 106.75;
-
-    const auto alN = 0.11384915003991744;
-    const auto beta = 5.794e+12 * (1.0 / 1.52e+24); // s^-1 * Gev/s^-1 = GeV;
-    const auto Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;
-    const auto dtau = 10.0 * Rs;
-    const auto TN = Ts; // GeV
-    const auto cpsq = 1.0 / 3.0;
-    const auto cmsq = cpsq;
-    const auto nuc_type = "exp";
-    std::string veff_file = "thermo.csv";
+    const auto vw = bp.vw();
+    const auto Ts = bp.Ts();
+    const auto TN = Ts;
+    const auto alN = bp.alN();
+    const auto beta = bp.beta();
+    const auto cpsq = bp.cpsq();
+    const auto cmsq = bp.cmsq();
+    const auto gs = bp.gs();
+    const auto dtau = bp.dtau();
+    const auto nuc_type = bp.nuc_type();
 
     const PhaseTransition::Universe un(Ts, gs);
-    // const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
-    const PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, dtau, nuc_type, un, veff_file);
+
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, dtau, nuc_type, un, veff_file);
 
     un.print();
-    params.print();
+    params_munu.print();
+
+    // Write fluid profiles to disk
+    const Hydrodynamics::FluidProfile profile_bag(params_bag);
+    profile_bag.write(dir + "profile_bag_" + profile_bag.mode_str() + ".csv");
+
+    const Hydrodynamics::FluidProfile profile_munu(params_munu);
+    profile_munu.write(dir + "profile_munu_" + profile_munu.mode_str() + ".csv");
+
+    const Hydrodynamics::FluidProfile profile_veff(params_veff);
+    profile_veff.write(dir + "profile_veff_" + profile_veff.mode_str() + ".csv");
 
     // Define GW spectrum
-    // const auto freq_vals = logspace(1e-7, 1.0, 100); // Hz
-    // std::vector<double> kRs_vals;
-    // for (const auto& f : freq_vals) {
-    //     const auto kRs = f * (10.0 / 2.6e-5) * (un.Hs() * params.Rs()) * (100.0 / un.Ts()) * std::pow(100.0 / un.gs(), 1.0 / 6.0);
-    //     kRs_vals.push_back(kRs);
-    // }
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
-    // const Hydrodynamics::FluidProfile profile(params);
-    // const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, profile);
-    
-    // Write/plot to disk
-    OmegaGW.write(filename + ".csv");
-    #ifdef ENABLE_MATPLOTLIB
-    OmegaGW.plot(filename + ".png");
-    // plt::figure_size(800, 600);
-    // plt::loglog(freq_vals, OmegaGW.P(), "k-");
-    // plt::suptitle("vw = " + to_string_with_precision(params.vw()) + ", alN = " + to_string_with_precision(params.alN()));
-    // plt::xlabel("f [Hz]");
-    // plt::ylabel("Omega_GW(f)");
-    // plt::xlim(freq_vals.front(), freq_vals.back());
-    // plt::grid(true);
-    // plt::save(filename + ".png");
-    #endif
+
+    const auto OmegaGW_bag = Spectrum::GWSpec2(kRs_vals, params_bag);
+    OmegaGW_bag.write(dir + "GWSpec_bag_" + profile_bag.mode_str() + ".csv");
+
+    const auto OmegaGW_munu = Spectrum::GWSpec2(kRs_vals, params_munu);
+    OmegaGW_munu.write(dir + "GWSpec_munu_" + profile_munu.mode_str() + ".csv");
+
+    const auto OmegaGW_veff = Spectrum::GWSpec2(kRs_vals, params_veff);
+    OmegaGW_veff.write(dir + "GWSpec_veff_" + profile_veff.mode_str() + ".csv");
+
+    // #ifdef ENABLE_MATPLOTLIB
+    // profile_bag.plot(dir + "profile_bag_" + profile_bag.mode_str() + ".png");
+    // profile_munu.plot(dir + "profile_munu_" + profile_munu.mode_str() + ".png");
+    // profile_veff.plot(dir + "profile_veff_" + profile_veff.mode_str() + ".png");
+    // OmegaGW.plot(dir + ".png");
+    // OmegaGW_veff.plot(dir + "_veff.png");
+    // #endif
 
     return;
 }
 
-// // Tests parameter space (vw, alN) for fluid profile calculation
+// Tests parameter space (vw, alN) for fluid profile calculation
 void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     std::cout << "Running fluid profiles tests for (vw, alN) parameter space...\n";
 
@@ -417,59 +395,119 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
     return;
 }
 
-void test_dSiCi_accuracy() {
-    const std::vector<std::pair<double, double>> test_ranges = {
-        {0.1, 1.0}, {1.0, 10.0}, {5.0, 15.0}, {0.01, 0.1}, {1e-6, 1e-3}
-    };
-    const double tolerance = 1e-10;
-
-    for (const auto& [y, x] : test_ranges) {
-        // Custom implementation
-        std::vector<double> res_custom = dSiCi(x, y, 2000);
-        double dSi_custom = res_custom[0];
-        double dCi_custom = res_custom[1];
-
-        // ALGLIB implementation
-        double Si_x, Ci_x, Si_y, Ci_y;
-        alglib::sinecosineintegrals(x, Si_x, Ci_x);
-        alglib::sinecosineintegrals(y, Si_y, Ci_y);
-        double dSi_lib = Si_x - Si_y;
-        double dCi_lib = Ci_x - Ci_y;
-
-        // Check results
-        if (std::abs(dSi_custom - dSi_lib) > tolerance ||
-            std::abs(dCi_custom - dCi_lib) > tolerance) {
-            std::cerr << "Test failed for range (" << y << ", " << x << ")\n";
-            std::cerr << std::setprecision(15) << "  dSi: custom = " << dSi_custom << ", lib = " << dSi_lib << "\n";
-            std::cerr << std::setprecision(15) << "  dCi: custom = " << dCi_custom << ", lib = " << dCi_lib << "\n";
-            assert(false && "Mismatch exceeds tolerance.");
-        }
-    }
-
-    std::cout << "All dSiCi tests passed successfully.\n";
-}
-
 int main() {
     /************************ CLOCK / PROFILER *************************/
     // ProfilerStart("profile.out");
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
 
-    /*** targets for k, p, z, tau: ***/
-    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    // const auto pRs_vals = logspace(1e-2, 1e+3, 1000);
-    // const auto Ttilde_vals = logspace(1e-2, 20, 1000);
-    // const auto z_vals = linspace(-1.0, 1.0, 1000);
-    // python code takes 2-4mins to run
-    /****************************/
+    const auto gs = 106.75;
+    const auto nuc_type = "exp";
 
-    // test_profile_params();
-    // example_Kin_Spec("Ekin");
-    // example_GW_Spec("GWSpec");
-    example_FluidProfile("profile_combined.png");
-    // test_FluidProfile("profile_test_bag.csv");
-    // test_GWSpec("GWSpec_test_bag.csv");
-    // test_rk4_solver();
+    benchmark_point BP1_hyb(
+        0.588525, // vw
+        98.1547,  // Ts
+        0.00821205, // alN
+        1106.16, // betaHs
+        1.3763e-14, // Hs
+        0.574624 * 0.574624, // cpsq
+        0.569767 * 0.569767, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP1/3deft/"
+    );
+
+    benchmark_point BP1_det(
+        0.729893, // vw
+        98.1547,  // Ts
+        0.00821205, // alN
+        1106.16, // betaHs
+        1.3763e-14, // Hs
+        0.574624 * 0.574624, // cpsq
+        0.569767 * 0.569767, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP1/3deft/"
+    );
+
+    benchmark_point BP2_hyb(
+        0.594842, // vw (hybrid)
+        114.579,  // Ts
+        0.00386107, // alN
+        1445.85, // betaHs
+        1.86566e-14, // Hs
+        0.575068 * 0.575068, // cpsq
+        0.570803 * 0.570803, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP2/3deft/"
+    );
+
+    benchmark_point BP2_det(
+        0.754187, // vw (detonation)
+        114.579,  // Ts
+        0.00386107, // alN
+        1445.85, // betaHs
+        1.86566e-14, // Hs
+        0.575068 * 0.575068, // cpsq
+        0.570803 * 0.570803, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP2/3deft/"
+    );
+
+    benchmark_point BP3(
+        0.605811, // vw (hybrid)
+        90.7257,  // Ts
+        0.0130246, // alN
+        1389.28, // betaHs
+        1.18307e-14, // Hs
+        0.331032, // cpsq
+        0.324375, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP3/"
+    );
+
+    // NOTE: TmTN < 1 for veff
+    benchmark_point BP4(
+        0.675122, // vw (hybrid)
+        52.9772,  // Ts
+        0.0972391, // alN
+        1231.05, // betaHs
+        4.34679e-15, // Hs
+        0.56705 * 0.56705, // cpsq
+        0.539046 * 0.539046, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP4/"
+    );
+
+    // NOTE: TmTN < 1 for veff
+    benchmark_point BP5(
+        0.626002, // vw (hybrid)
+        76.2128,  // Ts
+        0.0283037, // alN
+        941.912, // betaHs
+        8.49472e-15, // Hs
+        0.572982 * 0.572982, // cpsq
+        0.55958 * 0.55958, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP5/"
+    );
+
+    // example_GW_Spec(BP1_hyb);
+    // example_GW_Spec(BP1_det);
+
+    // example_GW_Spec(BP2_hyb);
+    // example_GW_Spec(BP2_det);
+
+    // example_GW_Spec(BP3);
+    // example_GW_Spec(BP4);
+    // example_GW_Spec(BP5);
+
+    example_FluidProfile(BP3);
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();

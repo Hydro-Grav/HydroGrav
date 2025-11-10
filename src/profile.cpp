@@ -196,7 +196,11 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         // calculate fluid profiles v(xi), w(xi), la(xi)
         switch (params.eos()) {
             case PhaseTransition::PTParams::ModelType::Bag:
-                std::cout << "Calculating fluid profile using Bag equation of state\n";
+                if (cpsq_ == cmsq_) { // bag
+                    std::cout << "Calculating fluid profile using Bag equation of state\n";
+                } else { // mu nu
+                    std::cout << "Calculating fluid profile using modified Bag equation of state\n";
+                }
                 bag_params_ = &dynamic_cast<const PhaseTransition::PTParams_Bag&>(params);
                 profiles = solve_profile(n);
                 break;
@@ -294,6 +298,8 @@ void FluidProfile::plot(const std::string& filename) const {
 int FluidProfile::get_mode_bag(double vw, double cmsq, double alN) const {
     const auto vwsq = vw * vw;
 
+    std::cout << "vw=" << vw << ", vwsq = " << vwsq << ", cmsq = " << cmsq << ", vJ_det = " << vJ_det(alN) << "\n";
+
     if (vwsq < cmsq) return 0; // deflagration
     if (vw < vJ_det(alN)) return 1; // hybrid
     return 2; // detonation
@@ -330,19 +336,25 @@ double FluidProfile::w1wN_from_matching(double xi_sh) const { // w1/wN
 }
 
 double FluidProfile::get_T1TN(double w1wN) const {
-    const auto mu = 1.0 + 1.0 / cpsq_;
-    return std::pow(w1wN, 1.0 / mu);
+    // const auto mu = 1.0 + 1.0 / cpsq_;
+    // return std::pow(w1wN, 1.0 / mu);
+    return std::pow(w1wN, 0.25);
 }
 
 double FluidProfile::get_TmTN(double wmwN) const {
-    const auto mu = 1.0 + 1.0 / cpsq_;
-    const auto nu = 1.0 + 1.0 / cmsq_;
+    // const auto mu = 1.0 + 1.0 / cpsq_;
+    // const auto nu = 1.0 + 1.0 / cmsq_;
+    // const auto r = 1.0; // ap/am ratio
+
+    // if (cpsq_ == cmsq_) return std::pow(r * wmwN, 1.0 / mu);
+
+    // const auto fac = (mu / nu) * r * wmwN;
+    // return std::pow(fac, 1.0 / nu) * std::pow(bag_params_->TN(), mu / nu - 1.0);
+
     const auto r = 1.0; // ap/am ratio
 
-    if (cpsq_ == cmsq_) return std::pow(r * wmwN, 1.0 / mu);
-
-    const auto fac = (mu / nu) * r * wmwN;
-    return std::pow(fac, 1.0 / nu) * std::pow(bag_params_->TN(), mu / nu - 1.0);
+    if (cpsq_ == cmsq_) return std::pow(r * wmwN, 0.25);
+    return std::pow(r * (1.0 + cpsq_) / (1.0 + cmsq_) * wmwN, 0.25);
 }
 
 double FluidProfile::v1UF_from_shock(double xi_sh) const {
@@ -825,6 +837,10 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         const auto xi_sh = ics.first;
         y0 = ics.second;
 
+        const auto v1UF = y0[0];
+        const auto w1wN = y0[1];
+        const auto T1TN = y0[2];
+
         // xi0 = xi_sh - dlt;
         // xif = vw_ + dlt;
         xi0 = xi_sh;
@@ -841,6 +857,8 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             w_sol_tmp.push_back(y_sol_tmp[i][1]);
             T_sol_tmp.push_back(y_sol_tmp[i][2]);
 
+            // std::cout << T_sol_tmp[i] << "\n";
+
             la_sol_tmp.push_back(lambda_s(w_sol_tmp[i]));
         }
 
@@ -848,6 +866,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         // if (vpUF >= vw_) throw std::invalid_argument("vpUF must be < vw");
 
         const auto wpwN = w_sol_tmp.back();
+        const auto TpTN = T_sol_tmp.back();
         
         // check alp okay
         // Note: need alp for this so must do root-finding BEFORE determining if alp is good/bad
@@ -910,11 +929,11 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
             std::cout << "Hybrid profile:\n"
                       << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
-                      << "  wmwN = " << w_end_val << ", TmTN = " << T_end_val << "\n"
+                      << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
                       << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
-                      << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
-                      << "  v1 = " << mu(xi_sh, abs(y0[0])) << ", v1UF = " << y0[0] << "\n"
-                      << "  w1wN = " << y0[1] << ", T1TN = " << y0[2] << "\n"
+                      << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+                      << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+                      << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
                       << "  xi_sh = " << xi_sh << "\n"
                       << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
         }
