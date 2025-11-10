@@ -4,8 +4,13 @@
 #include "phasetransition.hpp"
 
 TEST_CASE("Tests the FluidProfile class for correct behavior and integration.", "[fluidProfile]") {
-
-    PhaseTransition::PTParams_Bag params(0.9, 0.1); // (vw, alN)
+    PhaseTransition::PTParams_Bag params(0.9, 0.1,
+                                         PhaseTransition::dflt_PTParams::TN,
+                                         PhaseTransition::dflt_PTParams::beta,
+                                         PhaseTransition::dflt_PTParams::Rs,
+                                         PhaseTransition::dflt_PTParams::dtau,
+                                         PhaseTransition::dflt_PTParams::nuc_type,
+                                         PhaseTransition::default_universe());
     Hydrodynamics::FluidProfile profile(params);
 
     auto xi_vals = profile.xi_vals();

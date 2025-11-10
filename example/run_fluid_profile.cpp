@@ -5,6 +5,7 @@ int main(int argc, char* argv[]) {
     auto vw = PhaseTransition::dflt_PTParams::vw;
     auto alN = PhaseTransition::dflt_PTParams::alN;
     auto beta = PhaseTransition::dflt_PTParams::beta;
+    auto Rs = PhaseTransition::dflt_PTParams::Rs;
     auto dtau = PhaseTransition::dflt_PTParams::dtau;
     auto TN = PhaseTransition::dflt_PTParams::TN;
     auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
@@ -18,7 +19,7 @@ int main(int argc, char* argv[]) {
     }
 
     const PhaseTransition::Universe un;
-    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
     if(argc == 4) {
         params.print();
     }

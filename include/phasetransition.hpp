@@ -43,9 +43,7 @@ class Universe {
   public:
     // ctors
     Universe();
-    Universe(double Ts, double gs);
     Universe(double Ts, double gs, double Hs);
-    Universe(double T0, double Ts, double g0, double gs, double H0);
     Universe(double T0, double Ts, double g0, double gs, double H0, double Hs);
 
     // params today (0) and at start of PT (s)
@@ -68,12 +66,14 @@ class Universe {
 
 const Universe& default_universe();
 
+constexpr double Rs_approx(double vw, double beta) { return std::pow(8 * M_PI, 1. / 3.) * vw / beta; };
+
 // DO NOT CHANGE DEFAULT VALS
 struct dflt_PTParams {
   static constexpr double vw = 0.8;              // Wall velocity
   static constexpr double alN = 0.1;           // PT strength 
   static constexpr double beta = 1e-12;            // Transition rate param
-  static constexpr double Rs = std::pow(8 * M_PI, 1. / 3.) * vw / beta;   
+  static constexpr double Rs = Rs_approx(vw, beta);   
   static constexpr double dtau = 10.0 * Rs;         // PT duration
   static constexpr double TN = dflt_universe::Ts;     // Nucleation temperature
   static constexpr double cpsq = 1.0 / 3.0;      // speed of sound squared (symmetric phase)
@@ -100,7 +100,7 @@ units:
 class PTParams {
   public:
     // ctor
-    PTParams(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un);
 
     enum class ModelType { Bag, Veff }; // equation of state model
     virtual ModelType eos() const = 0;
@@ -141,9 +141,8 @@ class PTParams {
 class PTParams_Bag : public PTParams {
   public:
     // ctors
-    PTParams_Bag(double vw, double alN);
-    PTParams_Bag(double vw, double alN, double TN, double cpsq, double cmsq);
-    PTParams_Bag(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
+    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un);
+    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
 
     ModelType eos() const override { return ModelType::Bag; }
 
@@ -185,11 +184,11 @@ class PTParams_Veff : public PTParams {
 public:
   // These use the new eos_data
   PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data);
-  PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
 
   // Backward compatibile
   PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
-  PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
 
   ModelType eos() const override { return ModelType::Veff; }
 

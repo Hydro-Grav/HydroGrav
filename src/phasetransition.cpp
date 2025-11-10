@@ -67,14 +67,14 @@ const Universe& default_universe() {
 }
 
 /************************************ PTParams ************************************/
-PTParams::PTParams(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un)
     : un_(un),
       vw_(vw),
       alN_(alN),
       TN_(TN),
       wNeN_rat_(std::numeric_limits<double>::quiet_NaN()),
       beta_(beta),
-      Rs_(),
+      Rs_(Rs),
       tau_s_(),
       tau_fin_(),
       dtau_(dtau),
@@ -120,8 +120,6 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double dtau, c
         nuc_type_ = dflt_PTParams::nuc_type;
       }
 
-      Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
-
       // define duration of sound waves
       tau_s_ = 1.0 / un_.Hs();
       tau_fin_ = tau_s_ + dtau_;
@@ -160,14 +158,11 @@ bool PTParams::is_valid_model(const char* model, const char* allowed_models[], c
 }
 
 /********************************** PTParams_Bag **********************************/
-PTParams_Bag::PTParams_Bag(double vw, double alN) // Bag model
-    : PTParams_Bag(vw, alN, dflt_PTParams::TN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), dflt_PTParams::cpsq, dflt_PTParams::cmsq) {}
+PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un) // Bag model
+    : PTParams_Bag(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0) {}
 
-PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double cpsq, double cmsq) // mu nu model
-    : PTParams_Bag(vw, alN, dflt_PTParams::TN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), cpsq, cmsq) {}
-
-PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq) // full ctor
-    : PTParams(vw, alN, TN, beta, dtau, nuc_type, un),
+PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq) // full ctor
+    : PTParams(vw, alN, TN, beta, Rs, dtau, nuc_type, un),
       cpsq_(cpsq),
       cmsq_(cmsq) {
 
@@ -292,10 +287,10 @@ bool EquationOfState::is_valid() const
 /********************************** PTParams_Veff *********************************/
 // New primary constructor
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data)
-    : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
+    : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::Rs, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
 
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
-    : PTParams(vw, alN, TN, beta, dtau, nuc_type, un),
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
+    : PTParams(vw, alN, TN, beta, Rs, dtau, nuc_type, un),
       cpsq_(),
       cmsq_() {
     
@@ -306,8 +301,8 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename)
     : PTParams_Veff(vw, alN, TN, EquationOfState::from_file(veff_eos_filename)) {}
 
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
-    : PTParams_Veff(vw, alN, TN, beta, dtau, nuc_type, un, EquationOfState::from_file(veff_eos_filename)) {}
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
+    : PTParams_Veff(vw, alN, TN, beta, Rs, dtau, nuc_type, un, EquationOfState::from_file(veff_eos_filename)) {}
 
 // Private initialization method
 void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
@@ -569,21 +564,6 @@ void PTParams_Veff::print() const {
   PTParams::print();
   std::cout << "*************************************************\n";
 }
-
-
-// double PTParams_Veff::cpsq(double TTN) const {
-//   if (TTN < TTN_min() || TTN > TTN_max()) {
-//     throw std::out_of_range("Temperature T/TN out of range for Veff eos. Must have " + std::to_string(TTN_min()) + " < T/TN < " + std::to_string(TTN_max()));
-//   }
-//   return alglib::spline1dcalc(cpsq_fit_, TTN);
-// }
-
-// double PTParams_Veff::cmsq(double TTN) const {
-//   if (TTN < TTN_min() || TTN > TTN_max()) {
-//     throw std::out_of_range("Temperature T/TN out of range for Veff eos. Must have " + std::to_string(TTN_min()) + " < T/TN < " + std::to_string(TTN_max()));
-//   }
-//   return alglib::spline1dcalc(cmsq_fit_, TTN);
-// }
 
 
 

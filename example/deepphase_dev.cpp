@@ -33,9 +33,10 @@ namespace plt = matplotlibcpp;
 class benchmark_point {
     public:
         benchmark_point(double vw, double Ts, double alN, double betaHs, double Hs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& dir)
-        : vw_(vw), Ts_(Ts), alN_(alN), betaHs_(betaHs), Hs_(Hs), cpsq_(cpsq), cmsq_(cmsq), gs_(gs), nuc_type_(nuc_type), dir_(dir) {
+        : benchmark_point(vw, Ts, alN, betaHs, Hs, PhaseTransition::Rs_approx(vw, betaHs * Hs), cpsq, cmsq, gs,nuc_type, dir) {}
+        benchmark_point(double vw, double Ts, double alN, double betaHs, double Hs, double Rs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& dir)
+        : vw_(vw), Ts_(Ts), alN_(alN), betaHs_(betaHs), Hs_(Hs), Rs_(Rs), cpsq_(cpsq), cmsq_(cmsq), gs_(gs), nuc_type_(nuc_type), dir_(dir) {
             beta_ = betaHs_ * Hs_;
-            Rs_ = std::pow(8 * M_PI, 1. / 3.) * vw_ / beta_;
             dtau_ = 10.0 * Rs_;
         }
         
@@ -59,13 +60,14 @@ class benchmark_point {
         const double alN_;
         const double betaHs_;
         const double Hs_;
+        const double Rs_;
         const double cpsq_;
         const double cmsq_;
         const double gs_;
         const char* nuc_type_;
         const std::string dir_;
 
-        double beta_, Rs_, dtau_;
+        double beta_, dtau_;
 };
 
 // Fluid profile
@@ -78,6 +80,7 @@ void example_FluidProfile(const benchmark_point& bp) {
     const auto TN = Ts;
     const auto alN = bp.alN();
     const auto beta = bp.beta();
+    const auto Rs = bp.Rs();
     const auto Hs = bp.Hs();
     const auto cpsq = bp.cpsq();
     const auto cmsq = bp.cmsq();
@@ -87,9 +90,9 @@ void example_FluidProfile(const benchmark_point& bp) {
 
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
-    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
-    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, dtau, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, Rs, dtau, nuc_type, un, veff_file);
 
     un.print();
     params_munu.print();
@@ -207,6 +210,7 @@ void example_GW_Spec(const benchmark_point& bp) {
     const auto alN = bp.alN();
     const auto beta = bp.beta();
     const auto Hs = bp.Hs();
+    const auto Rs = bp.Rs();
     const auto cpsq = bp.cpsq();
     const auto cmsq = bp.cmsq();
     const auto gs = bp.gs();
@@ -215,9 +219,9 @@ void example_GW_Spec(const benchmark_point& bp) {
 
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
-    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
-    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, dtau, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, Rs, dtau, nuc_type, un, veff_file);
 
     un.print();
     params_munu.print();
@@ -262,6 +266,13 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     const int n = 30000;
     // const int n = 100;
 
+    // dflt vals
+    const auto TN = PhaseTransition::dflt_PTParams::TN;
+    const auto beta = PhaseTransition::dflt_PTParams::beta;
+    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+    // const PhaseTransition::Universe un();
+
     std::random_device rd; // obtain a random number from hardware
     std::mt19937 gen(rd()); // seed the generator
     
@@ -282,8 +293,9 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     for (int i = 0; i < n; ++i) {
         const auto vw = vw_distr(gen);
         const auto alN = std::pow(10.0, log_alN_distr(gen));
+        const auto Rs = PhaseTransition::Rs_approx(vw, beta);
 
-        const PhaseTransition::PTParams_Bag params(vw, alN);
+        const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, nuc_type, PhaseTransition::default_universe());
         // const PhaseTransition::PTParams_Veff params(vw, alN, "thermo.csv");
         
         file << vw << "," << alN << ",";
@@ -358,9 +370,10 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
         const auto vw = vw_distr(gen);
         const auto alN = std::pow(10.0, log_alN_distr(gen));
         const auto beta = Hs * std::pow(10.0, log_betaH_distr(gen));
+        const auto Rs = PhaseTransition::Rs_approx(vw, beta);
         
-        const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, dtau, nuc_type, un, cpsq, cmsq);
-        // const PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, dtau, nuc_type, un, "thermo.csv");
+        const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
+        // const PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, Rs, dtau, nuc_type, un, "thermo.csv");
 
         file << vw << "," << alN << "," << beta << ",";
 
