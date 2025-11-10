@@ -72,10 +72,10 @@ class FluidProfile {
     int mode() const { return mode_; }; // Hydrodynamic mode (0=deflagration, 1=hybrid, 2=detonation)
     std::string mode_str() const;
 
-    void write(const std::string& filename = "bubble_prof.csv") const; // write bubble profile to disk
+    void write(const std::string& filename = "fp.csv") const; // write bubble profile to disk
     
     #ifdef ENABLE_MATPLOTLIB
-    void plot(const std::string& filename = "bubble_prof.png") const; // Plots bubble profiles
+    void plot(const std::string& filename = "fp.png") const; // Plots bubble profiles
     #endif
 
   private:
@@ -134,6 +134,10 @@ class FluidProfile {
     std::vector<prof_type> solve_profile(int n=5000);
     std::vector<prof_type> solve_profile_veff(int n=5000);
 };
+
+#ifdef ENABLE_MATPLOTLIB
+void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, const FluidProfile& fp_veff, const std::string& filename="fp_combined.png");
+#endif
 
 } // namespace Hydrodynamics
 

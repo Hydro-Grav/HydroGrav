@@ -298,8 +298,6 @@ void FluidProfile::plot(const std::string& filename) const {
 int FluidProfile::get_mode_bag(double vw, double cmsq, double alN) const {
     const auto vwsq = vw * vw;
 
-    std::cout << "vw=" << vw << ", vwsq = " << vwsq << ", cmsq = " << cmsq << ", vJ_det = " << vJ_det(alN) << "\n";
-
     if (vwsq < cmsq) return 0; // deflagration
     if (vw < vJ_det(alN)) return 1; // hybrid
     return 2; // detonation
@@ -1235,6 +1233,91 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 }
 
 /*******************************************************************************/
+
+#ifdef ENABLE_MATPLOTLIB
+void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, const FluidProfile& fp_veff, const std::string& filename) {
+    const auto xi_bag = fp_bag.xi_vals();
+    const auto v_bag = fp_bag.v_vals();
+    const auto w_bag = fp_bag.w_vals();
+    const auto T_bag = fp_bag.T_vals();
+    const auto la_bag = fp_bag.la_vals();
+
+    const auto xi_munu = fp_munu.xi_vals();
+    const auto v_munu = fp_munu.v_vals();
+    const auto w_munu = fp_munu.w_vals();
+    const auto T_munu = fp_munu.T_vals();
+    const auto la_munu = fp_munu.la_vals();
+
+    const auto xi_veff = fp_veff.xi_vals();
+    const auto v_veff = fp_veff.v_vals();
+    const auto w_veff = fp_veff.w_vals();
+    const auto T_veff = fp_veff.T_vals();
+    const auto la_veff = fp_veff.la_vals();
+    
+    std::map<std::string, std::string> opts_bag, opts_munu, opts_veff;
+    opts_bag["label"] = "Bag";
+    opts_bag["color"] = "red";
+    opts_bag["linestyle"] = "--";
+
+    opts_munu["label"] = "mu nu";
+    opts_munu["color"] = "black";
+    opts_munu["linestyle"] = "-.";
+
+    opts_veff["label"] = "Veff";
+    opts_veff["color"] = "blue";
+    opts_veff["linestyle"] = "-";
+
+    plt::figure_size(2400, 800);
+
+    // v(xi)
+    plt::subplot2grid(2, 2, 0, 0);
+    plt::plot(xi_bag, v_bag, opts_bag);
+    plt::plot(xi_munu, v_munu, opts_munu);
+    plt::plot(xi_veff, v_veff, opts_veff);
+    plt::xlabel("xi");
+    plt::ylabel("v(xi)");
+    plt::xlim(0.0, 1.0);
+    // plt::xlim(0.56, 0.61);
+    plt::grid(true);
+    plt::legend();
+
+    // w(xi)
+    plt::subplot2grid(2, 2, 0, 1);
+    plt::plot(xi_bag, w_bag, opts_bag);
+    plt::plot(xi_munu, w_munu, opts_munu);
+    plt::plot(xi_veff, w_veff, opts_veff);
+    plt::xlabel("xi");
+    plt::ylabel("w(xi)");
+    plt::xlim(0.0, 1.0);
+    plt::grid(true);
+
+    // T(xi)
+    plt::subplot2grid(2, 2, 1, 0);
+    plt::plot(xi_bag, T_bag, opts_bag);
+    plt::plot(xi_munu, T_munu, opts_munu);
+    plt::plot(xi_veff, T_veff, opts_veff);
+    plt::xlabel("xi");
+    plt::ylabel("T(xi)");
+    plt::xlim(0.0, 1.0);
+    // plt::xlim(0.56, 0.61);
+    plt::grid(true);
+
+    // la(xi)
+    plt::subplot2grid(2, 2, 1, 1);
+    plt::plot(xi_bag, la_bag, opts_bag);
+    plt::plot(xi_munu, la_munu, opts_munu);
+    plt::plot(xi_veff, la_veff, opts_veff);
+    plt::xlabel("xi");
+    plt::ylabel("la(xi)");
+    plt::xlim(0.0, 1.0);
+    plt::grid(true);
+
+    // plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
+
+    plt::save(filename);
+    std::cout << "Fluid profile saved to " << filename << "\n";
+}
+#endif
 
 } // namespace Hydrodynamics
 
