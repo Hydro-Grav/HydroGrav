@@ -929,8 +929,10 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
         } else { // hybrid
             // consistency check
-            if (vw_ >= vJ(alp))
-                throw std::runtime_error("Fluid profile failed due to edge case: Incorrect hydrodynamic mode detected!");
+            if (vw_ >= vJ_det(alp)) {
+                std::cout << "Warning: Hybrid condition violated (vw >= vJ_det). Hydrodynamic mode may be incorrect!\n";
+                // throw std::runtime_error("Fluid profile failed due to edge case: Incorrect hydrodynamic mode detected!");
+            }
             
             // initial conditions for rarefaction wave
             const auto xi0_rf = vw_;

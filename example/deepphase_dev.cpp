@@ -468,6 +468,7 @@ int main() {
     );
 
     // fp fails for veff
+    // Bag gives incorrect hydrodynamic mode (hybrid instead of detonation)
     benchmark_point BP6(
         0.765762, // vw (deflagration)
         47.417670, // Ts
@@ -493,10 +494,10 @@ int main() {
     // example_GW_Spec(BP4);
     // example_GW_Spec(BP5);
 
-    // Hydrodynamics::FluidProfile fp_bag(*BP6.get_PTParams_Bag());
+    Hydrodynamics::FluidProfile fp_bag(*BP6.get_PTParams_Bag());
     // Hydrodynamics::FluidProfile fp_munu(*BP6.get_PTParams_munu());
-    Hydrodynamics::FluidProfile fp_veff(*BP4.get_PTParams_Veff());
-    fp_veff.plot();
+    // Hydrodynamics::FluidProfile fp_veff(*BP4.get_PTParams_Veff());
+    // fp_veff.plot();
 
     // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined");
 
