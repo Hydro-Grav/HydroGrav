@@ -166,6 +166,8 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
       cpsq_(cpsq),
       cmsq_(cmsq) {
 
+      std::cout << "Note: PTParams_Bag must be given alN defined for Bag model!" << std::endl;
+
       // check valid speed of sound
       if (!is_valid_csq(cpsq_)) {
         throw std::invalid_argument("Unphysical speed of sound in symmetric phase passed into PTParams_Bag. Must have 0 < cpsq < 1.");
@@ -294,6 +296,7 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
       cpsq_(),
       cmsq_() {
     
+    std::cout << "Note: PTParams_Veff must be given alN defined for mu nu model!" << std::endl;
     initialize_from_eos_data(eos_data);
 }
 
