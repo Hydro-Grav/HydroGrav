@@ -585,6 +585,77 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
     return {eq1, eq2};
 }
 
+// testing purposes
+void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) const {
+    std::cout << "Running test for T2/TN residual... ";
+
+    const auto TmTN_vals = linspace(veff_params_->TTN_min(), veff_params_->TTN_max(), n);
+    // const auto TmTN_vals = linspace(1.0, 1.1, n);
+
+    std::vector<double> resi_vals(n);
+    for (int i = 0; i < n; i++) {
+        double resi = std::numeric_limits<double>::quiet_NaN();
+        try {
+            resi = T2TN_residual(dydv, TmTN_vals[i]);
+            // std::cout << "resi=" << resi << " for Tm/TN=" << TmTN_vals[i] << "\n";
+        } catch (std::exception& e) {
+            // std::cout << "failed for Tm/TN=" << TmTN_vals[i] << "\n";
+            // std::cout << e.what() << " for Tm/TN=" << TmTN_vals[i] << "\n";
+        }
+
+        resi_vals[i] = resi;
+    }
+    
+    #ifdef ENABLE_MATPLOTLIB
+    plt::figure_size(800, 800);
+    plt::plot(TmTN_vals, resi_vals);
+    plt::xlabel("TmTN");
+    plt::ylabel("residual");
+    // plt::xlim(1.0, 1.1);
+    plt::grid(true);
+    plt::save("T2_resi.png");
+    #endif
+
+    std::cout << "Test complete. T2/TN residual saved to 'T2_resi.png'\n";
+}
+
+void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const {
+    std::cout << "Running test for shock residual... ";
+    const auto pN = veff_params_->pN();
+    const auto eN = veff_params_->eN();
+
+    std::vector<double> xi_vals, resi_vals;
+    for (int i = 0; i < v_sol.size(); i++) {
+        const auto xi_sh = y_sol[i][0];
+        if (xi_sh <= vw_) continue;
+
+        xi_vals.push_back(xi_sh);
+        
+        const auto v1UF = v_sol[i];
+        const auto v1 = mu(xi_sh, abs(v1UF)); // v1=mu(xi_sh, v1UF)
+        const auto T1TN = y_sol[i][2];
+
+        const auto v2 = xi_sh; // v2=xi_sh
+
+        // shock condition mu(xi_sh, v(xi_sh)) xi_sh = (p1-pN)/(e1-eN)
+        resi_vals.push_back(abs(matching_eqs_shock(pN, eN, v2, v1, T1TN)[0]));
+
+        // std::cout << "xi_sh=" << xi_sh << ", resi=" << resi_vals[i] << "\n";
+    }
+
+    #ifdef ENABLE_MATPLOTLIB
+    plt::figure_size(800, 800);
+    plt::plot(xi_vals, resi_vals);
+    plt::xlabel("xi_sh");
+    plt::ylabel("residual");
+    // plt::xlim(1.0, 1.1);
+    plt::grid(true);
+    plt::save("shock_resi.png");
+    #endif
+
+    std::cout << "Test complete. Shock residual saved to 'shock_resi.png'\n";
+}
+
 double FluidProfile::find_TmTN_veff(const deriv_func& dydv) const {
     auto safe_residual = [this, &dydv] (double TmTN) {
         try {
@@ -596,46 +667,21 @@ double FluidProfile::find_TmTN_veff(const deriv_func& dydv) const {
         }
     };
 
+    // testing residual
+    // test_residual_veff(dydv, 500);
+
+    // find bracket where residual is defined and minimum lies
     const auto TmTN_min = veff_params_->TTN_min();
     const auto TmTN_max = veff_params_->TTN_max();
+    const auto bracket = find_bracket(safe_residual, TmTN_min, TmTN_max);
+    if (!std::isfinite(bracket[0]) || !std::isfinite(bracket[1]))
+        throw std::runtime_error("find_TmTN_veff failed (bracket not found)!");
 
-    // finds bracket where residual is defined and minimum lies
-    const auto [TmTN_start, TmTN_end] = find_bracket(safe_residual, TmTN_min, TmTN_max);
+    // find TmTN that minimise residual
+    const auto TmTN = golden_section_minimize(safe_residual, bracket[0], bracket[1]);
+    // std::cout << "TmTN=" << TmTN << ", bracket=[" << bracket[0] << ", " << bracket[1] << "]\n";
+    if (TmTN < 0.0) throw std::runtime_error("find_TmTN_veff failed (TmTN < 0)!");
 
-    const auto TmTN = golden_section_minimize(safe_residual, TmTN_start, TmTN_end);
-
-    // std::cout << "Found Tm/TN = " << TmTN << " that minimises T2TN residual!\n";
-
-    // testing residual
-    // const int n = 500;
-    // const auto TmTN_vals = linspace(veff_params_->TTN_min(), veff_params_->TTN_max(), n);
-    // // const auto TmTN_vals = linspace(1.0, 1.1, n);
-    // std::vector<double> resi_vals(n);
-
-    // for (int i = 0; i < n; i++) {
-    //     double resi = std::numeric_limits<double>::quiet_NaN();
-    //     try {
-    //         resi = T2TN_residual(dydv, TmTN_vals[i]);
-    //         // std::cout << "resi=" << resi << " for Tm/TN=" << TmTN_vals[i] << "\n";
-    //     } catch (std::exception& e) {
-    //         // std::cout << "failed for Tm/TN=" << TmTN_vals[i] << "\n";
-    //         // std::cout << e.what() << " for Tm/TN=" << TmTN_vals[i] << "\n";
-    //     }
-
-    //     resi_vals[i] = resi;
-    // }
-    
-    // plt::figure_size(800, 800);
-    // plt::plot(TmTN_vals, resi_vals);
-    // plt::xlabel("TmTN");
-    // plt::ylabel("residual");
-    // // plt::xlim(1.0, 1.1);
-    // plt::grid(true);
-    // plt::save("T2_resi.png");
-
-    
-
-    // throw std::runtime_error("kill switch");
     return TmTN;
 }
 
@@ -644,7 +690,7 @@ double FluidProfile::T2TN_residual(const deriv_func& dydv, double TmTN, const si
     const auto wmwN = veff_params_->wb_val(TmTN) / veff_params_->wN();
 
     // calculate fluid profile from wall to shock
-    const auto [v_sol, y_sol] = deflagration_profile(dydv, vm, wmwN, TmTN, n);
+    const auto [v_sol, y_sol] = deflagration_profile(dydv, vm, wmwN, TmTN, false, n);
 
     // fluid behind shock
     const auto xi_sh = y_sol.back()[0];
@@ -663,16 +709,13 @@ double FluidProfile::T2TN_residual(const deriv_func& dydv, double TmTN, const si
     return abs(T2TN - 1.0);
 }
 
-std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagration_profile(const deriv_func& dydv, double vm, double wmwN, double TmTN, const size_t n) const {
-    // std::cout << "\nCalculating deflagration profile...\n";
+std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagration_profile(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_shock, const size_t n) const {
     // matching at wall: vm,Tm -> vp,Tp
     auto wall_matching_helper = [this, vm, TmTN] (std::array<double, 2>& yp_guess) {
         return matching_eqs_wall(yp_guess[0], yp_guess[1], vm, TmTN); // yp = {vp, TpTN}
     };
 
-    const auto vp_guess = 0.9 * vw_; // vp < vw
-    const auto TpTN_guess = 1.1 * TmTN; // Tp > Tm
-    const std::array<double, 2> yp_guess = {vp_guess, TpTN_guess};
+    const std::array<double, 2> yp_guess = {0.9 * vw_, 1.1 * TmTN}; // {vp, Tp}
     const auto sol = newton_solve_2d(wall_matching_helper, yp_guess);
 
     // fluid in front of wall
@@ -688,7 +731,7 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
     const auto [v_sol_tmp, y_sol_tmp] = rk4_solver(dydv, vpUF, 1e-10, yp, n);
 
     // find shock & truncate solution
-    const auto sh_idx = std::min(find_shock_idx(v_sol_tmp, y_sol_tmp), v_sol_tmp.size() - 1);
+    const auto sh_idx = std::min(find_shock_idx(v_sol_tmp, y_sol_tmp, test_shock), v_sol_tmp.size() - 1);
     const std::vector<double> v_sol(v_sol_tmp.begin(), v_sol_tmp.begin() + sh_idx + 1);
     const std::vector<state_type> y_sol(y_sol_tmp.begin(), y_sol_tmp.begin() + sh_idx + 1);
 
@@ -697,19 +740,19 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 
 // TO DO:
 // check resi is sufficiently small
-size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const {
+size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_shock, const double tol) const {
     const auto pN = veff_params_->pN();
     const auto eN = veff_params_->eN();
 
-    // std::vector<double> xi_vals;
+    // testing purposes
+    // if (test_shock) {
+    //     test_shock_veff(v_sol, y_sol);
+    // }
 
-    // std::vector<double> resi_vals(v_sol.size());
     std::vector<double> resi_vals;
     for (int i = 0; i < v_sol.size(); i++) {
         const auto xi_sh = y_sol[i][0];
         if (xi_sh <= vw_) continue;
-
-        // xi_vals.push_back(xi_sh);
         
         const auto v1UF = v_sol[i];
         const auto v1 = mu(xi_sh, abs(v1UF)); // v1=mu(xi_sh, v1UF)
@@ -718,31 +761,19 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
         const auto v2 = xi_sh; // v2=xi_sh
 
         // shock condition mu(xi_sh, v(xi_sh)) xi_sh = (p1-pN)/(e1-eN)
-        // resi_vals[i] = abs(matching_eqs_shock(pN, eN, v2, v1, T1TN)[0]);
         resi_vals.push_back(abs(matching_eqs_shock(pN, eN, v2, v1, T1TN)[0]));
-
-        // std::cout << "xi_sh=" << xi_sh << ", resi=" << resi_vals[i] << "\n";
     }
 
-    // plt::figure_size(800, 800);
-    // plt::plot(xi_vals, resi_vals);
-    // plt::xlabel("xi_sh");
-    // plt::ylabel("residual");
-    // // plt::xlim(1.0, 1.1);
-    // plt::grid(true);
-    // plt::save("shock_resi.png");
-
-    if (resi_vals.size() == 0) {
-        throw std::runtime_error("No valid shock found in fluid profile!");
-    }
+    if (resi_vals.size() == 0)
+        throw std::runtime_error("find_shock_idx failed (no shock found in fluid profile)!");
 
     // index where residual is minimised
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
 
-    // const auto tol = 1e-5;
-    // if (resi_vals[idx] > tol)
-    //     std::cout << "Warning: Shock residual above tolerance. Residual=" << resi_vals[idx] << "\n";
+    if (test_shock && resi_vals[idx] > tol) {
+        std::cout << "Warning: Shock residual above tolerance (" << tol << "). Residual=" << resi_vals[idx] << "\n";
+    }
 
     return idx;
 }
@@ -768,8 +799,10 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff() const {
 
     // fluid behind wall
     const auto vm = sol[0];
+    if (abs(vm) >= abs(vp)) throw std::invalid_argument("|vm| must be < |vp|=vw for detonation");
+
     const auto vmUF = mu(vw_, abs(vm));
-    if (vm >= vw_) throw std::invalid_argument("vm must be < vw for detonation");
+    if (vmUF < 0.0) throw std::invalid_argument("vmUF must be > 0 for detonation");
 
     const auto TmTN = sol[1];
     if (TmTN <= TpTN) throw std::invalid_argument("Tm/TN must be > Tp/TN for detonation");
@@ -895,6 +928,12 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
                       
 
         } else { // hybrid
+            // consistency check
+            if (vw_ >= vJ_det(alp)) {
+                std::cout << "Warning: Hybrid condition violated (vw >= vJ_det). Hydrodynamic mode may be incorrect!\n";
+                // throw std::runtime_error("Fluid profile failed due to edge case: Incorrect hydrodynamic mode detected!");
+            }
+            
             // initial conditions for rarefaction wave
             const auto xi0_rf = vw_;
             const auto xif_rf = std::sqrt(cmsq_);
@@ -1060,15 +1099,12 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         // v(xi_sh) = v1UF, w(xi_sh) = w1wN, T(xi_sh) = T1TN
 
         const auto TmTN = find_TmTN_veff(dydv);
-        // const auto TmTN = 1.02139;
         const auto vm = (mode_ == 0) ? vw_ : std::sqrt(veff_params_->csq_b(TmTN)); // vm=vw (deflagration), vm=cm (hybrid)
         const auto wmwN = veff_params_->wb_val(TmTN) / veff_params_->wN();
 
-        const auto prof_tmp = deflagration_profile(dydv, vm, wmwN, TmTN);
+        const auto prof_tmp = deflagration_profile(dydv, vm, wmwN, TmTN, true, n);
         v_sol_tmp = prof_tmp.first;
         y_sol_tmp = prof_tmp.second;
-
-        // add checks to ensure v, w, T values physical (vpUF > 0, etc)
 
         std::reverse(v_sol_tmp.begin(), v_sol_tmp.end());
         std::reverse(y_sol_tmp.begin(), y_sol_tmp.end());
@@ -1084,12 +1120,22 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         }
 
         xi0 = xi_sol_tmp.front(); // xi_sh
+        if (xi0 <= vw_) throw std::runtime_error("solve_profile failed (xi_sh must be > vw)");
 
         const auto vpUF = v_sol_tmp.back();
-        const auto wpwN = w_sol_tmp.back();
-        const auto TpTN = T_sol_tmp.back();
+        if (vpUF <= 0.0) throw std::runtime_error("solve_profile failed (vpUF < 0)!");
 
-        if (mode_ == 0) {
+        const auto wpwN = w_sol_tmp.back();
+        if (wpwN <= 0.0) throw std::runtime_error("solve_profile failed (wpwN < 0)!");
+        if (wpwN <= 1.0) throw std::runtime_error("solve_profile failed (wp/wN must be > 1)!");
+        if (wpwN <= w_sol_tmp.front()) throw std::runtime_error("solve_profile failed (wp/wN must be > w1/wN)!");
+
+        const auto TpTN = T_sol_tmp.back();
+        if (TpTN <= 0.0) throw std::runtime_error("solve_profile failed (TpTN < 0)!");
+        if (TpTN <= 1.0) throw std::runtime_error("solve_profile failed (Tp/TN must be > 1)!");
+        if (TpTN <= T_sol_tmp.front()) throw std::runtime_error("solve_profile failed (Tp/TN must be > T1/TN)!");
+
+        if (mode_ == 0) { // deflagration
             xif = vw_;
 
             // fix end values 
@@ -1235,7 +1281,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 /*******************************************************************************/
 
 #ifdef ENABLE_MATPLOTLIB
-void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, const FluidProfile& fp_veff, const std::string& filename) {
+void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, const FluidProfile& fp_veff, const std::string& filename, const double xi_min, const double xi_max) {
     const auto xi_bag = fp_bag.xi_vals();
     const auto v_bag = fp_bag.v_vals();
     const auto w_bag = fp_bag.w_vals();
@@ -1276,7 +1322,7 @@ void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, cons
     plt::plot(xi_veff, v_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("v(xi)");
-    plt::xlim(0.0, 1.0);
+    plt::xlim(xi_min, xi_max);
     // plt::xlim(0.56, 0.61);
     plt::grid(true);
     plt::legend();
@@ -1288,7 +1334,7 @@ void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, cons
     plt::plot(xi_veff, w_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("w(xi)");
-    plt::xlim(0.0, 1.0);
+    plt::xlim(xi_min, xi_max);
     plt::grid(true);
 
     // T(xi)
@@ -1298,7 +1344,7 @@ void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, cons
     plt::plot(xi_veff, T_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("T(xi)");
-    plt::xlim(0.0, 1.0);
+    plt::xlim(xi_min, xi_max);
     // plt::xlim(0.56, 0.61);
     plt::grid(true);
 
@@ -1309,7 +1355,7 @@ void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, cons
     plt::plot(xi_veff, la_veff, opts_veff);
     plt::xlabel("xi");
     plt::ylabel("la(xi)");
-    plt::xlim(0.0, 1.0);
+    plt::xlim(xi_min, xi_max);
     plt::grid(true);
 
     // plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));

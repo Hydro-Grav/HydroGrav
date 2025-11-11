@@ -32,17 +32,18 @@ namespace plt = matplotlibcpp;
 
 class benchmark_point {
     public:
-        benchmark_point(double vw, double Ts, double alN, double betaHs, double Hs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& dir)
-        : benchmark_point(vw, Ts, alN, betaHs, Hs, PhaseTransition::Rs_approx(vw, betaHs * Hs), cpsq, cmsq, gs,nuc_type, dir) {}
-        benchmark_point(double vw, double Ts, double alN, double betaHs, double Hs, double Rs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& dir)
-        : vw_(vw), Ts_(Ts), alN_(alN), betaHs_(betaHs), Hs_(Hs), Rs_(Rs), cpsq_(cpsq), cmsq_(cmsq), gs_(gs), nuc_type_(nuc_type), dir_(dir) {
+        benchmark_point(double vw, double Ts, double alN_bag, double alN_munu, double betaHs, double Hs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& dir)
+        : benchmark_point(vw, Ts, alN_bag, alN_munu, betaHs, Hs, PhaseTransition::Rs_approx(vw, betaHs * Hs), cpsq, cmsq, gs,nuc_type, dir) {}
+        benchmark_point(double vw, double Ts, double alN_bag, double alN_munu, double betaHs, double Hs, double Rs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& dir)
+        : vw_(vw), Ts_(Ts), alN_bag_(alN_bag), alN_munu_(alN_munu), betaHs_(betaHs), Hs_(Hs), Rs_(Rs), cpsq_(cpsq), cmsq_(cmsq), gs_(gs), nuc_type_(nuc_type), dir_(dir) {
             beta_ = betaHs_ * Hs_;
             dtau_ = 10.0 * Rs_;
         }
         
         double vw() const { return vw_; }
         double Ts() const { return Ts_; }
-        double alN() const { return alN_; }
+        double alN_bag() const { return alN_bag_; }
+        double alN_munu() const { return alN_munu_; }
         double betaHs() const { return betaHs_; }
         double Hs() const { return Hs_; }
         double beta() const { return beta_; }
@@ -54,19 +55,25 @@ class benchmark_point {
         const char* nuc_type() const { return nuc_type_; }
         std::string dir() const { return dir_; }
 
+        std::unique_ptr<PhaseTransition::PTParams> get_PTParams_Bag() const {
+            const PhaseTransition::Universe un(Ts_, gs_, Hs_);
+            return std::make_unique<PhaseTransition::PTParams_Bag>(vw_, alN_bag_, Ts_, beta_, Rs_, dtau_, nuc_type_, un);
+        }
+
+        std::unique_ptr<PhaseTransition::PTParams> get_PTParams_munu() const {
+            const PhaseTransition::Universe un(Ts_, gs_, Hs_);
+            return std::make_unique<PhaseTransition::PTParams_Bag>(vw_, alN_munu_, Ts_, beta_, Rs_, dtau_, nuc_type_, un, cpsq_, cmsq_);
+        }
+
+        std::unique_ptr<PhaseTransition::PTParams> get_PTParams_Veff() const {
+            const PhaseTransition::Universe un(Ts_, gs_, Hs_);
+            return std::make_unique<PhaseTransition::PTParams_Veff>(vw_, alN_munu_, Ts_, beta_, Rs_, dtau_, nuc_type_, un, dir_ + "eos.csv");
+        }
+
     private:
-        const double vw_;
-        const double Ts_;
-        const double alN_;
-        const double betaHs_;
-        const double Hs_;
-        const double Rs_;
-        const double cpsq_;
-        const double cmsq_;
-        const double gs_;
+        const double vw_, Ts_, alN_bag_, alN_munu_, betaHs_, Hs_, Rs_, cpsq_, cmsq_, gs_;
         const char* nuc_type_;
         const std::string dir_;
-
         double beta_, dtau_;
 };
 
@@ -78,7 +85,8 @@ void example_FluidProfile(const benchmark_point& bp) {
     const auto vw = bp.vw();
     const auto Ts = bp.Ts();
     const auto TN = Ts;
-    const auto alN = bp.alN();
+    const auto alN_bag = bp.alN_bag();
+    const auto alN_munu = bp.alN_munu();
     const auto beta = bp.beta();
     const auto Rs = bp.Rs();
     const auto Hs = bp.Hs();
@@ -90,9 +98,9 @@ void example_FluidProfile(const benchmark_point& bp) {
 
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
-    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
-    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, Rs, dtau, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, dtau, nuc_type, un, veff_file);
 
     un.print();
     params_munu.print();
@@ -133,69 +141,8 @@ void example_FluidProfile(const benchmark_point& bp) {
     // params_veff.plot_csq();
 
     #ifdef ENABLE_MATPLOTLIB
-    plt::figure_size(2400, 800);
-
-    std::map<std::string, std::string> opts_bag, opts_munu, opts_veff;
-    opts_bag["label"] = "Bag";
-    opts_bag["color"] = "red";
-    opts_bag["linestyle"] = "--";
-
-    opts_munu["label"] = "mu nu";
-    opts_munu["color"] = "black";
-    opts_munu["linestyle"] = "-.";
-
-    opts_veff["label"] = "Veff";
-    opts_veff["color"] = "blue";
-    opts_veff["linestyle"] = "-";
-
-    // v(xi)
-    plt::subplot2grid(2, 2, 0, 0);
-    plt::plot(xi_bag, v_bag, opts_bag);
-    plt::plot(xi_munu, v_munu, opts_munu);
-    plt::plot(xi_veff, v_veff, opts_veff);
-    plt::xlabel("xi");
-    plt::ylabel("v(xi)");
-    plt::xlim(0.0, 1.0);
-    // plt::xlim(0.56, 0.61);
-    plt::grid(true);
-    plt::legend();
-
-    // w(xi)
-    plt::subplot2grid(2, 2, 0, 1);
-    plt::plot(xi_bag, w_bag, opts_bag);
-    plt::plot(xi_munu, w_munu, opts_munu);
-    plt::plot(xi_veff, w_veff, opts_veff);
-    plt::xlabel("xi");
-    plt::ylabel("w(xi)");
-    plt::xlim(0.0, 1.0);
-    plt::grid(true);
-
-    // T(xi)
-    plt::subplot2grid(2, 2, 1, 0);
-    plt::plot(xi_bag, T_bag, opts_bag);
-    plt::plot(xi_munu, T_munu, opts_munu);
-    plt::plot(xi_veff, T_veff, opts_veff);
-    plt::xlabel("xi");
-    plt::ylabel("T(xi)");
-    plt::xlim(0.0, 1.0);
-    // plt::xlim(0.56, 0.61);
-    plt::grid(true);
-
-    // la(xi)
-    plt::subplot2grid(2, 2, 1, 1);
-    plt::plot(xi_bag, la_bag, opts_bag);
-    plt::plot(xi_munu, la_munu, opts_munu);
-    plt::plot(xi_veff, la_veff, opts_veff);
-    plt::xlabel("xi");
-    plt::ylabel("la(xi)");
-    plt::xlim(0.0, 1.0);
-    plt::grid(true);
-
-    plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
-
     const auto filename = bp.dir() + "profile_" + profile_bag.mode_str() + ".png";
-    plt::save(filename);
-    std::cout << "Fluid profile saved to " << filename << "\n";
+    Hydrodynamics::plot_profiles(profile_bag, profile_munu, profile_veff, filename);
     #endif
 }
 
@@ -207,7 +154,8 @@ void example_GW_Spec(const benchmark_point& bp) {
     const auto vw = bp.vw();
     const auto Ts = bp.Ts();
     const auto TN = Ts;
-    const auto alN = bp.alN();
+    const auto alN_bag = bp.alN_bag();
+    const auto alN_munu = bp.alN_munu();
     const auto beta = bp.beta();
     const auto Hs = bp.Hs();
     const auto Rs = bp.Rs();
@@ -219,9 +167,9 @@ void example_GW_Spec(const benchmark_point& bp) {
 
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
-    const PhaseTransition::PTParams_Bag params_bag(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-    const PhaseTransition::PTParams_Bag params_munu(vw, alN, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
-    const PhaseTransition::PTParams_Veff params_veff(vw, alN, TN, beta, Rs, dtau, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, dtau, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, dtau, nuc_type, un, veff_file);
 
     un.print();
     params_munu.print();
@@ -422,7 +370,8 @@ int main() {
     benchmark_point BP1_hyb(
         0.588525, // vw
         98.1547,  // Ts
-        0.00821205, // alN
+        0.00821205, // alN_bag
+        0.00821205, // alN_munu
         1106.16, // betaHs
         1.3763e-14, // Hs
         0.574624 * 0.574624, // cpsq
@@ -435,7 +384,8 @@ int main() {
     benchmark_point BP1_det(
         0.729893, // vw
         98.1547,  // Ts
-        0.00821205, // alN
+        0.00821205, // alN_bag
+        0.00821205, // alN_munu
         1106.16, // betaHs
         1.3763e-14, // Hs
         0.574624 * 0.574624, // cpsq
@@ -448,7 +398,8 @@ int main() {
     benchmark_point BP2_hyb(
         0.594842, // vw (hybrid)
         114.579,  // Ts
-        0.00386107, // alN
+        0.00386107, // alN_bag
+        0.00386107, // alN_munu
         1445.85, // betaHs
         1.86566e-14, // Hs
         0.575068 * 0.575068, // cpsq
@@ -461,7 +412,8 @@ int main() {
     benchmark_point BP2_det(
         0.754187, // vw (detonation)
         114.579,  // Ts
-        0.00386107, // alN
+        0.00386107, // alN_bag
+        0.00386107, // alN_munu
         1445.85, // betaHs
         1.86566e-14, // Hs
         0.575068 * 0.575068, // cpsq
@@ -474,7 +426,8 @@ int main() {
     benchmark_point BP3(
         0.605811, // vw (hybrid)
         90.7257,  // Ts
-        0.0130246, // alN
+        0.0130246, // alN_bag
+        0.0130246, // alN_munu
         1389.28, // betaHs
         1.18307e-14, // Hs
         0.331032, // cpsq
@@ -488,7 +441,8 @@ int main() {
     benchmark_point BP4(
         0.675122, // vw (hybrid)
         52.9772,  // Ts
-        0.0972391, // alN
+        0.0972391, // alN_bag
+        0.0972391, // alN_munu
         1231.05, // betaHs
         4.34679e-15, // Hs
         0.56705 * 0.56705, // cpsq
@@ -502,7 +456,8 @@ int main() {
     benchmark_point BP5(
         0.626002, // vw (hybrid)
         76.2128,  // Ts
-        0.0283037, // alN
+        0.0283037, // alN_bag
+        0.0283037, // alN_munu
         941.912, // betaHs
         8.49472e-15, // Hs
         0.572982 * 0.572982, // cpsq
@@ -510,6 +465,23 @@ int main() {
         gs,
         nuc_type,
         "benchmark_pts/BP5/"
+    );
+
+    // fp fails for veff
+    // Bag gives incorrect hydrodynamic mode (hybrid instead of detonation)
+    benchmark_point BP6(
+        0.765762, // vw (deflagration)
+        47.417670, // Ts
+        0.107000, // alN_bag
+        0.107000, // alN_munu
+        604.582851, // betaHs
+        3.397981e-15, // Hs
+        // 1.335622 / 3.397981e-15, // Rs
+        0.570803 * 0.570803, // cpsq
+        0.572998 * 0.572998, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP6/3deft/"
     );
 
     // example_GW_Spec(BP1_hyb);
@@ -522,7 +494,12 @@ int main() {
     // example_GW_Spec(BP4);
     // example_GW_Spec(BP5);
 
-    example_FluidProfile(BP3);
+    Hydrodynamics::FluidProfile fp_bag(*BP6.get_PTParams_Bag());
+    // Hydrodynamics::FluidProfile fp_munu(*BP6.get_PTParams_munu());
+    // Hydrodynamics::FluidProfile fp_veff(*BP4.get_PTParams_Veff());
+    // fp_veff.plot();
+
+    // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined");
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();

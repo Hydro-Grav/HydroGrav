@@ -125,10 +125,14 @@ class FluidProfile {
 
     std::pair<double, state_type> get_IC_detonation_veff() const;
 
+    // testing
+    void test_residual_veff(const deriv_func& dydv, const size_t n) const;
+    void test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
+
     double find_TmTN_veff(const deriv_func& dydv) const;
     double T2TN_residual(const deriv_func& dydv, double TmTN, const size_t n=1000) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vm, double wmwN, double TmTN, const size_t n=1000) const;
-    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_shock=false, const size_t n=1000) const;
+    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_shock=false, const double tol=1e-5) const;
 
     // put number of integration points in input file? seems bad to hardcode
     std::vector<prof_type> solve_profile(int n=5000);
@@ -136,7 +140,7 @@ class FluidProfile {
 };
 
 #ifdef ENABLE_MATPLOTLIB
-void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, const FluidProfile& fp_veff, const std::string& filename="fp_combined.png");
+void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, const FluidProfile& fp_veff, const std::string& filename="fp_combined.png", const double xi_min=0.0, const double xi_max=1.0);
 #endif
 
 } // namespace Hydrodynamics
