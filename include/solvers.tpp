@@ -39,7 +39,7 @@ T newton_solve_1d(
             return x0;
     }
 
-    throw std::runtime_error("Newton's method did not converge");
+    throw std::runtime_error("Newton's method 1D did not converge");
 }
 
 template <typename T, typename Func>
@@ -99,7 +99,7 @@ std::array<T,2> newton_solve_2d(
             return x0;
     }
 
-    throw std::runtime_error("Newton's method solver did not converge");
+    throw std::runtime_error("Newton's method 2D did not converge");
 }
 
 // RK4 solver: works with std::vector<T> or std::array<T, N>
