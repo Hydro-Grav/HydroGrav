@@ -494,12 +494,19 @@ int main() {
     // example_GW_Spec(BP4);
     // example_GW_Spec(BP5);
 
-    Hydrodynamics::FluidProfile fp_bag(*BP6.get_PTParams_Bag());
-    // Hydrodynamics::FluidProfile fp_munu(*BP6.get_PTParams_munu());
-    // Hydrodynamics::FluidProfile fp_veff(*BP4.get_PTParams_Veff());
-    // fp_veff.plot();
+    std::vector<benchmark_point> bp_list = {BP1_hyb, BP2_hyb, BP3, BP4, BP5};
+    std::vector<std::string> bp_name = {"BP1_hyb", "BP2_hyb", "BP3", "BP4", "BP5"};
 
-    // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined");
+    const int i = 1;
+    // for (int i = 0; i < bp_list.size(); i++) {
+        const auto bp = bp_list[i];
+        const Hydrodynamics::FluidProfile fp_bag(*bp.get_PTParams_Bag());
+        const Hydrodynamics::FluidProfile fp_munu(*bp.get_PTParams_munu());
+        const Hydrodynamics::FluidProfile fp_veff(*bp.get_PTParams_Veff());
+
+        Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp_name[i]);
+    // }
+    
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();

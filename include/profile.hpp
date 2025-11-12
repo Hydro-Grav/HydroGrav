@@ -90,51 +90,69 @@ class FluidProfile {
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
     prof_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
 
+    /************************** Bag EoS **************************/
     int get_mode_bag(double vw, double cmsq, double alN) const;
     double vJ_det(double alp) const;
+    std::array<double, 2> get_alp_minmax(double vw) const;
 
-    double vm_from_matching(double vp, double alpha_p) const;
+    // matching at wall
+    double get_alp_wall(double vpUF, double vw) const;
     double vp_from_matching(double vm, double alpha_p) const;
-    double w_from_matching(double wp, double vp, double vm) const;
-    double w1wN_from_matching(double xi_sh) const;
-  
-    double get_T1TN(double w1wN) const;
+    double vm_from_matching(double vp, double alpha_p) const;
     double get_TmTN(double wmwN) const;
 
+    // matching at shock
     double v1UF_from_shock(double xi_sh) const;
-    std::array<double, 2> get_alp_minmax(double vw) const;
-    double get_alp_wall(double vpUF, double vw) const;
+    double w1wN_from_shock(double xi_sh) const;
+    double get_T1TN(double w1wN) const;
 
-    double alN_residual_func(double xi_sh, const deriv_func& dydxi, const int n=1000) const;
-    double veff_residual_func(double xi_sh, const deriv_func& dydxi) const;
+    // deflagrations
+    double find_vpUF(const deriv_func& dydv) const;
+    double wpwN_from_vpUF(const deriv_func& dydv, double vpUF, const size_t n=1000) const;
+    double alN_residual(const deriv_func& dydv, double vpUF, const size_t n=1000) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_shock=false, const size_t n=1000) const;
+    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_shock=false, const double tol=1e-5) const;
 
+    // dev
+    void test_alN_residual(const deriv_func& dydv, const size_t n) const;
+    void test_shock_bag(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
+
+    // detonations
+    std::pair<double, state_type> get_IC_detonation() const;
+
+    // lambda profiles
     double lambda_b(double wowN) const;
     double lambda_s(double wowN) const;
 
-    double lambda_s_veff(double ToTN, const double eN, const double wN_inv) const;
-    double lambda_b_veff(double ToTN, const double eN, const double wN_inv) const;
-
-    double find_shock(const deriv_func& dydxi) const;
-
-    std::pair<double, state_type> get_IC_deflagration(const deriv_func& dydxi) const;
-    std::pair<double, state_type> get_IC_detonation() const;
-
+    /*************************************************************/
+    /************************** Veff EoS *************************/  
+    // matching eqs
     std::array<double, 2> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
     std::array<double, 2> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
     std::array<double, 2> matching_eqs_shock2(double v1, double T1TN, double v2, double T2TN) const;
-
-    std::pair<double, state_type> get_IC_detonation_veff() const;
-
-    // testing
+    
+    // deflagrations
+    double find_TmTN_veff(const deriv_func& dydv) const;
+    double T2TN_residual_veff(const deriv_func& dydv, double TmTN, const size_t n=1000) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_shock=false, const size_t n=1000) const;
+    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_shock=false, const double tol=1e-5) const;
+    
+    // dev
     void test_residual_veff(const deriv_func& dydv, const size_t n) const;
     void test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
+    
+    // detonations
+    std::pair<double, state_type> get_IC_detonation_veff() const;
 
-    double find_TmTN_veff(const deriv_func& dydv) const;
-    double T2TN_residual(const deriv_func& dydv, double TmTN, const size_t n=1000) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_shock=false, const size_t n=1000) const;
-    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_shock=false, const double tol=1e-5) const;
+    // lambda profiles
+    double lambda_s_veff(double ToTN, const double eN, const double wN_inv) const;
+    double lambda_b_veff(double ToTN, const double eN, const double wN_inv) const;
 
-    // put number of integration points in input file? seems bad to hardcode
+    /*************************************************************/
+    /********************** Both Bag/Veff EoS ********************/  
+    double w_from_matching(double wp, double vp, double vm) const;
+
+    // solve profiles
     std::vector<prof_type> solve_profile(int n=5000);
     std::vector<prof_type> solve_profile_veff(int n=5000);
 };
