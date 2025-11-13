@@ -37,14 +37,10 @@ using deriv_func = std::function<std::array<double, 3>(double, const std::array<
  */
 double mu(double xi, double v);
 
-double dvdxi(double xi, double v, const double csq);
-double dwdxi(double xi, double v, double w, const double csq);
-double dTdxi(double xi, double v, double T, const double csq);
-state_type dydxi_vec(double xi, const state_type& y, double vw, double cmsq, double cpsq);
-
 double dxidv(double xi, double v, const double csq);
 double dxidw(double xi, double v, double w, const double csq);
 double dxidT(double xi, double v, double T, const double csq);
+state_type dydv_vec(double v, const state_type& y, double vw, double cmsq, double cpsq);
 
 void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pts, int y_pts, const std::string& filename);
 void generate_streamplot_data(const PhaseTransition::PTParams& params);
@@ -96,25 +92,25 @@ class FluidProfile {
     std::array<double, 2> get_alp_minmax(double vw) const;
 
     // matching at wall
-    double get_alp_wall(double vpUF, double vw) const;
+    // double get_alp_wall(double vpUF, double vw) const;
+    double get_alp_wall(double vp, double vm) const;
     double vp_from_matching(double vm, double alpha_p) const;
     double vm_from_matching(double vp, double alpha_p) const;
     double get_TmTN(double wmwN) const;
 
     // matching at shock
-    double v1UF_from_shock(double xi_sh) const;
-    double w1wN_from_shock(double xi_sh) const;
-    double get_T1TN(double w1wN) const;
+    // double v1UF_from_shock(double xi_sh) const;
+    std::pair<double, double> wT_from_shock(double xi_sh) const;
 
     // deflagrations
-    double find_vpUF(const deriv_func& dydv) const;
-    double wpwN_from_vpUF(const deriv_func& dydv, double vpUF, const size_t n=1000) const;
-    double alN_residual(const deriv_func& dydv, double vpUF, const size_t n=1000) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_shock=false, const size_t n=1000) const;
-    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_shock=false, const double tol=1e-5) const;
+    double find_vpUF(const deriv_func& dydv, const size_t n=1000) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi=false, const size_t n=1000) const;
+    double alN_residual(const deriv_func& dydv, double vpUF, double vm, const size_t n=1000) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_resi=false, const size_t n=1000) const;
+    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false, const double tol=1e-5) const;
 
     // dev
-    void test_alN_residual(const deriv_func& dydv, const size_t n) const;
+    void test_alN_residual(const deriv_func& dydv, double vm, const size_t n) const;
     void test_shock_bag(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
 
     // detonations
@@ -134,8 +130,8 @@ class FluidProfile {
     // deflagrations
     double find_TmTN_veff(const deriv_func& dydv) const;
     double T2TN_residual_veff(const deriv_func& dydv, double TmTN, const size_t n=1000) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_shock=false, const size_t n=1000) const;
-    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_shock=false, const double tol=1e-5) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_resi=false, const size_t n=1000) const;
+    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false, const double tol=1e-5) const;
     
     // dev
     void test_residual_veff(const deriv_func& dydv, const size_t n) const;

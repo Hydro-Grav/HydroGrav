@@ -55,6 +55,26 @@ class benchmark_point {
         const char* nuc_type() const { return nuc_type_; }
         std::string dir() const { return dir_; }
 
+        void print() const {
+            std::cout << "********** Phase Transition parameters **********\n"
+                      << std::left
+                      << std::setw(35) << "vw ="        << vw_        << "\n"
+                      << std::setw(35) << "Ts ="        << Ts_        << "\n"
+                      << std::setw(35) << "alN_bag ="   << alN_bag_   << "\n"
+                      << std::setw(35) << "alN_munu ="  << alN_munu_  << "\n"
+                      << std::setw(35) << "betaHs ="    << betaHs_    << "\n"
+                      << std::setw(35) << "Hs ="        << Hs_        << "\n"
+                      << std::setw(35) << "beta ="      << beta_      << "\n"
+                      << std::setw(35) << "cpsq ="      << cpsq_      << "\n"
+                      << std::setw(35) << "cmsq ="      << cmsq_      << "\n"
+                      << std::setw(35) << "gs ="        << gs_        << "\n"
+                      << std::setw(35) << "dtau ="      << dtau_      << "\n"
+                      << std::setw(35) << "Rs ="        << Rs_        << "\n"
+                      << std::setw(35) << "nuc_type ="  << nuc_type_  << "\n"
+                      << std::setw(35) << "dir ="       << dir_       << "\n"
+                      << "*************************************************\n";
+        }
+
         std::unique_ptr<PhaseTransition::PTParams> get_PTParams_Bag() const {
             const PhaseTransition::Universe un(Ts_, gs_, Hs_);
             return std::make_unique<PhaseTransition::PTParams_Bag>(vw_, alN_bag_, Ts_, beta_, Rs_, dtau_, nuc_type_, un);
@@ -208,11 +228,8 @@ void example_GW_Spec(const benchmark_point& bp) {
 }
 
 // Tests parameter space (vw, alN) for fluid profile calculation
-void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
+void test_FluidProfile(const size_t n, const std::string& filename = "fluid_profile_test.csv") {
     std::cout << "Running fluid profiles tests for (vw, alN) parameter space...\n";
-
-    const int n = 30000;
-    // const int n = 100;
 
     // dflt vals
     const auto TN = PhaseTransition::dflt_PTParams::TN;
@@ -232,7 +249,7 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
     int unphysical_count = 0;
 
     std::ofstream file(filename);
-    file << "vw,alN,mode\n";
+    file << "vw,alN,mode,note\n";
 
     // Suppress console output during testing
     std::streambuf* original_cout_buffer = std::cout.rdbuf();
@@ -251,14 +268,14 @@ void test_FluidProfile(const std::string& filename = "fluid_profile_test.csv") {
         try {
             const Hydrodynamics::FluidProfile profile(params);
             pass_count++;
-            file << profile.mode_str() << "\n";
+            file << profile.mode_str() << "," << "\n";
         } catch (const std::exception& e) {
             // flags unphysical parameter choices
             if (e.what() == unphysical_exception[0] || e.what() == unphysical_exception[1] || e.what() == unphysical_exception[2]) {
-                file << "unphysical\n";
+                file << "unphysical" << "," << "\n";
                 unphysical_count++;
             } else {
-                file << "fail\n";
+                file << "fail" << "," << e.what() << "\n";
             }
         }
     }
@@ -476,7 +493,6 @@ int main() {
         0.107000, // alN_munu
         604.582851, // betaHs
         3.397981e-15, // Hs
-        // 1.335622 / 3.397981e-15, // Rs
         0.570803 * 0.570803, // cpsq
         0.572998 * 0.572998, // cmsq
         gs,
@@ -494,19 +510,33 @@ int main() {
     // example_GW_Spec(BP4);
     // example_GW_Spec(BP5);
 
-    std::vector<benchmark_point> bp_list = {BP1_hyb, BP2_hyb, BP3, BP4, BP5};
-    std::vector<std::string> bp_name = {"BP1_hyb", "BP2_hyb", "BP3", "BP4", "BP5"};
+    std::vector<benchmark_point> bp_list = {BP1_hyb, BP2_hyb, BP3, BP4, BP5, BP6};
+    std::vector<std::string> bp_name = {"BP1_hyb", "BP2_hyb", "BP3", "BP4", "BP5", "BP6"};
 
-    const int i = 1;
+    // const int i = 5;
     // for (int i = 0; i < bp_list.size(); i++) {
-        const auto bp = bp_list[i];
-        const Hydrodynamics::FluidProfile fp_bag(*bp.get_PTParams_Bag());
-        const Hydrodynamics::FluidProfile fp_munu(*bp.get_PTParams_munu());
-        const Hydrodynamics::FluidProfile fp_veff(*bp.get_PTParams_Veff());
+        // const auto bp = bp_list[i];
+    //     const Hydrodynamics::FluidProfile fp_bag(*bp.get_PTParams_Bag());
+    //     const Hydrodynamics::FluidProfile fp_munu(*bp.get_PTParams_munu());
+        // const Hydrodynamics::FluidProfile fp_veff(*bp.get_PTParams_Veff());
 
-        Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp_name[i]);
+        // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp_name[i]);
     // }
     
+    test_FluidProfile(2000);
+
+    // no shock found (xi_sol starts before vw so loop in find_shock_idx always continues)
+    // const auto vw = 0.620376;
+    // const auto alN = 0.00412303;
+
+    // const auto TN = PhaseTransition::dflt_PTParams::TN;
+    // const auto beta = PhaseTransition::dflt_PTParams::beta;
+    // const auto dtau = PhaseTransition::dflt_PTParams::dtau;
+    // const auto Rs = PhaseTransition::Rs_approx(vw, beta);
+
+    // const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, nuc_type, PhaseTransition::default_universe());
+    // const Hydrodynamics::FluidProfile profile(params);
+    // profile.plot("test_prof");
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();
