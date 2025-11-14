@@ -140,6 +140,10 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
  */
 double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile);
 
+#ifdef ENABLE_MATPLOTLIB
+void plot_spectra(const PowerSpec& gw_spec_bag, const PowerSpec& gw_spec_munu, const PowerSpec& gw_spec_veff, const std::string& filename="gw_spec_combined", const double f_min=1e-6, const double f_max=1e+0);
+#endif
+
 } // namespace Spectrum
 
 #endif // INCLUDE_SPECTRUM_HPP_H

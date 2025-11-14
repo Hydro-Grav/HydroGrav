@@ -25,6 +25,7 @@
 
 #ifdef ENABLE_MATPLOTLIB
 #include "matplotlibcpp.h"
+namespace plt = matplotlibcpp;
 #endif
 
 /*
@@ -81,8 +82,6 @@ void PowerSpec::write(const std::string& filename) const {
 
 #ifdef ENABLE_MATPLOTLIB
 void PowerSpec::plot(const std::string& filename) const {
-    namespace plt = matplotlibcpp;
-
     plt::figure_size(800, 600);
     plt::loglog(K(), P(), "k-");
     plt::suptitle("vw = " + to_string_with_precision(params_->vw()) + ", alN = " + to_string_with_precision(params_->alN()));
@@ -623,5 +622,49 @@ double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::Fluid
 
     return gw_prefac(Ek.max(), params->Rs(), params->wNeN_rat(), un.T0(), un.Ts(), un.H0(), un.Hs(), un.g0(), un.gs());
 }
+
+#ifdef ENABLE_MATPLOTLIB
+void plot_spectra(const PowerSpec& gw_spec_bag, const PowerSpec& gw_spec_munu, const PowerSpec& gw_spec_veff, const std::string& filename, const double f_min, const double f_max) {
+    const auto freq_bag = gw_spec_bag.freq();
+    const auto P_bag = gw_spec_bag.P();
+
+    const auto freq_munu = gw_spec_munu.freq();
+    const auto P_munu = gw_spec_munu.P();
+
+    const auto freq_veff = gw_spec_veff.freq();
+    const auto P_veff = gw_spec_veff.P();
+    
+    std::map<std::string, std::string> opts_bag, opts_munu, opts_veff;
+    opts_bag["label"] = "Bag";
+    opts_bag["color"] = "red";
+    opts_bag["linestyle"] = "--";
+
+    opts_munu["label"] = "mu nu";
+    opts_munu["color"] = "black";
+    opts_munu["linestyle"] = "-.";
+
+    opts_veff["label"] = "Veff";
+    opts_veff["color"] = "blue";
+    opts_veff["linestyle"] = "-";
+
+    plt::figure_size(800, 600);
+    // Set log scaling manually
+    PyRun_SimpleString("import matplotlib.pyplot as plt\n"
+                    "plt.xscale('log')\n"
+                    "plt.yscale('log')");
+
+    plt::plot(freq_bag, P_bag, opts_bag);
+    plt::plot(freq_munu, P_munu, opts_munu);
+    plt::plot(freq_veff, P_veff, opts_veff);
+    plt::xlabel("K=kRs");
+    plt::ylabel("Omega_GW(K)");
+    plt::xlim(f_min, f_max);
+    plt::grid(true);
+    plt::legend();    
+
+    plt::save(filename);
+    std::cout << "GW spectrum saved to " << filename << "\n";
+}
+#endif
 
 } // namespace Spectrum
