@@ -115,7 +115,7 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 
 
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
-PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
+PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const size_t n_fp=5000, const size_t np=1000, const size_t nz=1000);
 
 /**
  * @brief Calculates prefactor for GW power spectrum $\Omega_{GW}$

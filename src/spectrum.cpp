@@ -171,7 +171,7 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
 }
 
 /*** GW power spectrum ***/
-PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
+PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const size_t n_fp, const size_t np, const size_t nz) {
     /***************************** CLOCK ******************************/
     const auto ti = std::chrono::high_resolution_clock::now();
     /******************************************************************/
@@ -181,11 +181,10 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
     const auto tau_fin = params.tau_fin();
     const auto Rs_inv = 1.0 / params.Rs();
 
-    const Hydrodynamics::FluidProfile profile(params); // generate fluid profile
+    const Hydrodynamics::FluidProfile profile(params, n_fp); // generate fluid profile
 
     const auto nk = kRs_vals.size();
 
-    const auto np = 1000;
     const auto pRs_vals = logspace(1e-2, 1e+3, np); // P = p*Rs
 
     std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
@@ -195,7 +194,6 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
         pRs2_vals[i] = pRs * pRs;
     }
 
-    const auto nz = 1000;
     const auto z_vals = linspace(-1.0, 1.0, nz); // logspace gives nan over this domain
 
     const auto npnz = np * nz;
@@ -255,7 +253,7 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
                     const auto ptRs = ptilde(kRs, pRs, z);
 
                     if (ptRs == 0.0) { // careful! need to check this converges properly for pt=0!
-                        integrand[pp * np + zz] = 0.0;
+                        integrand[pp * nz + zz] = 0.0;
                         continue;
                     }
 
@@ -271,7 +269,7 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
                     const auto z_fac2 = z_fac * z_fac;
                     const auto ptRs4_inv = 1.0 / (ptRs * ptRs * ptRs * ptRs);
 
-                    integrand[pp * np + zz] = z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_val * dlt;
+                    integrand[pp * nz + zz] = z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_val * dlt;
                 }
             }
 
