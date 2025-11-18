@@ -60,6 +60,8 @@ option(BUILD_WITH_EXAMPLES "Enable examples" ON)
 # --------------------------
 find_package(OpenMP REQUIRED)
 find_package(ALGLIB REQUIRED)
+find_package(GSL REQUIRED)
+find_package(Boost REQUIRED)
 
 # --------------------------
 # Source and header files
@@ -108,12 +110,15 @@ target_include_directories(DeepPhaseLib
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/DeepPhase>
   ${ALGLIB_INCLUDES}
+  ${GSL_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
 )
 
 target_link_libraries(DeepPhaseLib
   PUBLIC
   OpenMP::OpenMP_CXX
   ${ALGLIB_LIBRARIES}
+  GSL::gsl GSL::gslcblas
 )
 
 # --------------------------

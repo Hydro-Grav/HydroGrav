@@ -207,13 +207,13 @@ void example_GW_Spec(const benchmark_point& bp) {
     // Define GW spectrum
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
 
-    const auto OmegaGW_bag = Spectrum::GWSpec2(kRs_vals, params_bag);
+    const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
     OmegaGW_bag.write(dir + "GWSpec_bag_" + profile_bag.mode_str() + ".csv");
 
-    const auto OmegaGW_munu = Spectrum::GWSpec2(kRs_vals, params_munu);
+    const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
     OmegaGW_munu.write(dir + "GWSpec_munu_" + profile_munu.mode_str() + ".csv");
 
-    const auto OmegaGW_veff = Spectrum::GWSpec2(kRs_vals, params_veff);
+    const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
     OmegaGW_veff.write(dir + "GWSpec_veff_" + profile_veff.mode_str() + ".csv");
 
     // #ifdef ENABLE_MATPLOTLIB
@@ -357,7 +357,7 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
 
         // attempt to construct GW spectrum
         try {         
-            const auto OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
+            const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params);
             pass_count++;
             file << OmegaGW.profile().mode_str() << "\n";
         } catch (const std::exception& e) {

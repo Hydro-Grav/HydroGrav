@@ -18,53 +18,15 @@ TO DO:
 #include <functional>
 #include <chrono>
 #include <omp.h>
-
 #include <fstream>
+
+#include <boost/math/quadrature/gauss_kronrod.hpp>
 
 #include "profile.hpp"
 
 namespace Hydrodynamics {
 
-double lifetime_dist(double Ttilde, const std::string& nuc_type) {
-
-    std::function<double(double)> lifetime_func;
-
-    if (nuc_type == "exp") {
-        return std::exp(-Ttilde);
-    } else if (nuc_type == "sim") {
-        const auto exp_fac = - Ttilde * Ttilde * Ttilde / 6.0;
-        return 0.5 * Ttilde * Ttilde * std::exp(exp_fac);
-    } else {
-        throw std::invalid_argument("Invalid nucleation type: " + nuc_type);
-    }
-}
-
-// calculate as vector here rather than calling function at integration step since it is expensive
-std::vector<double> lifetime_dist2(const std::vector<double>& Ttilde, const std::string& nuc_type) {
-    std::vector<double> dist;
-    dist.reserve(Ttilde.size()); // allocates fixed memory to dist
-
-    std::function<double(double)> lifetime_func;
-
-    if (nuc_type == "exp") {
-        lifetime_func = [](double Tt) { return std::exp(-Tt); };
-    } else if (nuc_type == "sim"){
-        lifetime_func = [](double Tt) {
-            const auto exp_fac = -pow(Tt, 3) / 6.;
-            return 0.5 * pow(Tt, 2) * std::exp(exp_fac);
-        };
-    }
-    else {
-        throw std::invalid_argument("Invalid nucleation type: " + nuc_type);
-    }
-
-    for (const auto &Tt : Ttilde)
-        dist.push_back(lifetime_func(Tt));
-    return dist;
-}
-
-std::function<double(double)> lifetime_dist_func(const std::string& nuc_type) {
-    // Return a lambda function that computes the lifetime distribution for the specified nucleation type
+std::function<double(double)> lifetime_distribution_function(const std::string& nuc_type) {
     if (nuc_type == "exp") {
         return [](double Ttilde) -> double {
             return std::exp(-Ttilde);
@@ -79,19 +41,40 @@ std::function<double(double)> lifetime_dist_func(const std::string& nuc_type) {
     }
 }
 
-/* profile integrals (vector) */
-// double check good integration step size (i.e. xi_vals) when fluid solver implemented
-// python code uses ~8000 steps
-std::pair<std::vector<double>, std::vector<double>> prof_ints_fl(const std::vector<double>& chi_vals, const FluidProfile& prof) {
+std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof) {
+
     const auto xi_vals = prof.xi_vals();
     const auto v_vals = prof.v_vals();
     const auto la_vals = prof.la_vals();
+
+    // the resolution is high enough that neighbouring points have the samee y_values which
+    // affects spline fitting.
+    std::vector<double> low_res_xi_vals, low_res_v_vals, low_res_la_vals;
+    for ( size_t i = 0; i < xi_vals.size(); i += 2) {
+        low_res_xi_vals.push_back(xi_vals[i]);
+        low_res_v_vals.push_back(v_vals[i]);
+        low_res_la_vals.push_back(la_vals[i]);
+    }
+
+    alglib::real_1d_array xi_arr, v_arr, la_arr;
+    xi_arr.setcontent(low_res_xi_vals.size(), low_res_xi_vals.data());
+    v_arr.setcontent(low_res_v_vals.size(), low_res_v_vals.data());
+    la_arr.setcontent(low_res_la_vals.size(), low_res_la_vals.data());
+
+    alglib::spline1dinterpolant v_spline, la_spline;
+    try {
+        alglib::spline1dbuildcubic(xi_arr, v_arr, v_spline);
+        alglib::spline1dbuildcubic(xi_arr, la_arr, la_spline);
+    } catch (const alglib::ap_error& e) {
+        throw std::runtime_error(std::string("Error building spline in prof_ints_fl: ") + e.msg);
+    } catch (...) {
+        throw std::runtime_error("Unknown error building spline in prof_ints_fl");
+    }
     
     const auto n = xi_vals.size();
     const auto m = chi_vals.size();
     const auto fac = 4.0 * M_PI;
 
-    // allocate memory for integrand/result
     std::vector<double> fd(m); 
     std::vector<double> l(m);
 
@@ -101,35 +84,52 @@ std::pair<std::vector<double>, std::vector<double>> prof_ints_fl(const std::vect
         std::vector<double> l_integrand(n);
 
         #pragma omp for
-        for (size_t j = 0; j < m; j++) { // chi
+        for (size_t j = 0; j < m; j++) {
+
             const auto chi = chi_vals[j];
             const auto inv_chi = 1.0 / chi;
 
-            for (size_t i = 0; i < n; i++) { // xi
-                const auto xi = xi_vals[i];
-                const auto v_prof = v_vals[i];
-                const auto la_prof = la_vals[i];
-                
+            auto integrand_f_dash = [&](double xi) -> double {
+
+                const auto v_p = alglib::spline1dcalc(v_spline, xi);
+
+                if(v_p == 0) { return 0.0;}
+
                 const auto chi_xi = chi * xi;
                 const auto sin_cx = std::sin(chi_xi);
                 const auto cos_cx = std::cos(chi_xi);
 
-                fd_integrand[i] = fac * inv_chi * v_prof * (xi * cos_cx - sin_cx * inv_chi);
-                l_integrand[i] = fac * inv_chi * xi * la_prof * sin_cx;
-            }
+                return v_p * (xi * cos_cx - sin_cx * inv_chi);
+            };
 
-            fd[j] = simpson_integrate(xi_vals, fd_integrand);
-            l[j] = simpson_integrate(xi_vals, l_integrand);
+            auto integrand_l = [&](double xi) -> double {
+
+                const auto lambda_p = alglib::spline1dcalc(la_spline, xi);
+
+                if(lambda_p == 0) { return 0.0;}
+
+                const auto chi_xi = chi * xi;
+                const auto sin_cx = std::sin(chi_xi);
+                const auto cos_cx = std::cos(chi_xi);
+
+                return  lambda_p * xi * sin_cx;
+            };
+
+            const int max_depth = (chi > 1e3) ? 7 : 5;
+            const double tol = (chi > 1e3) ? 1e-16 : 1e-8;
+
+            fd[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_f_dash, xi_vals.front(), xi_vals.back(), max_depth, tol);
+            l[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_l, xi_vals.front(), xi_vals.back(), max_depth, tol);
         }
     }
 
-    return {fd, l}; // {f', l}
+    return {fd, l};
 }
 
 // |A_+|^2
 std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfile& prof) {
     const auto csq = prof.params()->cpsq();
-    const auto [fd_int, l_int] = prof_ints_fl(chi_vals, prof);
+    const auto [fd_int, l_int] = fluid_profile_integrals(chi_vals, prof);
     const auto m = chi_vals.size();
 
     std::vector<double> Apsq(m);

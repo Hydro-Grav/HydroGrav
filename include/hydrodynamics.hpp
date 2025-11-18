@@ -2,10 +2,6 @@
 #ifndef INCLUDE_HYDRODYNAMICS_HPP_H
 #define INCLUDE_HYDRODYNAMICS_HPP_H
 
-/*
-TO DO:
-- 
-*/
 
 #include <array>
 #include <complex>
@@ -15,26 +11,13 @@ TO DO:
 namespace Hydrodynamics {
 
 /**
- * @brief Computes the bubble lifetime distribution at the normalized time Ttilde.
+ * @brief Returns a function that computes the lifetime distribution for the specified nucleation type.
  *
- * @param Ttilde Normalized time (T * β).
- * @param nuc_type Nucleation type: "exp" for exponential or "sim" for simultaneous.
- *
- * @return Lifetime distribution.
- */
-double lifetime_dist(double Ttilde, const std::string& nuc_type);
-
-/**
- * @brief Computes the bubble lifetime distribution over a vector of normalized times Ttilde.
- *
- * @param Ttilde Normalized time (T * β).
- * @param nuc_type Nucleation type: "exp" for exponential or "sim" for simultaneous.
+ * @param nuc_type Nucleation type ("exp" for exponential, "sim" for simultaneous)
  * 
- * @return Lifetime distribution.
+ * @return Function that takes a double Ttilde and returns the lifetime distribution value.
  */
-std::vector<double> lifetime_dist2(const std::vector<double>& Ttilde, const std::string& nuc_type);
-
-std::function<double(double)> lifetime_dist_func(const std::string& nuc_type);
+std::function<double(double)> lifetime_distribution_function(const std::string& nuc_type);
 
 /**
  * @brief Computes the integrated profile functions f'(χ) and l(χ) defined in Eq. (30), (31) of Pol, Procacci, Caprini (2024).
@@ -44,7 +27,7 @@ std::function<double(double)> lifetime_dist_func(const std::string& nuc_type);
  * 
  * @return Pair of vector of the integrated profile functions f' and l.
  */
-std::pair<std::vector<double>, std::vector<double>> prof_ints_fl(const std::vector<double>& chi_vals, const FluidProfile& prof);
+std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof);
 
 /**
  * @brief Computes |A₊(χ)|², defined in Eq. (29) of Pol, Procacci, Caprini (2024).

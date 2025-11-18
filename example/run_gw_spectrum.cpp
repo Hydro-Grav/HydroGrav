@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
     }
 
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec2(kRs_vals, params);
+    Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params);
 
     OmegaGW.write("gw_spectrum.csv");
 

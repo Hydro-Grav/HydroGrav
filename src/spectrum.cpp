@@ -16,6 +16,8 @@
 #include "interpolation.h"
 #include "specialfunctions.h"
 
+#include <boost/math/quadrature/gauss_kronrod.hpp>
+
 #include "maths_ops.hpp"
 #include "phasetransition.hpp"
 #include "hydrodynamics.hpp"
@@ -172,53 +174,55 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
 }
 
 /*** GW power spectrum ***/
-PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
-    /***************************** CLOCK ******************************/
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
+
     const auto ti = std::chrono::high_resolution_clock::now();
-    /******************************************************************/
 
     const auto cs = std::sqrt(params.cpsq());
     const auto tau_s = params.tau_s();
     const auto tau_fin = params.tau_fin();
     const auto Rs_inv = 1.0 / params.Rs();
 
-    const Hydrodynamics::FluidProfile profile(params); // generate fluid profile
+    const Hydrodynamics::FluidProfile profile(params);
 
     const auto nk = kRs_vals.size();
 
-    const auto np = 1000;
-    const auto pRs_vals = logspace(1e-2, 1e+3, np); // P = p*Rs
+    const auto np = 500;
+    const auto pRs_vals = logspace(1e-3, 1e+3, np); // P = p*Rs
 
-    std::vector<double> pRs2_vals(np), p_vals(np); // keep here otherwise have to calculate for each k
+    std::vector<double> log_pRs_vals(np), pRs_sq_vals(np), p_vals(np);
     for (size_t i = 0; i < np; i++) {
         const auto pRs = pRs_vals[i];
+        log_pRs_vals[i] = std::log(pRs);
         p_vals[i] = pRs * Rs_inv;
-        pRs2_vals[i] = pRs * pRs;
+        pRs_sq_vals[i] = pRs * pRs;
     }
 
-    const auto nz = 1000;
-    const auto z_vals = linspace(-1.0, 1.0, nz); // logspace gives nan over this domain
-
-    const auto npnz = np * nz;
-
-    /********** precompute normalised kinetic spectrum **********/
     const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
-    const auto zk_pRs_vals = zk_pRs_spec.P(); // store zetaKin(pRs) vals (quicker than calling interpolator)
+    const auto zk_pRs_vals = zk_pRs_spec.P();
 
-    // NOTE: zetaKin(ptRs) can't be precomputed since ptRs = ptRs(k,p,z)
-    //       > use interpolator instead (much faster than constructing PowerSpec objects inside loops)
-
-    // calc temp ptRs vals for interpolating func
     const auto ptRs_min = 0.99 * find_min_pt(kRs_vals, pRs_vals);
     const auto ptRs_max = 1.01 * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
 
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
 
-    // construct interpolating function for zetaKin(ptRs)
-    // WARNING: alglib spline does not do bound check, need to do this manually!!
     const auto zk_ptRs_spec = zetaKin(ptRs_vals_tmp, profile);
-    const auto zk_ptRs_K_vals = zk_ptRs_spec.K();
-    const auto zk_ptRs_P_vals = zk_ptRs_spec.P();
+
+    std::vector<double> zk_ptRs_K_vals, zk_ptRs_P_vals;
+    for (size_t i = 0; i < zk_ptRs_spec.K().size(); i++) {
+        zk_ptRs_K_vals.push_back(zk_ptRs_spec.K()[i]);
+        const auto P_val = zk_ptRs_spec.P()[i];
+        
+        if (P_val <= 0.0 || std::isnan(P_val) || std::isinf(P_val)) {
+            zk_ptRs_P_vals.push_back(-700);
+        } else {
+            zk_ptRs_P_vals.push_back(std::log(P_val));
+        }
+    }
+
+    if (zk_ptRs_K_vals.empty()) {
+        throw std::runtime_error("zetaKin(ptRs) spectrum is empty");
+    }
 
     const auto zk_ptRs_K_min = zk_ptRs_K_vals.front();
     const auto zk_ptRs_K_max = zk_ptRs_K_vals.back();
@@ -228,17 +232,29 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
     P_vals.setcontent(zk_ptRs_P_vals.size(), zk_ptRs_P_vals.data());
 
     alglib::spline1dinterpolant zk_ptRs_interp;
-    alglib::spline1dbuildcubic(K_vals, P_vals, zk_ptRs_interp);
-    /************************************************************/
+    try {
+        alglib::spline1dbuildcubic(K_vals, P_vals, zk_ptRs_interp);
+    } catch (const alglib::ap_error& e) {
+        std::cerr << "ALGLIB error building spline for zetaKin(ptRs): " << e.msg << std::endl;
+        throw;
+    } catch (const std::exception& e) {
+        std::cerr << "Error building spline for zetaKin(ptRs): " << e.what() << std::endl;
+        throw;
+    } catch (...) {
+        std::cerr << "Unknown error building spline for zetaKin(ptRs)" << std::endl;
+        throw;
+    }
 
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
-    const auto prefac = gw_prefac(kRs_vals, profile); // prefactor
+    const auto prefac = gw_prefac(kRs_vals, profile);
 
     std::vector<double> GW_P_vals(nk);
+    
     #pragma omp parallel 
     {
-        std::vector<double> integrand(npnz);
+
+        std::vector<double> pRs_integrand(np);
 
         #pragma omp for schedule(static)
         for (size_t kk = 0; kk < nk; kk++ ) {
@@ -249,34 +265,46 @@ PowerSpec GWSpec2(const std::vector<double>& kRs_vals, const PhaseTransition::PT
             for (size_t pp = 0; pp < np; pp++) {
                 const auto pRs = pRs_vals[pp];
                 const auto p = p_vals[pp];
-                const auto zk_pRs_fac = kRs3 * zk_pRs_vals[pp] * pRs2_vals[pp]; // kRs^3 * zetaKin(pRs) * pRs^2
+                const auto pRs_sq = pRs_sq_vals[pp];
+                const auto zk_pRs_val = zk_pRs_vals[pp];
+                const auto zk_pRs_fac = kRs3 * zk_pRs_val * pRs_sq;
 
-                for (size_t zz = 0; zz < nz; zz++) {
-                    const auto z = z_vals[zz];
+                auto z_integrand = [&](double z) -> double {
                     const auto ptRs = ptilde(kRs, pRs, z);
 
-                    if (ptRs == 0.0) { // careful! need to check this converges properly for pt=0!
-                        integrand[pp * np + zz] = 0.0;
-                        continue;
-                    }
-
-                    // if this fails, need to manually adjust ptRs_min
-                    if (ptRs < zk_ptRs_K_min || ptRs > zk_ptRs_K_max) {
-                        throw std::runtime_error("ptRs out of bounds in GWSpec2: " + std::to_string(ptRs) + " not in [" + std::to_string(zk_ptRs_K_min) + ", " + std::to_string(zk_ptRs_K_max) + "]");
+                    if (ptRs == 0.0 || ptRs < zk_ptRs_K_min || ptRs > zk_ptRs_K_max) 
+                    {
+                        return 0.0;
                     }
                 
                     const auto dlt = dlt_SSM2(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);      
-                    const auto zk_ptRs_val = alglib::spline1dcalc(zk_ptRs_interp, ptRs);
+                    double zk_ptRs_val;
+                    try {
+                        zk_ptRs_val = std::exp(alglib::spline1dcalc(zk_ptRs_interp, ptRs));
+                    }  catch (const alglib::ap_error& e) {
+                        std::cerr << "ALGLIB error evaluating spline for zetaKin(ptRs): " << e.msg << std::endl;
+                        throw;
+                    } catch (const std::exception& e) {
+                        std::cerr << "Error evaluating spline for zetaKin(ptRs) at ptRs = " << ptRs << ": " << e.what() << std::endl;
+                        throw;
+                    } catch (...) {
+                        std::cerr << "Unknown error evaluating spline for zetaKin(ptRs) at ptRs = " << ptRs << std::endl;
+                        throw;
+                    }
 
-                    const auto z_fac = 1.0 - z;
+                    const auto z_fac = 1.0 - z*z;
                     const auto z_fac2 = z_fac * z_fac;
                     const auto ptRs4_inv = 1.0 / (ptRs * ptRs * ptRs * ptRs);
 
-                    integrand[pp * np + zz] = z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_val * dlt;
-                }
+                    return pRs * z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_val * dlt;
+                };
+
+                double z_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(z_integrand, -1.0, 1.0, 5, 1e-6);
+
+                pRs_integrand[pp] = z_result;
             }
 
-            GW_P_vals[kk] = prefac * simpson_2d_integrate_flat(pRs_vals, z_vals, integrand);
+            GW_P_vals[kk] = prefac * simpson_integrate(log_pRs_vals, pRs_integrand);
         }
     }
 
@@ -529,11 +557,10 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto Rs = prof.params()->Rs();
     const auto nuc_type = prof.params()->nuc_type();
 
-    auto lt_dist = Hydrodynamics::lifetime_dist_func(nuc_type);
+    auto lt_dist = Hydrodynamics::lifetime_distribution_function(nuc_type);
 
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
-
 
     // define Ttilde from chi = Ttilde * k / beta (makes calling Apsq simpler)
     // using K = k * Rs below
@@ -542,34 +569,39 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     - Ap_sq = inf at 0
     - chi_vals = logspace(1e-3, 3000, 5000) gives good convergence
     */
-    const auto chi_vals = logspace(1e-3, 3000, 5000); // bad to hard code?
+    const auto chi_vals = logspace(1e-3, 3e3, 5000);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
 
     const auto fac1 = beta * Rs * Rs / (2.0 * M_PI * M_PI);
 
-    std::vector<std::vector<double>> integrands(omp_get_max_threads(), std::vector<double>(n));
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        std::vector<double>& integrand = integrands[tid]; // local thread copy of integrand
+    alglib::real_1d_array chi_arr, Apsq_arr;
+    chi_arr.setcontent(n, chi_vals.data());
+    Apsq_arr.setcontent(n, Apsq.data());
+    alglib::spline1dinterpolant Apsq_spline;
+    alglib::spline1dbuildcubic(chi_arr, Apsq_arr, Apsq_spline);
 
-        #pragma omp for
-        for (size_t kk = 0; kk < nk; kk++) {
-            const auto kRs = kRs_vals[kk];
-            const auto kRs_inv = 1.0 / kRs;
+    #pragma omp parallel for
+    for (size_t kk = 0; kk < nk; kk++) {
+        const auto kRs = kRs_vals[kk];
+        const auto kRs_inv = 1.0 / kRs;
 
-            const auto fac2 = fac1 * power(kRs_inv, 5);
-            const auto fac3 = beta * Rs * kRs_inv;
+        const auto fac2 = fac1 * power(kRs_inv, 5);
+        const auto fac3 = beta * Rs * kRs_inv;
 
-            for (size_t i = 0; i < n; i++) {
-                const auto chi = chi_vals[i];
-                integrand[i] = fac2 * lt_dist(fac3 * chi) * power(chi, 6) * Apsq[i];
-            }
+        auto integrand = [&](double log_chi) -> double {
+            const double chi = std::exp(log_chi);
+            const double Apsq_val = alglib::spline1dcalc(Apsq_spline, chi);
 
-            P_vals[kk] = simpson_integrate(chi_vals, integrand);
-        }
+            return chi * fac2 * lt_dist(fac3 * chi) * power(chi, 6) * Apsq_val;
+        };
+
+        const double log_chi_min = std::log(1e-3);
+        const double log_chi_max = std::log(3000.0);
+        
+        double error;
+        P_vals[kk] = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand, log_chi_min, log_chi_max, 5, 1e-9, &error);
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);
