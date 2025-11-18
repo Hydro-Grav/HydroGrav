@@ -194,7 +194,7 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         T_vals_ = profiles[3];
         la_vals_ = profiles[4];
 
-        std::cout << "Fluid profile constructed!\n";
+        std::cout << "Fluid profile constructed!\n\n";
     }
 
 // Public functions
@@ -437,6 +437,13 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 
     // find shock & truncate solution
     const auto sh_idx = std::min(find_shock_idx(v_sol_tmp, y_sol_tmp, test_resi), v_sol_tmp.size() - 1);
+
+    // re-integrate for final profile
+    // avoids insufficient no. points for integrating profile when shock is close to vpUF
+    if (test_resi) {
+        return rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
+    }
+
     const std::vector<double> v_sol(v_sol_tmp.begin(), v_sol_tmp.begin() + sh_idx + 1);
     const std::vector<state_type> y_sol(y_sol_tmp.begin(), y_sol_tmp.begin() + sh_idx + 1);
 
@@ -825,6 +832,14 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 
     // find shock & truncate solution
     const auto sh_idx = std::min(find_shock_idx_veff(v_sol_tmp, y_sol_tmp, test_resi), v_sol_tmp.size() - 1);
+
+    // re-integrate for final profile
+    // avoids insufficient no. points for integrating profile when shock is close to vpUF
+    if (test_resi) {
+        return rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
+    }
+
+
     const std::vector<double> v_sol(v_sol_tmp.begin(), v_sol_tmp.begin() + sh_idx + 1);
     const std::vector<state_type> y_sol(y_sol_tmp.begin(), y_sol_tmp.begin() + sh_idx + 1);
 
@@ -1013,14 +1028,14 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = get_TmTN(w_end_val);
             la_end_val = lambda_b(w_end_val);
 
-            std::cout << "Deflagration profile:\n"
-                      << "  vm = " << vm << ", vmUF = " << mu(vw_, abs(vm)) << "\n"
-                      << "  wmwN = " << w_end_val << ", TmTN = " << T_end_val << "\n"
-                      << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
-                      << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
-                      << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
-                      << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-                      << "  xi_sh = " << xi_sh << "\n";
+            // std::cout << "Deflagration profile:\n"
+            //           << "  vm = " << vm << ", vmUF = " << mu(vw_, abs(vm)) << "\n"
+            //           << "  wmwN = " << w_end_val << ", TmTN = " << T_end_val << "\n"
+            //           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
+            //           << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
+            //           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+            //           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+            //           << "  xi_sh = " << xi_sh << "\n";
                       
 
         } else { // hybrid
@@ -1062,15 +1077,15 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            std::cout << "Hybrid profile:\n"
-                      << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
-                      << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
-                      << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
-                      << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
-                      << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
-                      << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-                      << "  xi_sh = " << xi_sh << "\n"
-                      << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
+            // std::cout << "Hybrid profile:\n"
+            //           << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
+            //           << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
+            //           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
+            //           << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+            //           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+            //           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+            //           << "  xi_sh = " << xi_sh << "\n"
+            //           << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
         }
 
     } else { // detonation
@@ -1101,10 +1116,10 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
 
-        std::cout << "Detonation profile:\n"
-                      << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
-                      << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n"
-                      << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
+        // std::cout << "Detonation profile:\n"
+        //               << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
+        //               << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n"
+        //               << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
     }
     
     // define start & end points where profile=const (outside integration)
@@ -1148,7 +1163,18 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
     // concatenate la(xi) vals
     la_sol.insert(la_sol.end(), la_start.begin(), la_start.end());
     la_sol.insert(la_sol.end(), la_sol_tmp.begin(), la_sol_tmp.end());
-    la_sol.insert(la_sol.end(), la_end.begin(), la_end.end());    
+    la_sol.insert(la_sol.end(), la_end.begin(), la_end.end()); 
+    
+    // tmp fix for < 0 vals (numerical precision issue with xi)
+    for (int i = 0; i < xi_sol.size(); i++) {
+        if (xi_sol[i] < 0.0 || xi_sol[i] > 1.0) {
+            xi_sol.erase(xi_sol.begin() + i);
+            v_sol.erase(v_sol.begin() + i);
+            w_sol.erase(w_sol.begin() + i);
+            T_sol.erase(T_sol.begin() + i);
+            la_sol.erase(la_sol.begin() + i);
+        }
+    }
 
     // reformat from backwards integration
     std::reverse(xi_sol.begin(), xi_sol.end());
@@ -1241,15 +1267,15 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             T_end_val = TmTN;
             la_end_val = lambda_b_veff(T_end_val, eN, wN_inv); // lambda just behind wall (broken phase)
 
-            std::cout << "Deflagration profile:\n"
-                      << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
-                      << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
-                      << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
-                      << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
-                      << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
-                      << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
-                      << "  xi_sh = " << xi0 << "\n";
-
+            // std::cout << "Deflagration profile:\n"
+            //           << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
+            //           << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
+            //           << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
+            //           << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
+            //           << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
+            //           << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
+            //           << "  xi_sh = " << xi0 << "\n";
+            
         } else { // hybrid
             // initial conditions for rarefaction wave
             const auto xi0_rf = vw_;
@@ -1274,15 +1300,15 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            std::cout << "Hybrid profile:\n"
-                      << "  vm = " << vm << ", vmUF=" << vmUF << "\n"
-                      << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
-                      << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
-                      << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
-                      << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
-                      << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
-                      << "  xi_sh = " << xi0 << "\n"
-                      << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
+            // std::cout << "Hybrid profile:\n"
+            //           << "  vm = " << vm << ", vmUF=" << vmUF << "\n"
+            //           << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
+            //           << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
+            //           << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
+            //           << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
+            //           << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
+            //           << "  xi_sh = " << xi0 << "\n"
+            //           << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
         }
 
     } else { // detonation
@@ -1317,10 +1343,10 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
 
-        std::cout << "Detonation profile:\n"
-                  << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
-                  << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n"
-                  << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
+        // std::cout << "Detonation profile:\n"
+                //   << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
+                //   << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n"
+                //   << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
     }
 
     // define start & end points where profile=const (outside integration)
@@ -1365,6 +1391,16 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
     la_sol.insert(la_sol.end(), la_start.begin(), la_start.end());
     la_sol.insert(la_sol.end(), la_sol_tmp.begin(), la_sol_tmp.end());
     la_sol.insert(la_sol.end(), la_end.begin(), la_end.end());    
+
+    for (int i = 0; i < xi_sol.size(); i++) {
+        if (xi_sol[i] < 0.0 || xi_sol[i] > 1.0) {
+            xi_sol.erase(xi_sol.begin() + i);
+            v_sol.erase(v_sol.begin() + i);
+            w_sol.erase(w_sol.begin() + i);
+            T_sol.erase(T_sol.begin() + i);
+            la_sol.erase(la_sol.begin() + i);
+        }
+    }
 
     // reformat from backwards integration
     std::reverse(xi_sol.begin(), xi_sol.end());
@@ -1421,7 +1457,6 @@ void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, cons
     plt::xlabel("xi");
     plt::ylabel("v(xi)");
     plt::xlim(xi_min, xi_max);
-    // plt::xlim(0.56, 0.61);
     plt::grid(true);
     plt::legend();
 
@@ -1443,7 +1478,6 @@ void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, cons
     plt::xlabel("xi");
     plt::ylabel("T(xi)");
     plt::xlim(xi_min, xi_max);
-    // plt::xlim(0.56, 0.61);
     plt::grid(true);
 
     // la(xi)
