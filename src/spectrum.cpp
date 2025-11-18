@@ -199,6 +199,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     }
 
     const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
+    zk_pRs_spec.write("zetaKin_pRs.csv");
     const auto zk_pRs_vals = zk_pRs_spec.P();
 
     const auto ptRs_min = 0.99 * find_min_pt(kRs_vals, pRs_vals);
@@ -334,12 +335,9 @@ double dlt_SSM2(double k, double p, double pt, const double cs, const double tau
             const auto x2 = pmn * tau_s;
 
             double Si_x1, Ci_x1, Si_x2, Ci_x2;
-            sici(x1, Si_x1, Ci_x1);
-            sici(x2, Si_x2, Ci_x2);
 
-            // use this instead if sici fails for very large x
-            // alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
-            // alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
+            alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
+            alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
 
             const auto dSi = Si_x1 - Si_x2;
             const auto dCi = Ci_x1 - Ci_x2;
