@@ -212,7 +212,7 @@ void FluidProfile::write(const std::string& filename) const {
     file << "xi,v,w,T,la\n";
 
     for (size_t i = 0; i < xi_vals_.size(); ++i) {
-        file << xi_vals_[i] << "," << v_vals_[i] << "," << w_vals_[i] << "," << T_vals_[i] << "," << la_vals_[i] << "\n";
+        file << std::setprecision(10) << xi_vals_[i] << "," << v_vals_[i] << "," << w_vals_[i] << "," << T_vals_[i] << "," << la_vals_[i] << "\n";
     }
     file.close();
 

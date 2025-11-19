@@ -199,7 +199,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     }
 
     const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
-    // zk_pRs_spec.write("zetaKin_pRs.csv");
+    zk_pRs_spec.write("zetaKin_pRs.csv");
     const auto zk_pRs_vals = zk_pRs_spec.P();
 
     const auto ptRs_min = 0.99 * find_min_pt(kRs_vals, pRs_vals);
@@ -208,7 +208,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
 
     const auto zk_ptRs_spec = zetaKin(ptRs_vals_tmp, profile);
-    // zk_ptRs_spec.write("zetaKin_ptRs.csv");
+    zk_ptRs_spec.write("zetaKin_ptRs.csv");
 
     std::vector<double> zk_ptRs_K_vals, zk_ptRs_P_vals;
     for (size_t i = 0; i < zk_ptRs_spec.K().size(); i++) {

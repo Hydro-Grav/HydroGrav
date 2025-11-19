@@ -70,6 +70,13 @@ std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(cons
     } catch (...) {
         throw std::runtime_error("Unknown error building spline in prof_ints_fl");
     }
+
+    std::ofstream ofs_debug("spline_debug.csv");
+    ofs_debug << "xi,v,v_sp,la,la_sp\n";
+    for (size_t i = 0; i < low_res_xi_vals.size(); ++i) {
+        ofs_debug << low_res_xi_vals[i] << "," << low_res_v_vals[i] << "," << alglib::spline1dcalc(v_spline, low_res_xi_vals[i]) << "," << low_res_la_vals[i] << "," << alglib::spline1dcalc(la_spline, low_res_xi_vals[i]) << "\n";
+    }
+    ofs_debug.close();
     
     const auto n = xi_vals.size();
     const auto m = chi_vals.size();
@@ -117,7 +124,7 @@ std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(cons
 
             const double tol = 1e-8;
 
-            if (chi < 1e0) {
+            if (chi < 1e-10) {
                 const int max_depth = 5;
                 auto integrand_fd_small_chi = [&](double xi) -> double {
                     const auto v_p = alglib::spline1dcalc(v_spline, xi);
@@ -155,12 +162,12 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
         Apsq[j] = 0.25 * (f*f + csq * l*l);
     }
 
-    // std::ofstream ofs("Ap_sq_debug.csv");
-    // ofs << "chi,Apsq,fd,l\n";
-    // for (size_t j = 0; j < m; j++) {
-    //     ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
-    // }
-    // ofs.close();
+    std::ofstream ofs("Ap_sq_debug.csv");
+    ofs << "chi,Apsq,fd,l\n";
+    for (size_t j = 0; j < m; j++) {
+        ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
+    }
+    ofs.close();
 
     return Apsq;
 }
