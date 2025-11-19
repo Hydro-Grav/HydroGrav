@@ -199,7 +199,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     }
 
     const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
-    zk_pRs_spec.write("zetaKin_pRs.csv");
+    // zk_pRs_spec.write("zetaKin_pRs.csv");
     const auto zk_pRs_vals = zk_pRs_spec.P();
 
     const auto ptRs_min = 0.99 * find_min_pt(kRs_vals, pRs_vals);
@@ -208,7 +208,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
 
     const auto zk_ptRs_spec = zetaKin(ptRs_vals_tmp, profile);
-    zk_ptRs_spec.write("zetaKin_ptRs.csv");
+    // zk_ptRs_spec.write("zetaKin_ptRs.csv");
 
     std::vector<double> zk_ptRs_K_vals, zk_ptRs_P_vals;
     for (size_t i = 0; i < zk_ptRs_spec.K().size(); i++) {
@@ -592,19 +592,20 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         auto integrand = [&](double log_chi) -> double {
             const double chi = std::exp(log_chi);
             const double Apsq_val = alglib::spline1dcalc(Apsq_spline, chi);
+            const double T_tilde = fac3*chi;
 
-            if( fac3*chi < 1e-1 || fac3*chi > 1e2) {
+            if(T_tilde < 1e-1 || T_tilde> 1e2) {
                 return 0.0;
             }
 
-            return fac2 * lt_dist(fac3 * chi) * power(chi, 7) * Apsq_val;
+            return lt_dist(T_tilde) * power(chi, 7) * Apsq_val;
         };
 
         const double log_chi_min = std::log(1e-3);
         const double log_chi_max = std::log(3000.0);
         
         double error;
-        P_vals[kk] = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand, log_chi_min, log_chi_max, 5, 1e-9, &error);
+        P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand, log_chi_min, log_chi_max, 6, 1e-9, &error);
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);
