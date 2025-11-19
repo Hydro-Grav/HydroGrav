@@ -115,8 +115,8 @@ std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(cons
                 return  lambda_p * xi * sin_cx;
             };
 
-            const int max_depth = (chi > 1e3) ? 7 : 5;
-            const double tol = (chi > 1e3) ? 1e-16 : 1e-8;
+            const int max_depth = (chi > 1e4) ? 7 : 5;
+            const double tol = (chi > 1e4) ? 1e-16 : 1e-8;
 
             fd[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_f_dash, xi_vals.front(), xi_vals.back(), max_depth, tol);
             l[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_l, xi_vals.front(), xi_vals.back(), max_depth, tol);
@@ -139,6 +139,13 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
 
         Apsq[j] = 0.25 * (f*f + csq * l*l);
     }
+
+    std::ofstream ofs("Ap_sq_debug.csv");
+    ofs << "chi,Apsq,fd,l\n";
+    for (size_t j = 0; j < m; j++) {
+        ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
+    }
+    ofs.close();
 
     return Apsq;
 }

@@ -12,9 +12,9 @@ int main(int argc, char* argv[]) {
     auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    if (argc == 5) {;
+    if (argc == 4) {
         alN = std::stod(argv[1]);
-        beta = std::stod(argv[2]);
+        beta = std::stod(argv[2])*(1e-15);
         vw = std::stod(argv[3]);
     }
 

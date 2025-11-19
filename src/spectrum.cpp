@@ -208,6 +208,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
 
     const auto zk_ptRs_spec = zetaKin(ptRs_vals_tmp, profile);
+    zk_ptRs_spec.write("zetaKin_ptRs.csv");
 
     std::vector<double> zk_ptRs_K_vals, zk_ptRs_P_vals;
     for (size_t i = 0; i < zk_ptRs_spec.K().size(); i++) {
@@ -592,7 +593,11 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
             const double chi = std::exp(log_chi);
             const double Apsq_val = alglib::spline1dcalc(Apsq_spline, chi);
 
-            return chi * fac2 * lt_dist(fac3 * chi) * power(chi, 6) * Apsq_val;
+            if( fac3*chi < 1e-1 || fac3*chi > 1e2) {
+                return 0.0;
+            }
+
+            return fac2 * lt_dist(fac3 * chi) * power(chi, 7) * Apsq_val;
         };
 
         const double log_chi_min = std::log(1e-3);
