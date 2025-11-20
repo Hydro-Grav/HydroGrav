@@ -21,6 +21,7 @@ TO DO:
 #include <fstream>
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
+#include <boost/math/quadrature/trapezoidal.hpp>
 #include <boost/math/special_functions/sinc.hpp>
 
 #include "profile.hpp"
@@ -118,15 +119,14 @@ std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(cons
 
                 const double chi_xi = chi * xi;
                 const double z_pi = chi_xi / M_PI;
-                const double sinc = boost::math::sinc_pi(z_pi); 
+                double sinc = boost::math::sinc_pi(z_pi); 
 
                 return lambda_p * xi * xi * sinc;
             };
 
-            const double tol = 1e-6;
-            const int max_depth = 5;
-            fd[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_f_dash, xi_vals.front(), xi_vals.back(), max_depth, tol);
-            l[j] = fac * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_l, xi_vals.front(), xi_vals.back(), max_depth, tol);
+            const double tol = 1e-8;
+            fd[j] = fac * inv_chi * boost::math::quadrature::trapezoidal(integrand_f_dash, xi_vals.front(), xi_vals.back(), tol);
+            l[j] = fac * boost::math::quadrature::trapezoidal(integrand_l, xi_vals.front(), xi_vals.back(), tol);
         }
     }
 
