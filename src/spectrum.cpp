@@ -178,7 +178,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 {
     const auto kinetic_spectrum = zetaKin(kRs_vals, profile);
 
-    // kinetic_spectrum.write("zetaKin_ptRs.csv");
+    kinetic_spectrum.write("zetakin_debug.csv");
 
     alglib::real_1d_array x_arr, y_arr;
     x_arr.setlength(kinetic_spectrum.K().size());
@@ -478,7 +478,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
 
-    const auto chi_vals = logspace(1e-3, 5e3, 1000);
+    const auto chi_vals = logspace(1e-3, 5e3, 500);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
@@ -512,9 +512,9 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         
         double error;
         const double tol = 1e-6;
-        const int max_iter = 5;
 
-        P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand, log_chi_min, log_chi_max, max_iter, tol, &error);
+        // P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 61>::integrate(integrand, log_chi_min, log_chi_max, max_iter, tol, &error);
+        P_vals[kk] = fac2 * boost::math::quadrature::trapezoidal(integrand, log_chi_min, log_chi_max, tol);
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);

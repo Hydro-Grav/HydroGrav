@@ -22,8 +22,12 @@ TO DO:
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 #include <boost/math/quadrature/trapezoidal.hpp>
+#include <boost/math/quadrature/gauss.hpp>
 #include <boost/math/special_functions/sinc.hpp>
+#include <gsl/gsl_integration.h>
+#include <gsl/gsl_errno.h>
 
+#include "maths_ops.hpp"
 #include "profile.hpp"
 
 namespace Hydrodynamics {
@@ -43,44 +47,98 @@ std::function<double(double)> lifetime_distribution_function(const std::string& 
     }
 }
 
-std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof) {
+struct IntegrandParams {
+    const alglib::spline1dinterpolant* spline;
+};
 
+double integrand_qawo(double xi, void *params)
+{
+    auto *P = static_cast<IntegrandParams*>(params);
+    return alglib::spline1dcalc(*(P->spline), xi) * xi;
+}
+
+const double compute_gsl_QAWO(const double& chi, const alglib::spline1dinterpolant& v_spline, const gsl_integration_qawo_enum type)
+{
+    const double xi_min = 0.01;
+    const double xi_max = 0.99;
+    const double L = xi_max - xi_min;
+
+    gsl_error_handler_t* old_handler = gsl_set_error_handler_off();
+
+    size_t workspace_size = 10000;
+    size_t n_levels = 150;
+
+    gsl_integration_workspace *w = gsl_integration_workspace_alloc(workspace_size);
+    gsl_integration_qawo_table *table = gsl_integration_qawo_table_alloc(chi, L, type, n_levels);
+
+    IntegrandParams params{ &v_spline };
+
+    gsl_function F;
+    F.function = &integrand_qawo;
+    F.params   = &params;
+
+    double result, error;
+
+    double abs_tol = 1e-4;
+    double rel_tol = 1e-4;
+
+    int status = gsl_integration_qawo(&F, xi_min, abs_tol, rel_tol, workspace_size, w, table, &result, &error);
+
+    if (status != GSL_SUCCESS) {
+        std::cerr << "GSL QAWO error: " << gsl_strerror(status) << " for chi = " << chi << ", error = " << error << "\n";
+        gsl_integration_qawo_table_free(table);
+        gsl_integration_workspace_free(w);
+        gsl_set_error_handler(old_handler);
+        return -1;
+    }
+
+    gsl_integration_qawo_table_free(table);
+    gsl_integration_workspace_free(w);
+
+    gsl_set_error_handler(old_handler);
+
+    return result;
+}
+
+void create_fluid_integrand_splines(const FluidProfile& prof, alglib::spline1dinterpolant& f_sin_spline, alglib::spline1dinterpolant& f_cos_spline, alglib::spline1dinterpolant& l_sin_spline)
+{
     const auto xi_vals = prof.xi_vals();
     const auto v_vals = prof.v_vals();
     const auto la_vals = prof.la_vals();
 
-    // the resolution is high enough that neighbouring points have the samee y_values which
-    // affects spline fitting.
-    std::vector<double> low_res_xi_vals, low_res_v_vals, low_res_la_vals;
+    std::vector<double> x_vals, f_sin_vals, f_cos_vals, l_sin_vals;
     for ( size_t i = 0; i < xi_vals.size(); i += 2) {
-        low_res_xi_vals.push_back(xi_vals[i]);
-        low_res_v_vals.push_back(v_vals[i]);
-        low_res_la_vals.push_back(la_vals[i]);
+        x_vals.push_back(xi_vals[i]);
+        f_sin_vals.push_back( - v_vals[i]);
+        f_cos_vals.push_back(v_vals[i] * xi_vals[i]);
+        l_sin_vals.push_back(la_vals[i] * xi_vals[i]);
     }
 
-    alglib::real_1d_array xi_arr, v_arr, la_arr;
-    xi_arr.setcontent(low_res_xi_vals.size(), low_res_xi_vals.data());
-    v_arr.setcontent(low_res_v_vals.size(), low_res_v_vals.data());
-    la_arr.setcontent(low_res_la_vals.size(), low_res_la_vals.data());
+    alglib::real_1d_array x_arr, f_sin_arr, f_cos_arr, l_sin_arr;
+    x_arr.setcontent(x_vals.size(), x_vals.data());
+    f_sin_arr.setcontent(f_sin_vals.size(), f_sin_vals.data());
+    f_cos_arr.setcontent(f_cos_vals.size(), f_cos_vals.data());
+    l_sin_arr.setcontent(l_sin_vals.size(), l_sin_vals.data());
 
-    alglib::spline1dinterpolant v_spline, la_spline;
     try {
-        alglib::spline1dbuildcubic(xi_arr, v_arr, v_spline);
-        alglib::spline1dbuildcubic(xi_arr, la_arr, la_spline);
+        alglib::spline1dbuildcubic(x_arr, f_sin_arr, f_sin_spline);
+        alglib::spline1dbuildcubic(x_arr, f_cos_arr, f_cos_spline);
+        alglib::spline1dbuildcubic(x_arr, l_sin_arr, l_sin_spline);
     } catch (const alglib::ap_error& e) {
         throw std::runtime_error(std::string("Error building spline in prof_ints_fl: ") + e.msg);
     } catch (...) {
         throw std::runtime_error("Unknown error building spline in prof_ints_fl");
     }
+}
 
-    std::ofstream ofs_debug("spline_debug.csv");
-    ofs_debug << "xi,v,v_sp,la,la_sp\n";
-    for (size_t i = 0; i < low_res_xi_vals.size(); ++i) {
-        ofs_debug << low_res_xi_vals[i] << "," << low_res_v_vals[i] << "," << alglib::spline1dcalc(v_spline, low_res_xi_vals[i]) << "," << low_res_la_vals[i] << "," << alglib::spline1dcalc(la_spline, low_res_xi_vals[i]) << "\n";
-    }
-    ofs_debug.close();
+std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof) {
+
+    alglib::spline1dinterpolant f_sin_spline, f_cos_spline, l_sin_spline;
+    create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
+
+    const double xi_min = prof.xi_vals().front();
+    const double xi_max = prof.xi_vals().back();
     
-    const auto n = xi_vals.size();
     const auto m = chi_vals.size();
     const auto fac = 4.0 * M_PI;
 
@@ -89,9 +147,6 @@ std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(cons
 
     #pragma omp parallel
     {
-        std::vector<double> fd_integrand(n);
-        std::vector<double> l_integrand(n);
-
         #pragma omp for
         for (size_t j = 0; j < m; j++) {
 
@@ -100,33 +155,37 @@ std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(cons
 
             auto integrand_f_dash = [&](double xi) -> double {
 
-                const auto v_p = alglib::spline1dcalc(v_spline, xi);
-
-                if(v_p == 0) { return 0.0;}
+                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
+                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
 
                 const auto chi_xi = chi * xi;
                 const auto sin_cx = std::sin(chi_xi);
                 const auto cos_cx = std::cos(chi_xi);
 
-                return v_p * (xi * cos_cx - sin_cx * inv_chi);
+                return sin_term * inv_chi * sin_cx + cos_term * cos_cx;
             };
 
             auto integrand_l = [&](double xi) -> double {
 
-                const auto lambda_p = alglib::spline1dcalc(la_spline, xi);
+                const auto sin_term = alglib::spline1dcalc(l_sin_spline, xi);
 
-                if(lambda_p == 0) { return 0.0;}
+                if(sin_term == 0) {return 0.0;}
 
-                const double chi_xi = chi * xi;
-                const double z_pi = chi_xi / M_PI;
-                double sinc = boost::math::sinc_pi(z_pi); 
+                double sin_cx = std::sin(chi * xi);
 
-                return lambda_p * xi * xi * sinc;
+                return sin_term * sin_cx;
             };
 
-            const double tol = 1e-8;
-            fd[j] = fac * inv_chi * boost::math::quadrature::trapezoidal(integrand_f_dash, xi_vals.front(), xi_vals.back(), tol);
-            l[j] = fac * boost::math::quadrature::trapezoidal(integrand_l, xi_vals.front(), xi_vals.back(), tol);
+            double abs_error = 1e-8 / (1.0 + chi);
+            double rel_error = 1e-8;
+            if(chi < 5e2) {
+                boost::math::quadrature::gauss_kronrod<double, 1000> integrator;
+                l[j] = fac * inv_chi * integrator.integrate(integrand_l, xi_min, xi_max, abs_error, rel_error);
+                fd[j] = fac * inv_chi * integrator.integrate(integrand_f_dash, xi_min, xi_max, abs_error, rel_error);
+            } else {
+                l[j] = fac * inv_chi * Levin::levin_integrate(l_sin_spline, chi, xi_min, xi_max, 64, false).first;
+                fd[j] = fac * inv_chi * (inv_chi * Levin::levin_integrate(f_sin_spline, chi, xi_min, xi_max, 64, false).first + Levin::levin_integrate(f_cos_spline, chi, xi_min, xi_max, 64, false).second);
+            }
         }
     }
 

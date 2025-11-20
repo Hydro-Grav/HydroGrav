@@ -5,11 +5,11 @@
 
 int main() {
 
-    const auto vw = 0.617095;
-    const auto alN = 0.020392;
-    const auto TN = 82.923938;
-    const auto beta = 988.636799 * 9.974751e-15;
-    const auto Rs = 0.002557/(9.974751e-15);
+    const auto vw = 0.577499;
+    const auto alN = 0.010780;
+    const auto TN = 94.049935;
+    const auto beta = 1794.730595 * 1.198829e-14;
+    const auto Rs = 0.001409/(9.974751e-15);
     const auto dtau = 10 * Rs;
     const auto cs_p = 0.573788;
     const auto cs_m = 0.562375;

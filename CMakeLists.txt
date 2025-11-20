@@ -62,6 +62,7 @@ find_package(OpenMP REQUIRED)
 find_package(ALGLIB REQUIRED)
 find_package(GSL REQUIRED)
 find_package(Boost REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 # --------------------------
 # Source and header files
@@ -112,6 +113,7 @@ target_include_directories(DeepPhaseLib
   ${ALGLIB_INCLUDES}
   ${GSL_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
 )
 
 target_link_libraries(DeepPhaseLib
@@ -119,6 +121,7 @@ target_link_libraries(DeepPhaseLib
   OpenMP::OpenMP_CXX
   ${ALGLIB_LIBRARIES}
   GSL::gsl GSL::gslcblas
+  Eigen3::Eigen
 )
 
 # --------------------------

@@ -5,6 +5,15 @@
 
 #include <array>
 #include <complex>
+#include <Eigen/Dense>
+#include <vector>
+#include <cmath>
+#include <stdexcept>
+#include <iostream>
+
+#include <gsl/gsl_integration.h>
+
+#include "interpolation.h"
 
 #include "profile.hpp"
 
@@ -28,6 +37,15 @@ std::function<double(double)> lifetime_distribution_function(const std::string& 
  * @return Pair of vector of the integrated profile functions f' and l.
  */
 std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof);
+
+void create_fluid_integrand_splines(const FluidProfile& prof, 
+    alglib::spline1dinterpolant& f_sin_spline, 
+    alglib::spline1dinterpolant& f_cos_spline, 
+    alglib::spline1dinterpolant& l_sin_spline);
+
+double integrand_qawo(double xi, void *params);
+
+const double compute_gsl_QAWO(const double& chi, const alglib::spline1dinterpolant& v_spline, const gsl_integration_qawo_enum type);
 
 /**
  * @brief Computes |A₊(χ)|², defined in Eq. (29) of Pol, Procacci, Caprini (2024).
