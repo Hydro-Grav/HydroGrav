@@ -173,6 +173,47 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
     return min_pt;
 }
 
+void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline) 
+{
+    const auto kinetic_spectrum = zetaKin(kRs_vals, profile);
+
+    // kinetic_spectrum.write("zetaKin_ptRs.csv");
+
+    alglib::real_1d_array x_arr, y_arr;
+    x_arr.setlength(kinetic_spectrum.K().size());
+    y_arr.setlength(kinetic_spectrum.K().size());
+    for (size_t i = 0; i < kinetic_spectrum.K().size(); i++) 
+    {
+        x_arr[i] = kinetic_spectrum.K()[i];
+
+        const auto P_val = kinetic_spectrum.P()[i];
+        if (P_val <= 0.0 || std::isnan(P_val) || std::isinf(P_val)) 
+        {
+            y_arr[i] = -700;
+        } else 
+        {
+            y_arr[i] = std::log(P_val);
+        }
+    }
+
+    try 
+    {
+        alglib::spline1dbuildcubic(x_arr, y_arr, log_zk_spline);
+    } catch (const alglib::ap_error& e) 
+    {
+        std::cerr << "ALGLIB error building spline for zetaKin(ptRs): " << e.msg << std::endl;
+        throw;
+    } catch (const std::exception& e) 
+    {
+        std::cerr << "Error building spline for zetaKin(ptRs): " << e.what() << std::endl;
+        throw;
+    } catch (...) 
+    {
+        std::cerr << "Unknown error building spline for zetaKin(ptRs)" << std::endl;
+        throw;
+    }
+}
+
 /*** GW power spectrum ***/
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
 
@@ -187,65 +228,27 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto nk = kRs_vals.size();
 
-    const auto np = 500;
-    const auto pRs_vals = logspace(1e-3, 1e+3, np); // P = p*Rs
+    const double pRs_minimum = 1e-3;
+    const double pRs_maximum = 1e+3;
+    const auto n_pRs = 500;
 
-    std::vector<double> log_pRs_vals(np), pRs_sq_vals(np), p_vals(np);
-    for (size_t i = 0; i < np; i++) {
+    const auto pRs_vals = logspace(pRs_minimum, pRs_maximum, n_pRs); // P = p*Rs
+
+    std::vector<double> log_pRs_vals(n_pRs), pRs_sq_vals(n_pRs), p_vals(n_pRs);
+    for (size_t i = 0; i < n_pRs; i++) {
         const auto pRs = pRs_vals[i];
         log_pRs_vals[i] = std::log(pRs);
         p_vals[i] = pRs * Rs_inv;
         pRs_sq_vals[i] = pRs * pRs;
     }
 
-    const auto zk_pRs_spec = zetaKin(pRs_vals, profile);
-    zk_pRs_spec.write("zetaKin_pRs.csv");
-    const auto zk_pRs_vals = zk_pRs_spec.P();
+    const auto kinetic_spectrum_spline_lower_bound = 0.99 * find_min_pt(kRs_vals, pRs_vals);
+    const auto kinetic_spectrum_spline_upper_bound = 1.01 * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
 
-    const auto ptRs_min = 0.99 * find_min_pt(kRs_vals, pRs_vals);
-    const auto ptRs_max = 1.01 * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
+    const auto kinetic_spectrum_K_values = logspace(kinetic_spectrum_spline_lower_bound, kinetic_spectrum_spline_upper_bound, 2*n_pRs);
 
-    const auto ptRs_vals_tmp = logspace(ptRs_min, ptRs_max, 2*np);
-
-    const auto zk_ptRs_spec = zetaKin(ptRs_vals_tmp, profile);
-    zk_ptRs_spec.write("zetaKin_ptRs.csv");
-
-    std::vector<double> zk_ptRs_K_vals, zk_ptRs_P_vals;
-    for (size_t i = 0; i < zk_ptRs_spec.K().size(); i++) {
-        zk_ptRs_K_vals.push_back(zk_ptRs_spec.K()[i]);
-        const auto P_val = zk_ptRs_spec.P()[i];
-        
-        if (P_val <= 0.0 || std::isnan(P_val) || std::isinf(P_val)) {
-            zk_ptRs_P_vals.push_back(-700);
-        } else {
-            zk_ptRs_P_vals.push_back(std::log(P_val));
-        }
-    }
-
-    if (zk_ptRs_K_vals.empty()) {
-        throw std::runtime_error("zetaKin(ptRs) spectrum is empty");
-    }
-
-    const auto zk_ptRs_K_min = zk_ptRs_K_vals.front();
-    const auto zk_ptRs_K_max = zk_ptRs_K_vals.back();
-
-    alglib::real_1d_array K_vals, P_vals;
-    K_vals.setcontent(zk_ptRs_K_vals.size(), zk_ptRs_K_vals.data());
-    P_vals.setcontent(zk_ptRs_P_vals.size(), zk_ptRs_P_vals.data());
-
-    alglib::spline1dinterpolant zk_ptRs_interp;
-    try {
-        alglib::spline1dbuildcubic(K_vals, P_vals, zk_ptRs_interp);
-    } catch (const alglib::ap_error& e) {
-        std::cerr << "ALGLIB error building spline for zetaKin(ptRs): " << e.msg << std::endl;
-        throw;
-    } catch (const std::exception& e) {
-        std::cerr << "Error building spline for zetaKin(ptRs): " << e.what() << std::endl;
-        throw;
-    } catch (...) {
-        std::cerr << "Unknown error building spline for zetaKin(ptRs)" << std::endl;
-        throw;
-    }
+    alglib::spline1dinterpolant log_zk_spline;
+    build_kinetic_spectrum_spline(kinetic_spectrum_K_values, profile, log_zk_spline);
 
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
@@ -255,44 +258,36 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     
     #pragma omp parallel 
     {
-
-        std::vector<double> pRs_integrand(np);
+        std::vector<double> pRs_integrand(n_pRs);
 
         #pragma omp for schedule(static)
-        for (size_t kk = 0; kk < nk; kk++ ) {
+        for (size_t kk = 0; kk < nk; kk++ ) 
+        {
             const auto kRs = kRs_vals[kk];
             const auto k = kRs * Rs_inv;
             const auto kRs3 = kRs * kRs * kRs;
 
-            for (size_t pp = 0; pp < np; pp++) {
+            for (size_t pp = 0; pp < n_pRs; pp++) 
+            {
                 const auto pRs = pRs_vals[pp];
                 const auto p = p_vals[pp];
                 const auto pRs_sq = pRs_sq_vals[pp];
-                const auto zk_pRs_val = zk_pRs_vals[pp];
+                const auto zk_pRs_val = std::exp(alglib::spline1dcalc(log_zk_spline, pRs));
                 const auto zk_pRs_fac = kRs3 * zk_pRs_val * pRs_sq;
 
-                auto z_integrand = [&](double z) -> double {
+                auto z_integrand = [&](double z) -> double 
+                {
                     const auto ptRs = ptilde(kRs, pRs, z);
 
-                    if (ptRs == 0.0 || ptRs < zk_ptRs_K_min || ptRs > zk_ptRs_K_max) 
+                    if (ptRs == 0.0 
+                        || ptRs < kinetic_spectrum_spline_lower_bound 
+                        || ptRs > kinetic_spectrum_spline_upper_bound) 
                     {
                         return 0.0;
                     }
                 
                     const auto dlt = dlt_SSM(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);      
-                    double zk_ptRs_val;
-                    try {
-                        zk_ptRs_val = std::exp(alglib::spline1dcalc(zk_ptRs_interp, ptRs));
-                    }  catch (const alglib::ap_error& e) {
-                        std::cerr << "ALGLIB error evaluating spline for zetaKin(ptRs): " << e.msg << std::endl;
-                        throw;
-                    } catch (const std::exception& e) {
-                        std::cerr << "Error evaluating spline for zetaKin(ptRs) at ptRs = " << ptRs << ": " << e.what() << std::endl;
-                        throw;
-                    } catch (...) {
-                        std::cerr << "Unknown error evaluating spline for zetaKin(ptRs) at ptRs = " << ptRs << std::endl;
-                        throw;
-                    }
+                    double zk_ptRs_val = std::exp(alglib::spline1dcalc(log_zk_spline, ptRs));
 
                     const auto z_fac = 1.0 - z*z;
                     const auto z_fac2 = z_fac * z_fac;
@@ -302,7 +297,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
                 };
 
                 double z_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(z_integrand, -1.0, 1.0, 5, 1e-6);
-
                 pRs_integrand[pp] = z_result;
             }
 

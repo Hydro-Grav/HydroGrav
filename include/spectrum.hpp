@@ -111,6 +111,8 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
 
+void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline);
+
 /**
  * @brief Calculates prefactor for GW power spectrum $\Omega_{GW}$
  *
