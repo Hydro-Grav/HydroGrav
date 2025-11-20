@@ -605,7 +605,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         const double log_chi_max = std::log(3000.0);
         
         double error;
-        P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand, log_chi_min, log_chi_max, 6, 1e-9, &error);
+        P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 31>::integrate(integrand, log_chi_min, log_chi_max, 6, 1e-9, &error);
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);

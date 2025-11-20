@@ -21,6 +21,7 @@ TO DO:
 #include <fstream>
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
+#include <boost/math/special_functions/sinc.hpp>
 
 #include "profile.hpp"
 
@@ -115,33 +116,17 @@ std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(cons
 
                 if(lambda_p == 0) { return 0.0;}
 
-                const auto chi_xi = chi * xi;
-                const auto sin_cx = std::sin(chi_xi);
-                const auto cos_cx = std::cos(chi_xi);
+                const double chi_xi = chi * xi;
+                const double z_pi = chi_xi / M_PI;
+                const double sinc = boost::math::sinc_pi(z_pi); 
 
-                return  lambda_p * xi * sin_cx;
+                return lambda_p * xi * xi * sinc;
             };
 
-            const double tol = 1e-8;
-
-            if (chi < 1e-10) {
-                const int max_depth = 5;
-                auto integrand_fd_small_chi = [&](double xi) -> double {
-                    const auto v_p = alglib::spline1dcalc(v_spline, xi);
-                    return -0.5 * v_p * xi * xi * xi;
-                };
-                fd[j] = fac * chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_fd_small_chi, xi_vals.front(), xi_vals.back(), max_depth, tol);
-                
-                auto integrand_l_small_chi = [&](double xi) -> double {
-                    const auto lambda_p = alglib::spline1dcalc(la_spline, xi);
-                    return lambda_p * xi * xi;
-                };
-                l[j] = fac * chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_l_small_chi, xi_vals.front(), xi_vals.back(), max_depth, tol);
-            } else {
-                const int max_depth = 8;
-                fd[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_f_dash, xi_vals.front(), xi_vals.back(), max_depth, tol);
-                l[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_l, xi_vals.front(), xi_vals.back(), max_depth, tol);
-            }
+            const double tol = 1e-6;
+            const int max_depth = 5;
+            fd[j] = fac * inv_chi * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_f_dash, xi_vals.front(), xi_vals.back(), max_depth, tol);
+            l[j] = fac * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand_l, xi_vals.front(), xi_vals.back(), max_depth, tol);
         }
     }
 
