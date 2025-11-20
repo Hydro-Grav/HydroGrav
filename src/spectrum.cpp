@@ -279,7 +279,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
                         return 0.0;
                     }
                 
-                    const auto dlt = dlt_SSM2(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);      
+                    const auto dlt = dlt_SSM(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);      
                     double zk_ptRs_val;
                     try {
                         zk_ptRs_val = std::exp(alglib::spline1dcalc(zk_ptRs_interp, ptRs));
@@ -322,7 +322,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 }
 /***************************/
 
-double dlt_SSM2(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin) {
+double dlt_SSM(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin) {
     const auto ptcs = pt * cs;
     const auto pcs = p * cs;
 
@@ -474,77 +474,6 @@ std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vecto
     return result;
 }
 
-std::vector<double> dlt_SSM(const std::vector<double>& kRs_vals, const std::vector<double>& pRs_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params) {
-    /***************************** CLOCK ******************************/
-    const auto ti = std::chrono::high_resolution_clock::now();
-    /******************************************************************/
-
-    const auto cs = std::sqrt(params.cpsq());
-    const auto tau_s = params.tau_s();
-    const auto tau_fin = params.tau_fin();
-    const auto Rs_inv = 1.0 / params.Rs();
-
-    const auto nk = kRs_vals.size();
-    const auto np = pRs_vals.size();
-    const auto nz = z_vals.size();
-
-    // reserve memory for integration
-    std::vector<double> result(nk * np * nz);
-    constexpr std::array<double,2> sum_vals = {-1.0, 1.0};
-
-    #pragma omp parallel
-    {
-        #pragma omp for collapse(3) schedule(static)
-        for (size_t kk = 0; kk < nk; kk++)
-        for (size_t pp = 0; pp < np; pp++)
-        for (size_t zz = 0; zz < nz; zz++) {
-            const auto k = kRs_vals[kk] * Rs_inv;
-            const auto p = pRs_vals[pp] * Rs_inv;
-            const auto z = z_vals[zz];
-
-            const auto pt = ptilde(k, p, z);
-            // const auto pt = std::sqrt(k*k - 2.0 * k * p * z + p*p);
-            auto dlt_temp = 0.0;
-
-            for (int i = 0; i < 2; i++) {
-                const auto m = sum_vals[i];
-                const auto pmn_1 = (p + m * pt) * cs;
-                for (int j = 0; j < 2; j++) {
-                    const auto n = sum_vals[j];
-                    const auto pmn = pmn_1 + n * k;
-
-                    const auto x1 = pmn * tau_fin;
-                    const auto x2 = pmn * tau_s;
-
-                    double Si_x1, Ci_x1, Si_x2, Ci_x2;
-                    sici(x1, Si_x1, Ci_x1);
-                    sici(x2, Si_x2, Ci_x2);
-                    // alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
-                    // alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
-
-                    // Im(Si(x))=0 for real x, Im(Ci(x))=pi (x<0), 0 (x>0)
-                    // Taking difference dCi -> imaginary part cancels since sign of x1, x2 always the same
-                    const auto dSi = Si_x1 - Si_x2;
-                    const auto dCi = Ci_x1 - Ci_x2;
-
-                    dlt_temp += 0.25 * (dCi * dCi + dSi * dSi);
-                }
-            }
-
-            result[kk * np * nz + pp * nz + zz] = dlt_temp;
-        }
-    }
-
-    /***************************** CLOCK ******************************/
-    const auto tf = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = tf - ti;
-    std::cout << "Timer (dlt_SSM): " << duration.count() << " s" << std::endl;
-    /******************************************************************/
-
-    return result;
-}
-/***************************/
-
 /*** Kinetic spectrum ***/
 // avoids duplicating fluid profile in GWSpec
 PowerSpec Ekin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
@@ -561,14 +490,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
 
-    // define Ttilde from chi = Ttilde * k / beta (makes calling Apsq simpler)
-    // using K = k * Rs below
-    /*
-    NOTE:
-    - Ap_sq = inf at 0
-    - chi_vals = logspace(1e-3, 3000, 5000) gives good convergence
-    */
-    const auto chi_vals = logspace(1e-3, 3e3, 5000);
+    const auto chi_vals = logspace(1e-3, 5e3, 1000);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
@@ -589,23 +511,22 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         const auto fac2 = fac1 * power(kRs_inv, 5);
         const auto fac3 = beta * Rs * kRs_inv;
 
-        auto integrand = [&](double log_chi) -> double {
+        auto integrand = [&](double log_chi) -> double 
+        {
             const double chi = std::exp(log_chi);
             const double Apsq_val = alglib::spline1dcalc(Apsq_spline, chi);
             const double T_tilde = fac3*chi;
-
-            if(T_tilde < 1e-1 || T_tilde> 1e2) {
-                return 0.0;
-            }
-
             return lt_dist(T_tilde) * power(chi, 7) * Apsq_val;
         };
 
         const double log_chi_min = std::log(1e-3);
-        const double log_chi_max = std::log(3000.0);
+        const double log_chi_max = std::log(5000.0);
         
         double error;
-        P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 31>::integrate(integrand, log_chi_min, log_chi_max, 6, 1e-9, &error);
+        const double tol = 1e-6;
+        const int max_iter = 5;
+
+        P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 15>::integrate(integrand, log_chi_min, log_chi_max, max_iter, tol, &error);
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);

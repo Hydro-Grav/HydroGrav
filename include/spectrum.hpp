@@ -83,8 +83,7 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
 double ff(double tau_m, double kcs);
 
 std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params);
-std::vector<double> dlt_SSM(const std::vector<double>& kRs_vals, const std::vector<double>& pRs_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params);
-double dlt_SSM2(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin);
+double dlt_SSM(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin);
 
 /**
  * @brief Calculates kinetic (velocity) power spectrum
