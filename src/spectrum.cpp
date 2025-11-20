@@ -17,6 +17,7 @@
 #include "specialfunctions.h"
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
+#include <boost/math/quadrature/trapezoidal.hpp>
 
 #include "maths_ops.hpp"
 #include "phasetransition.hpp"
@@ -234,14 +235,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto pRs_vals = logspace(pRs_minimum, pRs_maximum, n_pRs); // P = p*Rs
 
-    std::vector<double> log_pRs_vals(n_pRs), pRs_sq_vals(n_pRs), p_vals(n_pRs);
-    for (size_t i = 0; i < n_pRs; i++) {
-        const auto pRs = pRs_vals[i];
-        log_pRs_vals[i] = std::log(pRs);
-        p_vals[i] = pRs * Rs_inv;
-        pRs_sq_vals[i] = pRs * pRs;
-    }
-
     const auto kinetic_spectrum_spline_lower_bound = 0.99 * find_min_pt(kRs_vals, pRs_vals);
     const auto kinetic_spectrum_spline_upper_bound = 1.01 * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
 
@@ -258,8 +251,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     
     #pragma omp parallel 
     {
-        std::vector<double> pRs_integrand(n_pRs);
-
         #pragma omp for schedule(static)
         for (size_t kk = 0; kk < nk; kk++ ) 
         {
@@ -267,13 +258,13 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
             const auto k = kRs * Rs_inv;
             const auto kRs3 = kRs * kRs * kRs;
 
-            for (size_t pp = 0; pp < n_pRs; pp++) 
+            auto pRs_integrand = [&](double log_pRs) -> double
             {
-                const auto pRs = pRs_vals[pp];
-                const auto p = p_vals[pp];
-                const auto pRs_sq = pRs_sq_vals[pp];
+                const auto pRs = exp(log_pRs);
+                const auto p = pRs * Rs_inv;
+                const auto pRs_sq = pRs*pRs;
                 const auto zk_pRs_val = std::exp(alglib::spline1dcalc(log_zk_spline, pRs));
-                const auto zk_pRs_fac = kRs3 * zk_pRs_val * pRs_sq;
+                const auto zk_pRs_fac = zk_pRs_val * pRs_sq;
 
                 auto z_integrand = [&](double z) -> double 
                 {
@@ -293,14 +284,17 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
                     const auto z_fac2 = z_fac * z_fac;
                     const auto ptRs4_inv = 1.0 / (ptRs * ptRs * ptRs * ptRs);
 
-                    return pRs * z_fac2 * ptRs4_inv * zk_pRs_fac * zk_ptRs_val * dlt;
+                    return z_fac2 * ptRs4_inv * zk_ptRs_val * dlt;
                 };
 
-                double z_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(z_integrand, -1.0, 1.0, 5, 1e-6);
-                pRs_integrand[pp] = z_result;
-            }
+                const double z_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(z_integrand, -1.0, 1.0, 5, 1e-6);
 
-            GW_P_vals[kk] = prefac * simpson_integrate(log_pRs_vals, pRs_integrand);
+                return pRs * zk_pRs_fac * z_result;
+            };
+
+            // double pRs_result = boost::math::quadrature::trapezoidal(pRs_integrand, log(pRs_minimum), log(pRs_maximum), 1e-6);
+            double pRs_result = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(pRs_integrand, log(pRs_minimum), log(pRs_maximum), 5, 1e-6);
+            GW_P_vals[kk] = prefac * kRs3 * pRs_result;
         }
     }
 
