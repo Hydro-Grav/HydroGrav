@@ -47,58 +47,58 @@ std::function<double(double)> lifetime_distribution_function(const std::string& 
     }
 }
 
-struct IntegrandParams {
-    const alglib::spline1dinterpolant* spline;
-};
+// struct IntegrandParams {
+//     const alglib::spline1dinterpolant* spline;
+// };
 
-double integrand_qawo(double xi, void *params)
-{
-    auto *P = static_cast<IntegrandParams*>(params);
-    return alglib::spline1dcalc(*(P->spline), xi) * xi;
-}
+// double integrand_qawo(double xi, void *params)
+// {
+//     auto *P = static_cast<IntegrandParams*>(params);
+//     return alglib::spline1dcalc(*(P->spline), xi) * xi;
+// }
 
-const double compute_gsl_QAWO(const double& chi, const alglib::spline1dinterpolant& v_spline, const gsl_integration_qawo_enum type)
-{
-    const double xi_min = 0.01;
-    const double xi_max = 0.99;
-    const double L = xi_max - xi_min;
+// const double compute_gsl_QAWO(const double& chi, const alglib::spline1dinterpolant& v_spline, const gsl_integration_qawo_enum type)
+// {
+//     const double xi_min = 0.01;
+//     const double xi_max = 0.99;
+//     const double L = xi_max - xi_min;
 
-    gsl_error_handler_t* old_handler = gsl_set_error_handler_off();
+//     gsl_error_handler_t* old_handler = gsl_set_error_handler_off();
 
-    size_t workspace_size = 10000;
-    size_t n_levels = 150;
+//     size_t workspace_size = 10000;
+//     size_t n_levels = 150;
 
-    gsl_integration_workspace *w = gsl_integration_workspace_alloc(workspace_size);
-    gsl_integration_qawo_table *table = gsl_integration_qawo_table_alloc(chi, L, type, n_levels);
+//     gsl_integration_workspace *w = gsl_integration_workspace_alloc(workspace_size);
+//     gsl_integration_qawo_table *table = gsl_integration_qawo_table_alloc(chi, L, type, n_levels);
 
-    IntegrandParams params{ &v_spline };
+//     IntegrandParams params{ &v_spline };
 
-    gsl_function F;
-    F.function = &integrand_qawo;
-    F.params   = &params;
+//     gsl_function F;
+//     F.function = &integrand_qawo;
+//     F.params   = &params;
 
-    double result, error;
+//     double result, error;
 
-    double abs_tol = 1e-4;
-    double rel_tol = 1e-4;
+//     double abs_tol = 1e-4;
+//     double rel_tol = 1e-4;
 
-    int status = gsl_integration_qawo(&F, xi_min, abs_tol, rel_tol, workspace_size, w, table, &result, &error);
+//     int status = gsl_integration_qawo(&F, xi_min, abs_tol, rel_tol, workspace_size, w, table, &result, &error);
 
-    if (status != GSL_SUCCESS) {
-        std::cerr << "GSL QAWO error: " << gsl_strerror(status) << " for chi = " << chi << ", error = " << error << "\n";
-        gsl_integration_qawo_table_free(table);
-        gsl_integration_workspace_free(w);
-        gsl_set_error_handler(old_handler);
-        return -1;
-    }
+//     if (status != GSL_SUCCESS) {
+//         std::cerr << "GSL QAWO error: " << gsl_strerror(status) << " for chi = " << chi << ", error = " << error << "\n";
+//         gsl_integration_qawo_table_free(table);
+//         gsl_integration_workspace_free(w);
+//         gsl_set_error_handler(old_handler);
+//         return -1;
+//     }
 
-    gsl_integration_qawo_table_free(table);
-    gsl_integration_workspace_free(w);
+//     gsl_integration_qawo_table_free(table);
+//     gsl_integration_workspace_free(w);
 
-    gsl_set_error_handler(old_handler);
+//     gsl_set_error_handler(old_handler);
 
-    return result;
-}
+//     return result;
+// }
 
 void create_fluid_integrand_splines(const FluidProfile& prof, alglib::spline1dinterpolant& f_sin_spline, alglib::spline1dinterpolant& f_cos_spline, alglib::spline1dinterpolant& l_sin_spline)
 {

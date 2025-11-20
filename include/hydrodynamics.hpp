@@ -43,9 +43,9 @@ void create_fluid_integrand_splines(const FluidProfile& prof,
     alglib::spline1dinterpolant& f_cos_spline, 
     alglib::spline1dinterpolant& l_sin_spline);
 
-double integrand_qawo(double xi, void *params);
+// double integrand_qawo(double xi, void *params);
 
-const double compute_gsl_QAWO(const double& chi, const alglib::spline1dinterpolant& v_spline, const gsl_integration_qawo_enum type);
+// const double compute_gsl_QAWO(const double& chi, const alglib::spline1dinterpolant& v_spline, const gsl_integration_qawo_enum type);
 
 /**
  * @brief Computes |A₊(χ)|², defined in Eq. (29) of Pol, Procacci, Caprini (2024).
