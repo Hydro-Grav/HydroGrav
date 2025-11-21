@@ -64,6 +64,17 @@ find_package(GSL REQUIRED)
 find_package(Boost REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+# FINUFFT and FFTW3
+find_library(FINUFFT_LIBRARY finufft PATHS /usr/local/lib REQUIRED)
+find_path(FINUFFT_INCLUDE_DIR finufft.h PATHS /usr/local/include REQUIRED)
+find_library(FFTW3_LIBRARY fftw3 REQUIRED)
+find_library(FFTW3F_LIBRARY fftw3f REQUIRED)
+find_library(FFTW3_OMP_LIBRARY fftw3_omp REQUIRED)
+find_library(FFTW3F_OMP_LIBRARY fftw3f_omp REQUIRED)
+
+message(STATUS "Found FINUFFT: ${FINUFFT_LIBRARY}")
+message(STATUS "Found FINUFFT includes: ${FINUFFT_INCLUDE_DIR}")
+
 # --------------------------
 # Source and header files
 # --------------------------
@@ -114,6 +125,7 @@ target_include_directories(DeepPhaseLib
   ${GSL_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${FINUFFT_INCLUDE_DIR}
 )
 
 target_link_libraries(DeepPhaseLib
@@ -122,6 +134,11 @@ target_link_libraries(DeepPhaseLib
   ${ALGLIB_LIBRARIES}
   GSL::gsl GSL::gslcblas
   Eigen3::Eigen
+  ${FINUFFT_LIBRARY}
+  ${FFTW3_LIBRARY}
+  ${FFTW3F_LIBRARY}
+  ${FFTW3_OMP_LIBRARY}
+  ${FFTW3F_OMP_LIBRARY}
 )
 
 # --------------------------

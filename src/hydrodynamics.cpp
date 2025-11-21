@@ -26,6 +26,8 @@ TO DO:
 #include <boost/math/special_functions/sinc.hpp>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_errno.h>
+#include <fftw3.h>
+#include <finufft.h>
 
 #include "maths_ops.hpp"
 #include "profile.hpp"
@@ -47,145 +49,167 @@ std::function<double(double)> lifetime_distribution_function(const std::string& 
     }
 }
 
-// struct IntegrandParams {
-//     const alglib::spline1dinterpolant* spline;
-// };
-
-// double integrand_qawo(double xi, void *params)
-// {
-//     auto *P = static_cast<IntegrandParams*>(params);
-//     return alglib::spline1dcalc(*(P->spline), xi) * xi;
-// }
-
-// const double compute_gsl_QAWO(const double& chi, const alglib::spline1dinterpolant& v_spline, const gsl_integration_qawo_enum type)
-// {
-//     const double xi_min = 0.01;
-//     const double xi_max = 0.99;
-//     const double L = xi_max - xi_min;
-
-//     gsl_error_handler_t* old_handler = gsl_set_error_handler_off();
-
-//     size_t workspace_size = 10000;
-//     size_t n_levels = 150;
-
-//     gsl_integration_workspace *w = gsl_integration_workspace_alloc(workspace_size);
-//     gsl_integration_qawo_table *table = gsl_integration_qawo_table_alloc(chi, L, type, n_levels);
-
-//     IntegrandParams params{ &v_spline };
-
-//     gsl_function F;
-//     F.function = &integrand_qawo;
-//     F.params   = &params;
-
-//     double result, error;
-
-//     double abs_tol = 1e-4;
-//     double rel_tol = 1e-4;
-
-//     int status = gsl_integration_qawo(&F, xi_min, abs_tol, rel_tol, workspace_size, w, table, &result, &error);
-
-//     if (status != GSL_SUCCESS) {
-//         std::cerr << "GSL QAWO error: " << gsl_strerror(status) << " for chi = " << chi << ", error = " << error << "\n";
-//         gsl_integration_qawo_table_free(table);
-//         gsl_integration_workspace_free(w);
-//         gsl_set_error_handler(old_handler);
-//         return -1;
-//     }
-
-//     gsl_integration_qawo_table_free(table);
-//     gsl_integration_workspace_free(w);
-
-//     gsl_set_error_handler(old_handler);
-
-//     return result;
-// }
-
-void create_fluid_integrand_splines(const FluidProfile& prof, alglib::spline1dinterpolant& f_sin_spline, alglib::spline1dinterpolant& f_cos_spline, alglib::spline1dinterpolant& l_sin_spline)
+static void build_nodes_and_samples(const FluidProfile &prof,
+    std::vector<double>& x, std::vector<double>& f_sin, std::vector<double>& f_cos, std::vector<double>& l_sin)
 {
-    const auto xi_vals = prof.xi_vals();
-    const auto v_vals = prof.v_vals();
-    const auto la_vals = prof.la_vals();
+    const auto &xi_vals = prof.xi_vals();
+    const auto &v_vals  = prof.v_vals();
+    const auto &la_vals = prof.la_vals();
 
-    std::vector<double> x_vals, f_sin_vals, f_cos_vals, l_sin_vals;
-    for ( size_t i = 0; i < xi_vals.size(); i += 2) {
-        x_vals.push_back(xi_vals[i]);
-        f_sin_vals.push_back( - v_vals[i]);
-        f_cos_vals.push_back(v_vals[i] * xi_vals[i]);
-        l_sin_vals.push_back(la_vals[i] * xi_vals[i]);
-    }
+    if (xi_vals.size() != v_vals.size() || xi_vals.size() != la_vals.size())
+        throw std::runtime_error("profile vectors size mismatch");
 
-    alglib::real_1d_array x_arr, f_sin_arr, f_cos_arr, l_sin_arr;
-    x_arr.setcontent(x_vals.size(), x_vals.data());
-    f_sin_arr.setcontent(f_sin_vals.size(), f_sin_vals.data());
-    f_cos_arr.setcontent(f_cos_vals.size(), f_cos_vals.data());
-    l_sin_arr.setcontent(l_sin_vals.size(), l_sin_vals.data());
+    x.clear(); f_sin.clear(); f_cos.clear(); l_sin.clear();
 
-    try {
-        alglib::spline1dbuildcubic(x_arr, f_sin_arr, f_sin_spline);
-        alglib::spline1dbuildcubic(x_arr, f_cos_arr, f_cos_spline);
-        alglib::spline1dbuildcubic(x_arr, l_sin_arr, l_sin_spline);
-    } catch (const alglib::ap_error& e) {
-        throw std::runtime_error(std::string("Error building spline in prof_ints_fl: ") + e.msg);
-    } catch (...) {
-        throw std::runtime_error("Unknown error building spline in prof_ints_fl");
+    for (size_t i = 0; i + 1 < xi_vals.size(); i += 2) {
+        x.push_back(xi_vals[i]);
+        f_sin.push_back(-v_vals[i]);
+        f_cos.push_back(v_vals[i] * xi_vals[i]);
+        l_sin.push_back(la_vals[i] * xi_vals[i]);
     }
 }
 
-std::pair<std::vector<double>, std::vector<double>> fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof) {
+static std::vector<double> trapezoid_weights(const std::vector<double>& x) {
+    const size_t N = x.size();
+    if (N == 0) return {};
+    std::vector<double> w(N);
+    if (N == 1) { w[0] = 0.0; return w; }
 
-    alglib::spline1dinterpolant f_sin_spline, f_cos_spline, l_sin_spline;
-    create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
+    w[0] = 0.5 * (x[1] - x[0]);
+    for (size_t i = 1; i + 1 < N; ++i) {
+        w[i] = 0.5 * (x[i+1] - x[i-1]);
+    }
+    w[N-1] = 0.5 * (x[N-1] - x[N-2]);
+    return w;
+}
 
-    const double xi_min = prof.xi_vals().front();
-    const double xi_max = prof.xi_vals().back();
+/*
+    Below is a modification of this routine that utilises FFT for 
+    small chi values, and resorts to a levine integration method for 
+    large chi. 
+
+    This code was produced using GPT 5.0 and Claude Sonnet 4.5
+*/
+std::pair<std::vector<double>, std::vector<double>>
+fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof)
+{
+    const double chi_threshold = 500.0;
     
-    const auto m = chi_vals.size();
-    const auto fac = 4.0 * M_PI;
+    std::vector<double> x, f_sin, f_cos, l_sin;
+    build_nodes_and_samples(prof, x, f_sin, f_cos, l_sin);
 
-    std::vector<double> fd(m); 
-    std::vector<double> l(m);
+    const size_t N = x.size();
+    if (N == 0) return {{},{}};
 
-    #pragma omp parallel
-    {
-        #pragma omp for
-        for (size_t j = 0; j < m; j++) {
+    const double fac = 4.0 * M_PI;
+    const size_t M = chi_vals.size();
+    
+    std::vector<double> fd(M, 0.0), l(M, 0.0);
 
-            const auto chi = chi_vals[j];
-            const auto inv_chi = 1.0 / chi;
+    std::vector<size_t> low_chi_indices, high_chi_indices;
+    std::vector<double> low_chi_vals, high_chi_vals;
+    
+    for (size_t j = 0; j < M; ++j) {
+        if (chi_vals[j] < chi_threshold) {
+            low_chi_indices.push_back(j);
+            low_chi_vals.push_back(chi_vals[j]);
+        } else {
+            high_chi_indices.push_back(j);
+            high_chi_vals.push_back(chi_vals[j]);
+        }
+    }
 
-            auto integrand_f_dash = [&](double xi) -> double {
+    if (!low_chi_vals.empty()) {
+        std::vector<double> w = trapezoid_weights(x);
 
-                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
-                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
+        std::vector<std::complex<double>> c_fsin(N), c_fcos(N), c_lsin(N);
+        for (size_t n = 0; n < N; ++n) {
+            c_fsin[n] = std::complex<double>( f_sin[n] * w[n], 0.0 );
+            c_fcos[n] = std::complex<double>( f_cos[n] * w[n], 0.0 );
+            c_lsin[n] = std::complex<double>( l_sin[n] * w[n], 0.0 );
+        }
 
-                const auto chi_xi = chi * xi;
-                const auto sin_cx = std::sin(chi_xi);
-                const auto cos_cx = std::cos(chi_xi);
+        const size_t M_low = low_chi_vals.size();
 
-                return sin_term * inv_chi * sin_cx + cos_term * cos_cx;
-            };
+        std::vector<double> xbuf = x;
+        std::vector<double> kbuf = low_chi_vals;
+        std::vector<std::complex<double>> out_fsin(M_low), out_fcos(M_low), out_lsin(M_low);
 
-            auto integrand_l = [&](double xi) -> double {
+        const int iflag = +1;
+        const double eps = 1e-12;
+        int ier;
 
-                const auto sin_term = alglib::spline1dcalc(l_sin_spline, xi);
+        ier = finufft1d3((int64_t)N, xbuf.data(),
+                         reinterpret_cast<std::complex<double>*>(c_fsin.data()),
+                         iflag, eps, (int64_t)M_low, kbuf.data(),
+                         reinterpret_cast<std::complex<double>*>(out_fsin.data()), nullptr);
+        if (ier != 0) throw std::runtime_error("FINUFFT error in f_sin transform");
 
-                if(sin_term == 0) {return 0.0;}
+        ier = finufft1d3((int64_t)N, xbuf.data(),
+                         reinterpret_cast<std::complex<double>*>(c_fcos.data()),
+                         iflag, eps, (int64_t)M_low, kbuf.data(),
+                         reinterpret_cast<std::complex<double>*>(out_fcos.data()), nullptr);
+        if (ier != 0) throw std::runtime_error("FINUFFT error in f_cos transform");
 
-                double sin_cx = std::sin(chi * xi);
+        ier = finufft1d3((int64_t)N, xbuf.data(),
+                         reinterpret_cast<std::complex<double>*>(c_lsin.data()),
+                         iflag, eps, (int64_t)M_low, kbuf.data(),
+                         reinterpret_cast<std::complex<double>*>(out_lsin.data()), nullptr);
+        if (ier != 0) throw std::runtime_error("FINUFFT error in l_sin transform");
 
-                return sin_term * sin_cx;
-            };
+        for (size_t i = 0; i < M_low; ++i) {
+            const size_t j = low_chi_indices[i];
+            const double chi = chi_vals[j];
+            const double inv_chi = 1.0 / chi;
 
-            double abs_error = 1e-8 / (1.0 + chi);
-            double rel_error = 1e-8;
-            if(chi < 5e2) {
-                boost::math::quadrature::gauss_kronrod<double, 1000> integrator;
-                l[j] = fac * inv_chi * integrator.integrate(integrand_l, xi_min, xi_max, abs_error, rel_error);
-                fd[j] = fac * inv_chi * integrator.integrate(integrand_f_dash, xi_min, xi_max, abs_error, rel_error);
-            } else {
-                l[j] = fac * inv_chi * Levin::levin_integrate(l_sin_spline, chi, xi_min, xi_max, 64, false).first;
-                fd[j] = fac * inv_chi * (inv_chi * Levin::levin_integrate(f_sin_spline, chi, xi_min, xi_max, 64, false).first + Levin::levin_integrate(f_cos_spline, chi, xi_min, xi_max, 64, false).second);
-            }
+            l[j] = fac * inv_chi * std::imag(out_lsin[i]);
+
+            double term_cos = std::real(out_fcos[i]);
+            double term_sin = std::imag(out_fsin[i]);
+            fd[j] = fac * inv_chi * (term_cos + inv_chi * term_sin);
+        }
+    }
+
+    if (!high_chi_vals.empty()) {
+        const auto &xi_vals = prof.xi_vals();
+        const auto &v_vals  = prof.v_vals();
+        const auto &la_vals = prof.la_vals();
+
+        std::vector<double> x_for_spline, v_for_spline, v_xi_for_spline, la_xi_for_spline;
+        for (size_t i = 0; i + 1 < xi_vals.size(); i += 2) {
+            x_for_spline.push_back(xi_vals[i]);
+            v_for_spline.push_back(v_vals[i]);
+            v_xi_for_spline.push_back(v_vals[i] * xi_vals[i]);
+            la_xi_for_spline.push_back(la_vals[i] * xi_vals[i]);
+        }
+
+        alglib::real_1d_array x_arr, v_arr, v_xi_arr, la_xi_arr;
+        x_arr.setcontent(x_for_spline.size(), x_for_spline.data());
+        v_arr.setcontent(v_for_spline.size(), v_for_spline.data());
+        v_xi_arr.setcontent(v_xi_for_spline.size(), v_xi_for_spline.data());
+        la_xi_arr.setcontent(la_xi_for_spline.size(), la_xi_for_spline.data());
+
+        alglib::spline1dinterpolant v_spline, v_xi_spline, la_xi_spline;
+        alglib::spline1dbuildcubic(x_arr, v_arr, v_spline);
+        alglib::spline1dbuildcubic(x_arr, v_xi_arr, v_xi_spline);
+        alglib::spline1dbuildcubic(x_arr, la_xi_arr, la_xi_spline);
+
+        const double xi_min = x_for_spline.front();
+        const double xi_max = x_for_spline.back();
+        const int N_colloc = 32;
+
+        for (size_t i = 0; i < high_chi_vals.size(); ++i) {
+            const size_t j = high_chi_indices[i];
+            const double chi = chi_vals[j];
+            const double inv_chi = 1.0 / chi;
+
+            auto [l_sin_int, l_cos_int] = Levin::levin_integrate(la_xi_spline, chi, xi_min, xi_max, N_colloc, false);
+            l[j] = fac * inv_chi * l_sin_int;
+
+            auto [v_sin_int, v_cos_int] = Levin::levin_integrate(v_spline, chi, xi_min, xi_max, N_colloc, false);
+            auto [vxi_sin_int, vxi_cos_int] = Levin::levin_integrate(v_xi_spline, chi, xi_min, xi_max, N_colloc, false);
+
+            fd[j] = fac * inv_chi * (vxi_cos_int - inv_chi * v_sin_int);
         }
     }
 
