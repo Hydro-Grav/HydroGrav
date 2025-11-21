@@ -65,7 +65,7 @@ state_type dydv_vec(double v, const state_type& y, double vw, double cmsq, doubl
     const auto xi = y[0];
     const auto w = y[1];
     const auto T = y[2];
-    const auto csq = (xi < vw) ? cmsq : cpsq;
+    const auto csq = (xi <= vw) ? cmsq : cpsq;
 
     return { dxidv(xi, v, csq), dwdv(xi, v, w, csq), dTdv(xi, v, T, csq) };
 }
@@ -956,7 +956,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
     std::cout << "\n";
 
     auto dydv = [this] (double v, const state_type& y) -> state_type {
-        return dydv_vec(v, y, vw_, cpsq_, cmsq_);
+        return dydv_vec(v, y, vw_, cmsq_, cpsq_);
     };
 
     double xi0, xif;
@@ -1073,31 +1073,6 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
             const state_type y0_rf = {xi0_rf, wmwN, TmTN};
             const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydv, vmUF, 1e-10, y0_rf, n);
-            // const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver_saddle_escape(dydv, vmUF, 1e-10, y0_rf, n);
-
-            // std::vector<double> xi_new(v_sol_rf_tmp.size());
-            // std::vector<double> v_new(v_sol_rf_tmp.size());
-            // for (int i = 0; i < v_sol_rf_tmp.size(); i++) {
-            //     // std::cout << std::setprecision(12) << "xi=" << y_sol_rf_tmp[i][0] << ", v=" << v_sol_rf_tmp[i] << ", dxidv=" << dxidv(y_sol_rf_tmp[i][0], v_sol_rf_tmp[i], cmsq_) << "\n";
-            //     xi_new[i] = y_sol_rf_tmp[i][0];
-            //     v_new[i] = v_sol_rf_tmp[i];
-            // }
-
-            // for (int i = 0; i < v_sol_rf_tmp.size(); i++) {
-            //     if (xi_new[i] < 0.0 || xi_new[i] > 1.0) {
-            //         xi_new.erase(xi_new.begin() + i);
-            //         v_new.erase(v_new.begin() + i);
-            //     }
-            // }
-
-            // plt::figure_size(800, 800);
-            // plt::plot(xi_new, v_new);
-            // plt::xlabel("xi");
-            // plt::ylabel("v(xi)");
-            // // plt::xlim(0.5685, 0.570);
-            // // plt::ylim(0.0, 0.004);
-            // plt::grid(true);
-            // plt::save("v_det");
 
             // combine rarefaction wave with shockwave part of solution
             for (size_t i = 0; i < v_sol_rf_tmp.size(); i++) {
@@ -1114,15 +1089,15 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-        //     std::cout << "Hybrid profile:\n"
-        //               << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
-        //               << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
-        //               << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
-        //               << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
-        //               << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
-        //               << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-        //               << "  xi_sh = " << xi_sh << "\n"
-        //               << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
+            // std::cout << "Hybrid profile:\n"
+            //           << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
+            //           << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
+            //           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
+            //           << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+            //           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+            //           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+            //           << "  xi_sh = " << xi_sh << "\n"
+            //           << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
         }
 
     } else { // detonation
@@ -1242,8 +1217,8 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 
     // wrapper for hydrodynamic EoM
     auto dydv = [this] (double vUF, const state_type& y) -> state_type {
-        // return dydv_vec(vUF, y, vw_, cpsq_, cmsq_);
-        return dydv_vec(vUF, y, vw_, veff_params_->csq_s(y[2]), veff_params_->csq_b(y[2]));
+        // return dydv_vec(vUF, y, vw_, cmsq_, cpsq_);
+        return dydv_vec(vUF, y, vw_, veff_params_->csq_b(y[2]), veff_params_->csq_s(y[2]));
     };
 
     const auto eN = veff_params_->eN();
