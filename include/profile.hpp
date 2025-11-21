@@ -65,6 +65,9 @@ class FluidProfile {
     prof_type la_vals() const { return la_vals_; }; // la(xi)
     prof_type T_vals() const { return T_vals_; }
 
+    double xi_max() const { return xi_max_integrate_; } // xi_sh
+    double xi_min() const { return xi_min_integrate_; } // vw (def), cm (det/hyb)
+
     int mode() const { return mode_; }; // Hydrodynamic mode (0=deflagration, 1=hybrid, 2=detonation)
     std::string mode_str() const;
 
@@ -85,6 +88,7 @@ class FluidProfile {
     double alp_min_, alp_max_;
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
     prof_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
+    double xi_min_integrate_, xi_max_integrate_; // start/endpoints of profile for integration
 
     /************************** Bag EoS **************************/
     int get_mode_bag(double vw, double cmsq, double alN) const;

@@ -1073,6 +1073,31 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
             const state_type y0_rf = {xi0_rf, wmwN, TmTN};
             const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydv, vmUF, 1e-10, y0_rf, n);
+            // const auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver_saddle_escape(dydv, vmUF, 1e-10, y0_rf, n);
+
+            // std::vector<double> xi_new(v_sol_rf_tmp.size());
+            // std::vector<double> v_new(v_sol_rf_tmp.size());
+            // for (int i = 0; i < v_sol_rf_tmp.size(); i++) {
+            //     // std::cout << std::setprecision(12) << "xi=" << y_sol_rf_tmp[i][0] << ", v=" << v_sol_rf_tmp[i] << ", dxidv=" << dxidv(y_sol_rf_tmp[i][0], v_sol_rf_tmp[i], cmsq_) << "\n";
+            //     xi_new[i] = y_sol_rf_tmp[i][0];
+            //     v_new[i] = v_sol_rf_tmp[i];
+            // }
+
+            // for (int i = 0; i < v_sol_rf_tmp.size(); i++) {
+            //     if (xi_new[i] < 0.0 || xi_new[i] > 1.0) {
+            //         xi_new.erase(xi_new.begin() + i);
+            //         v_new.erase(v_new.begin() + i);
+            //     }
+            // }
+
+            // plt::figure_size(800, 800);
+            // plt::plot(xi_new, v_new);
+            // plt::xlabel("xi");
+            // plt::ylabel("v(xi)");
+            // // plt::xlim(0.5685, 0.570);
+            // // plt::ylim(0.0, 0.004);
+            // plt::grid(true);
+            // plt::save("v_det");
 
             // combine rarefaction wave with shockwave part of solution
             for (size_t i = 0; i < v_sol_rf_tmp.size(); i++) {
@@ -1089,15 +1114,15 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            // std::cout << "Hybrid profile:\n"
-            //           << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
-            //           << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
-            //           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
-            //           << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
-            //           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
-            //           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-            //           << "  xi_sh = " << xi_sh << "\n"
-            //           << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
+        //     std::cout << "Hybrid profile:\n"
+        //               << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
+        //               << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
+        //               << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
+        //               << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+        //               << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+        //               << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+        //               << "  xi_sh = " << xi_sh << "\n"
+        //               << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
         }
 
     } else { // detonation
@@ -1133,6 +1158,10 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         //               << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n"
         //               << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
     }
+
+    // store start/endpoints of profile for integration
+    xi_min_integrate_ = xif;
+    xi_max_integrate_ = xi0;
     
     // define start & end points where profile=const (outside integration)
     const auto xi_start = linspace(0.99, xi0, n); // backwards integration
@@ -1361,6 +1390,10 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
                 //   << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n"
                 //   << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
     }
+
+    // store start/endpoints of profile for integration
+    xi_min_integrate_ = xif;
+    xi_max_integrate_ = xi0;
 
     // define start & end points where profile=const (outside integration)
     const auto xi_start = linspace(0.99, xi0, n); // backwards integration
