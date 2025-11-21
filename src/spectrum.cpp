@@ -292,7 +292,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
                 return pRs * zk_pRs_fac * z_result;
             };
 
-            // double pRs_result = boost::math::quadrature::trapezoidal(pRs_integrand, log(pRs_minimum), log(pRs_maximum), 1e-6);
             double pRs_result = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(pRs_integrand, log(pRs_minimum), log(pRs_maximum), 5, 1e-6);
             GW_P_vals[kk] = prefac * kRs3 * pRs_result;
         }
