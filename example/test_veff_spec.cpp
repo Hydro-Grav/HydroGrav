@@ -5,7 +5,7 @@
 
 int main() {
 
-    const auto vw = 0.1;
+    const auto vw = 0.7;
     const auto alN = 0.1;
     const auto TN = 100;
     const auto beta = 100* 6.082692e-15;
