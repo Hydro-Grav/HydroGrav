@@ -81,6 +81,70 @@ class CubicSpline {
 #include "CubicSpline.tpp"
 
 /**
+ * @brief Filon-type integrator for highly oscillatory integrals.
+ * 
+ * Implements a Filon-type quadrature method to efficiently compute integrals of the form:
+ *   ∫ f(x) * sin(ω*x) dx  or  ∫ f(x) * cos(ω*x) dx
+ * 
+ * where ω is large (causing standard quadrature methods to fail).
+ * 
+ * The method works by:
+ * 1. Subdividing the interval into subintervals containing a few oscillation periods
+ * 2. Approximating f(x) with a polynomial on each subinterval
+ * 3. Computing the oscillatory integral analytically for polynomial * sin/cos
+ * 
+ * This is more stable than pure Levin collocation for varying functions.
+ */
+class LevinIntegrator {
+public:
+    /**
+     * @brief Construct a Filon-type integrator.
+     * @param n_points Order of polynomial approximation (default: 8)
+     */
+    LevinIntegrator(int n_points = 8);
+    
+    /**
+     * @brief Integrate f(x) * sin(omega * x) from a to b.
+     * @param f Function to integrate (should accept double and return double)
+     * @param omega Oscillatory frequency parameter
+     * @param a Lower integration limit
+     * @param b Upper integration limit
+     * @return Integral value
+     */
+    double integrate_sin(const std::function<double(double)>& f, double omega, double a, double b);
+    
+    /**
+     * @brief Integrate f(x) * cos(omega * x) from a to b.
+     * @param f Function to integrate (should accept double and return double)
+     * @param omega Oscillatory frequency parameter
+     * @param a Lower integration limit
+     * @param b Upper integration limit
+     * @return Integral value
+     */
+    double integrate_cos(const std::function<double(double)>& f, double omega, double a, double b);
+    
+private:
+    int n_points_;
+    
+    /**
+     * @brief Integrate a single subinterval using Filon-type quadrature.
+     * @param f_vals Function values at quadrature points
+     * @param x_vals Quadrature point locations
+     * @param omega Oscillatory frequency
+     * @param a Lower limit
+     * @param b Upper limit
+     * @param use_sin True for sin integral, false for cos integral
+     */
+    double filon_integrate_interval(
+        const std::vector<double>& f_vals,
+        const std::vector<double>& x_vals,
+        double omega,
+        double a,
+        double b,
+        bool use_sin);
+};
+
+/**
  * @brief Creates a linearly spaced vector between `start` and `end` (C++ equivalent of python's linspace function).
  *
  * @param start Initial value.

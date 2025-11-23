@@ -5,15 +5,25 @@
 
 int main() {
 
-    const auto vw = 0.7;
-    const auto alN = 0.1;
-    const auto TN = 100;
-    const auto beta = 100* 6.082692e-15;
-    const auto Rs = 0.1/(6.082692e-15);
+    const auto vw = 0.619155;
+    const auto alN = 0.020960;
+    const auto TN = 82.459211;
+    const auto beta = 965.269746 * 9.868763e-15;
+    const auto Rs = 0.002619/(9.868763e-15);
     const auto dtau = 10 * Rs;
     const auto cs_p = 0.573788;
     const auto cs_m = 0.562375;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+
+    // const auto vw = 0.5;
+    // const auto alN = 0.1;
+    // const auto TN = 100;
+    // const auto beta = 100 * 9.868763e-15;
+    // const auto Rs = 0.1/(9.868763e-15);
+    // const auto dtau = 10 * Rs;
+    // const auto cs_p = 0.573788;
+    // const auto cs_m = 0.562375;
+    // const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
     const PhaseTransition::Universe un;
 

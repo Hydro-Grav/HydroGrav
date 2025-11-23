@@ -9,6 +9,8 @@
 #include <cassert>
 // #include <matplotlibcpp.h>
 
+#include <boost/math/quadrature/gauss_kronrod.hpp>
+
 #include "ap.h"
 #include "solvers.h"
 
@@ -66,6 +68,195 @@ std::vector<double> logspace(double start, double stop, std::size_t num) {
 
     return result;
 }
+
+// ============================================================================
+// Filon-Type Integrator Implementation
+// ============================================================================
+
+LevinIntegrator::LevinIntegrator(int n_points) : n_points_(n_points) {
+    if (n_points < 3) {
+        throw std::invalid_argument("LevinIntegrator requires at least 3 points");
+    }
+}
+
+double LevinIntegrator::filon_integrate_interval(
+    const std::vector<double>& f_vals,
+    const std::vector<double>& x_vals,
+    double omega,
+    double a,
+    double b,
+    bool use_sin)
+{
+    // Filon-type quadrature: approximate f(x) with piecewise linear/quadratic
+    // and integrate exactly for polynomial * sin(omega*x) or polynomial * cos(omega*x)
+    
+    const int n = f_vals.size();
+    if (n < 2) return 0.0;
+    
+    double result = 0.0;
+    
+    // Use Simpson-type approach: trapezoidal for 2 points, Simpson for 3+
+    if (n == 2) {
+        // Trapezoidal with exact oscillatory integration
+        // ∫[a,b] (f0 + (f1-f0)*(x-a)/(b-a)) * sin(omega*x) dx
+        double h = b - a;
+        double f0 = f_vals[0];
+        double f1 = f_vals[1];
+        
+        if (use_sin) {
+            // ∫[a,b] f0*sin(ωx) dx = -f0/ω * [cos(ωb) - cos(ωa)]
+            double s0 = -f0 / omega * (std::cos(omega * b) - std::cos(omega * a));
+            // ∫[a,b] (x-a)*sin(ωx) dx
+            double s1 = ((f1 - f0) / h) * 
+                        ((std::sin(omega * b) - std::sin(omega * a)) / omega - 
+                         a * (std::cos(omega * b) - std::cos(omega * a)) / omega);
+            result = s0 + s1;
+        } else {
+            // ∫[a,b] f0*cos(ωx) dx = f0/ω * [sin(ωb) - sin(ωa)]
+            double c0 = f0 / omega * (std::sin(omega * b) - std::sin(omega * a));
+            double c1 = ((f1 - f0) / h) * 
+                        (-(std::cos(omega * b) - std::cos(omega * a)) / omega - 
+                         a * (std::sin(omega * b) - std::sin(omega * a)) / omega);
+            result = c0 + c1;
+        }
+    } else {
+        // Use composite integration over subintervals
+        for (int i = 0; i + 1 < n; ++i) {
+            double x0 = x_vals[i];
+            double x1 = x_vals[i + 1];
+            double f0 = f_vals[i];
+            double f1 = f_vals[i + 1];
+            double h = x1 - x0;
+            
+            if (std::abs(h) < 1e-15) continue;
+            
+            if (use_sin) {
+                // Linear interpolation: f(x) = f0 + (f1-f0)*(x-x0)/h
+                // ∫[x0,x1] f(x)*sin(ωx) dx
+                double wa = omega * x0;
+                double wb = omega * x1;
+                double ca = std::cos(wa);
+                double cb = std::cos(wb);
+                double sa = std::sin(wa);
+                double sb = std::sin(wb);
+                
+                result += -f0 * (cb - ca) / omega + 
+                         (f1 - f0) / (h * omega * omega) * 
+                         (omega * h * (cb + ca) / 2.0 - (sb - sa));
+            } else {
+                // ∫[x0,x1] f(x)*cos(ωx) dx
+                double wa = omega * x0;
+                double wb = omega * x1;
+                double ca = std::cos(wa);
+                double cb = std::cos(wb);
+                double sa = std::sin(wa);
+                double sb = std::sin(wb);
+                
+                result += f0 * (sb - sa) / omega + 
+                         (f1 - f0) / (h * omega * omega) * 
+                         (omega * h * (sb + sa) / 2.0 + (cb - ca));
+            }
+        }
+    }
+    
+    return result;
+}
+
+double LevinIntegrator::integrate_sin(
+    const std::function<double(double)>& f,
+    double omega,
+    double a,
+    double b)
+{
+    if (std::abs(omega) < 10.0) {
+        // For small omega, use standard quadrature
+        auto integrand = [&](double x) { return f(x) * std::sin(omega * x); };
+        boost::math::quadrature::gauss<double, 30> integrator;
+        return integrator.integrate(integrand, a, b);
+    }
+    
+    // Adaptive subdivision based on oscillation count
+    const double interval = b - a;
+    const double period = 2.0 * M_PI / omega;
+    const int n_oscillations = static_cast<int>(std::ceil(interval / period));
+    
+    // Target: 2-4 oscillations per subinterval for stability
+    const int target_osc_per_interval = 3;
+    const int n_subdivisions = std::max(1, (n_oscillations + target_osc_per_interval - 1) / target_osc_per_interval);
+    
+    const double h_sub = interval / n_subdivisions;
+    double total = 0.0;
+    
+    for (int k = 0; k < n_subdivisions; ++k) {
+        double a_sub = a + k * h_sub;
+        double b_sub = a + (k + 1) * h_sub;
+        
+        // Sample function at n_points_ locations in this subinterval
+        std::vector<double> x_vals(n_points_);
+        std::vector<double> f_vals(n_points_);
+        
+        for (int i = 0; i < n_points_; ++i) {
+            double t = static_cast<double>(i) / (n_points_ - 1);  // uniform in [0,1]
+            x_vals[i] = a_sub + t * (b_sub - a_sub);
+            f_vals[i] = f(x_vals[i]);
+        }
+        
+        // Apply Filon-type quadrature on this subinterval
+        total += filon_integrate_interval(f_vals, x_vals, omega, a_sub, b_sub, true);
+    }
+    
+    return total;
+}
+
+double LevinIntegrator::integrate_cos(
+    const std::function<double(double)>& f,
+    double omega,
+    double a,
+    double b)
+{
+    if (std::abs(omega) < 10.0) {
+        // For small omega, use standard quadrature
+        auto integrand = [&](double x) { return f(x) * std::cos(omega * x); };
+        boost::math::quadrature::gauss<double, 30> integrator;
+        return integrator.integrate(integrand, a, b);
+    }
+    
+    // Adaptive subdivision based on oscillation count
+    const double interval = b - a;
+    const double period = 2.0 * M_PI / omega;
+    const int n_oscillations = static_cast<int>(std::ceil(interval / period));
+    
+    // Target: 2-4 oscillations per subinterval for stability
+    const int target_osc_per_interval = 3;
+    const int n_subdivisions = std::max(1, (n_oscillations + target_osc_per_interval - 1) / target_osc_per_interval);
+    
+    const double h_sub = interval / n_subdivisions;
+    double total = 0.0;
+    
+    for (int k = 0; k < n_subdivisions; ++k) {
+        double a_sub = a + k * h_sub;
+        double b_sub = a + (k + 1) * h_sub;
+        
+        // Sample function at n_points_ locations in this subinterval
+        std::vector<double> x_vals(n_points_);
+        std::vector<double> f_vals(n_points_);
+        
+        for (int i = 0; i < n_points_; ++i) {
+            double t = static_cast<double>(i) / (n_points_ - 1);  // uniform in [0,1]
+            x_vals[i] = a_sub + t * (b_sub - a_sub);
+            f_vals[i] = f(x_vals[i]);
+        }
+        
+        // Apply Filon-type quadrature on this subinterval
+        total += filon_integrate_interval(f_vals, x_vals, omega, a_sub, b_sub, false);
+    }
+    
+    return total;
+}
+
+// ============================================================================
+// End Filon-Type Integrator Implementation
+// ============================================================================
 
 // faster than std::pow
 double power(double x, int exp) {

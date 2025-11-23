@@ -93,12 +93,15 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     alglib::spline1dinterpolant f_sin_spline, f_cos_spline, l_sin_spline;
     create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
 
+    // Create Filon-type integrator for large chi values (16 points per subinterval)
+    LevinIntegrator levin(16);
+
     #pragma omp parallel for
     for (size_t j = 0; j < M; ++j) {
         const double chi = chi_vals[j];
         const double inv_chi = 1.0 / chi;
 
-        const double chi_threshold = 1e2;
+        const double chi_threshold = 5e2;
 
         double f_sin_int = 0.0;
         double f_cos_int = 0.0;
@@ -108,29 +111,28 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
         const double xi_max = prof.xi_max();
 
         if ( chi < chi_threshold ) {
-            for (size_t i = 0; i + 1 < N; ++i) {
-                const double xi_i = xi_vals[i];
+            // for (size_t i = 0; i + 1 < N; ++i) {
+            //     const double xi_i = xi_vals[i];
 
-                if(xi_i < xi_min || xi_i > xi_max) { continue; }
-                const double xi_ip1 = xi_vals[i + 1];
-                const double dx = xi_ip1 - xi_i;
+            //     if(xi_i < xi_min || xi_i > xi_max) { continue; }
+            //     const double xi_ip1 = xi_vals[i + 1];
+            //     const double dx = xi_ip1 - xi_i;
 
-                const double sin_chi_xi_i = std::sin(chi * xi_i);
-                const double sin_chi_xi_ip1 = std::sin(chi * xi_ip1);
+            //     const double sin_chi_xi_i = std::sin(chi * xi_i);
+            //     const double sin_chi_xi_ip1 = std::sin(chi * xi_ip1);
 
-                const double y_fsin_i = -v_vals[i] * sin_chi_xi_i;
-                const double y_fsin_ip1 = -v_vals[i + 1] * sin_chi_xi_ip1;
-                f_sin_int += 0.5 * (y_fsin_i + y_fsin_ip1) * dx;
+            //     const double y_fsin_i = -v_vals[i] * sin_chi_xi_i;
+            //     const double y_fsin_ip1 = -v_vals[i + 1] * sin_chi_xi_ip1;
+            //     f_sin_int += 0.5 * (y_fsin_i + y_fsin_ip1) * dx;
 
-                const double y_fcos_i = v_vals[i] * xi_i * std::cos(chi * xi_i);
-                const double y_fcos_ip1 = v_vals[i + 1] * xi_ip1 * std::cos(chi * xi_ip1);
-                f_cos_int += 0.5 * (y_fcos_i + y_fcos_ip1) * dx;
+            //     const double y_fcos_i = v_vals[i] * xi_i * std::cos(chi * xi_i);
+            //     const double y_fcos_ip1 = v_vals[i + 1] * xi_ip1 * std::cos(chi * xi_ip1);
+            //     f_cos_int += 0.5 * (y_fcos_i + y_fcos_ip1) * dx;
 
-                const double y_lsin_i = la_vals[i] * xi_i * sin_chi_xi_i;
-                const double y_lsin_ip1 = la_vals[i + 1] * xi_ip1 * sin_chi_xi_ip1;
-                l_sin_int += 0.5 * (y_lsin_i + y_lsin_ip1) * dx;
-            }
-        } else {
+            //     const double y_lsin_i = la_vals[i] * xi_i * sin_chi_xi_i;
+            //     const double y_lsin_ip1 = la_vals[i + 1] * xi_ip1 * sin_chi_xi_ip1;
+            //     l_sin_int += 0.5 * (y_lsin_i + y_lsin_ip1) * dx;
+            // }
 
             auto integrand_f_sin = [&](double xi) -> double {
 
@@ -139,7 +141,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
                 const auto chi_xi = chi * xi;
                 const auto sin_cx = std::sin(chi_xi);
 
-                return sin_term * inv_chi * sin_cx;
+                return sin_term * sin_cx;
             };
 
             auto integrand_f_cos = [&](double xi) -> double {
@@ -162,13 +164,27 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
                 return sin_term * sin_cx;
             };
 
-            double abs_error = 1e-8 / (1.0 + chi);
-            double rel_error = 1e-8;
-
-            boost::math::quadrature::gauss<double, 1024> integrator;
+            boost::math::quadrature::gauss<double, 32> integrator;
             f_cos_int = integrator.integrate(integrand_f_cos, xi_min, xi_max);
             f_sin_int = integrator.integrate(integrand_f_sin, xi_min, xi_max);
             l_sin_int = integrator.integrate(integrand_l_sin, xi_min, xi_max);
+
+        } else {
+            auto f_sin_func = [&](double xi) -> double {
+                return alglib::spline1dcalc(f_sin_spline, xi);
+            };
+            
+            auto f_cos_func = [&](double xi) -> double {
+                return alglib::spline1dcalc(f_cos_spline, xi);
+            };
+            
+            auto l_sin_func = [&](double xi) -> double {
+                return alglib::spline1dcalc(l_sin_spline, xi);
+            };
+
+            f_sin_int = levin.integrate_sin(f_sin_func, chi, xi_min, xi_max);
+            f_cos_int = levin.integrate_cos(f_cos_func, chi, xi_min, xi_max);
+            l_sin_int = levin.integrate_sin(l_sin_func, chi, xi_min, xi_max);
         }
 
         double fd_j = fac * inv_chi * (f_cos_int + inv_chi * f_sin_int);

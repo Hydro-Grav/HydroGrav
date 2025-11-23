@@ -477,7 +477,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
 
-    const auto chi_vals = logspace(1e-3, 5e3, 1000);
+    const auto chi_vals = logspace(1e-3, 3e3, 2000);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
@@ -490,16 +490,16 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     alglib::spline1dinterpolant Apsq_spline;
     alglib::spline1dbuildcubic(chi_arr, Apsq_arr, Apsq_spline);
 
-    std::ofstream debug_ofs("Ekin_debug.csv");
-    debug_ofs << "i,chi,Apsq,Apsq_spline\n";
-    for ( size_t i = 0; i < n; i ++)
-    {
-        const double chi = chi_vals[i];
-        const double Apsq_val = Apsq[i];
-        const double Apsq_spline_val = alglib::spline1dcalc(Apsq_spline, chi);
-        debug_ofs << i << "," << chi << "," << Apsq_val << "," << Apsq_spline_val << "\n";
-    }
-    debug_ofs.close();
+    // std::ofstream debug_ofs("Ekin_debug.csv");
+    // debug_ofs << "i,chi,Apsq,Apsq_spline\n";
+    // for ( size_t i = 0; i < n; i ++)
+    // {
+    //     const double chi = chi_vals[i];
+    //     const double Apsq_val = Apsq[i];
+    //     const double Apsq_spline_val = alglib::spline1dcalc(Apsq_spline, chi);
+    //     debug_ofs << i << "," << chi << "," << Apsq_val << "," << Apsq_spline_val << "\n";
+    // }
+    // debug_ofs.close();
 
     #pragma omp parallel for
     for (size_t kk = 0; kk < nk; kk++) {
@@ -518,13 +518,9 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         };
 
         const double log_chi_min = std::log(1e-3);
-        const double log_chi_max = std::log(5000.0);
-        
-        double error;
-        const double tol = 1e-6;
+        const double log_chi_max = std::log(3000.0);
 
-        P_vals[kk] = fac2 * boost::math::quadrature::gauss<double, 256>::integrate(integrand, log_chi_min, log_chi_max);
-        // P_vals[kk] = fac2 * boost::math::quadrature::trapezoidal(integrand, log_chi_min, log_chi_max, tol);
+        P_vals[kk] = fac2 * boost::math::quadrature::gauss<double, 1024>::integrate(integrand, log_chi_min, log_chi_max);
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);
