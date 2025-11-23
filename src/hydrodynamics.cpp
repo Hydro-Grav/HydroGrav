@@ -20,6 +20,9 @@ TO DO:
 #include <omp.h>
 #include <fstream>
 
+#include <boost/math/quadrature/gauss_kronrod.hpp>
+#include <boost/math/quadrature/trapezoidal.hpp>
+
 #include "maths_ops.hpp"
 #include "profile.hpp"
 
@@ -40,6 +43,37 @@ std::function<double(double)> lifetime_distribution_function(const std::string& 
     }
 }
 
+void create_fluid_integrand_splines(const FluidProfile& prof, alglib::spline1dinterpolant& f_sin_spline, alglib::spline1dinterpolant& f_cos_spline, alglib::spline1dinterpolant& l_sin_spline)
+{
+    const auto xi_vals = prof.xi_vals();
+    const auto v_vals = prof.v_vals();
+    const auto la_vals = prof.la_vals();
+
+    std::vector<double> x_vals, f_sin_vals, f_cos_vals, l_sin_vals;
+    for ( size_t i = 0; i < xi_vals.size(); i += 2) {
+        x_vals.push_back(xi_vals[i]);
+        f_sin_vals.push_back( - v_vals[i]);
+        f_cos_vals.push_back(v_vals[i] * xi_vals[i]);
+        l_sin_vals.push_back(la_vals[i] * xi_vals[i]);
+    }
+
+    alglib::real_1d_array x_arr, f_sin_arr, f_cos_arr, l_sin_arr;
+    x_arr.setcontent(x_vals.size(), x_vals.data());
+    f_sin_arr.setcontent(f_sin_vals.size(), f_sin_vals.data());
+    f_cos_arr.setcontent(f_cos_vals.size(), f_cos_vals.data());
+    l_sin_arr.setcontent(l_sin_vals.size(), l_sin_vals.data());
+
+    try {
+        alglib::spline1dbuildcubic(x_arr, f_sin_arr, f_sin_spline);
+        alglib::spline1dbuildcubic(x_arr, f_cos_arr, f_cos_spline);
+        alglib::spline1dbuildcubic(x_arr, l_sin_arr, l_sin_spline);
+    } catch (const alglib::ap_error& e) {
+        throw std::runtime_error(std::string("Error building spline in prof_ints_fl: ") + e.msg);
+    } catch (...) {
+        throw std::runtime_error("Unknown error building spline in prof_ints_fl");
+    }
+}
+
 
 std::pair<std::vector<double>, std::vector<double>>
 fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile& prof)
@@ -56,59 +90,100 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     
     std::vector<double> fd(M, 0.0), l(M, 0.0);
 
+    alglib::spline1dinterpolant f_sin_spline, f_cos_spline, l_sin_spline;
+    create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
+
     #pragma omp parallel for
     for (size_t j = 0; j < M; ++j) {
         const double chi = chi_vals[j];
         const double inv_chi = 1.0 / chi;
 
-        const double chi_threshold = 100.0;
-        const int subsample_factor = (chi > chi_threshold) ? static_cast<int>(std::ceil(chi / chi_threshold)) : 1;
+        const double chi_threshold = 1e2;
 
         double f_sin_int = 0.0;
         double f_cos_int = 0.0;
         double l_sin_int = 0.0;
 
-        for (size_t i = 0; i + 1 < N; ++i) {
-            const double xi_i = xi_vals[i];
-            const double xi_ip1 = xi_vals[i + 1];
-            const double dx_total = xi_ip1 - xi_i;
-            const int n_sub = subsample_factor;
-            const double dx_sub = dx_total / n_sub;
+        const double xi_min = prof.xi_min();
+        const double xi_max = prof.xi_max();
 
-            for (int k = 0; k < n_sub; ++k) {
-                const double xi_k = xi_i + k * dx_sub;
-                const double xi_kp1 = xi_i + (k + 1) * dx_sub;
+        if ( chi < chi_threshold ) {
+            for (size_t i = 0; i + 1 < N; ++i) {
+                const double xi_i = xi_vals[i];
 
-                const double t = static_cast<double>(k) / n_sub;
-                const double t_next = static_cast<double>(k + 1) / n_sub;
-                
-                const double v_k = v_vals[i] * (1.0 - t) + v_vals[i + 1] * t;
-                const double v_kp1 = v_vals[i] * (1.0 - t_next) + v_vals[i + 1] * t_next;
-                
-                const double la_k = la_vals[i] * (1.0 - t) + la_vals[i + 1] * t;
-                const double la_kp1 = la_vals[i] * (1.0 - t_next) + la_vals[i + 1] * t_next;
+                if(xi_i < xi_min || xi_i > xi_max) { continue; }
+                const double xi_ip1 = xi_vals[i + 1];
+                const double dx = xi_ip1 - xi_i;
 
-                const double sin_chi_xi_k = std::sin(chi * xi_k);
-                const double sin_chi_xi_kp1 = std::sin(chi * xi_kp1);
-                const double cos_chi_xi_k = std::cos(chi * xi_k);
-                const double cos_chi_xi_kp1 = std::cos(chi * xi_kp1);
+                const double sin_chi_xi_i = std::sin(chi * xi_i);
+                const double sin_chi_xi_ip1 = std::sin(chi * xi_ip1);
 
-                const double y_fsin_k = -v_k * sin_chi_xi_k;
-                const double y_fsin_kp1 = -v_kp1 * sin_chi_xi_kp1;
-                f_sin_int += 0.5 * (y_fsin_k + y_fsin_kp1) * dx_sub;
+                const double y_fsin_i = -v_vals[i] * sin_chi_xi_i;
+                const double y_fsin_ip1 = -v_vals[i + 1] * sin_chi_xi_ip1;
+                f_sin_int += 0.5 * (y_fsin_i + y_fsin_ip1) * dx;
 
-                const double y_fcos_k = v_k * xi_k * cos_chi_xi_k;
-                const double y_fcos_kp1 = v_kp1 * xi_kp1 * cos_chi_xi_kp1;
-                f_cos_int += 0.5 * (y_fcos_k + y_fcos_kp1) * dx_sub;
+                const double y_fcos_i = v_vals[i] * xi_i * std::cos(chi * xi_i);
+                const double y_fcos_ip1 = v_vals[i + 1] * xi_ip1 * std::cos(chi * xi_ip1);
+                f_cos_int += 0.5 * (y_fcos_i + y_fcos_ip1) * dx;
 
-                const double y_lsin_k = la_k * xi_k * sin_chi_xi_k;
-                const double y_lsin_kp1 = la_kp1 * xi_kp1 * sin_chi_xi_kp1;
-                l_sin_int += 0.5 * (y_lsin_k + y_lsin_kp1) * dx_sub;
+                const double y_lsin_i = la_vals[i] * xi_i * sin_chi_xi_i;
+                const double y_lsin_ip1 = la_vals[i + 1] * xi_ip1 * sin_chi_xi_ip1;
+                l_sin_int += 0.5 * (y_lsin_i + y_lsin_ip1) * dx;
             }
+        } else {
+
+            auto integrand_f_sin = [&](double xi) -> double {
+
+                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
+                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
+                const auto chi_xi = chi * xi;
+                const auto sin_cx = std::sin(chi_xi);
+
+                return sin_term * inv_chi * sin_cx;
+            };
+
+            auto integrand_f_cos = [&](double xi) -> double {
+
+                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
+                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
+                const auto chi_xi = chi * xi;
+                const auto cos_cx = std::cos(chi_xi);
+
+                return cos_term * cos_cx;
+            };
+
+            auto integrand_l_sin = [&](double xi) -> double {
+
+                const auto sin_term = alglib::spline1dcalc(l_sin_spline, xi);
+
+                if(sin_term == 0) {return 0.0;}
+
+                double sin_cx = std::sin(chi * xi);
+                return sin_term * sin_cx;
+            };
+
+            double abs_error = 1e-8 / (1.0 + chi);
+            double rel_error = 1e-8;
+
+            boost::math::quadrature::gauss<double, 1024> integrator;
+            f_cos_int = integrator.integrate(integrand_f_cos, xi_min, xi_max);
+            f_sin_int = integrator.integrate(integrand_f_sin, xi_min, xi_max);
+            l_sin_int = integrator.integrate(integrand_l_sin, xi_min, xi_max);
         }
 
-        fd[j] = fac * inv_chi * (f_cos_int + inv_chi * f_sin_int);
-        l[j] = fac * inv_chi * l_sin_int;
+        double fd_j = fac * inv_chi * (f_cos_int + inv_chi * f_sin_int);
+        double l_j = fac * inv_chi * l_sin_int;
+
+        const double lambda_min = prof.la_vals().front();
+        if(lambda_min != 0) {
+            const double cos_term = - xi_min * std::cos(xi_min * chi);
+            const double sin_term = std::sin(xi_min * chi)*inv_chi;
+            const double analytic_l = cos_term + sin_term;
+            l_j += fac * inv_chi * inv_chi * lambda_min * analytic_l;
+        }
+
+        fd[j] = fd_j;
+        l[j] = l_j;
     }
 
     return {fd, l};

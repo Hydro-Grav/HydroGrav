@@ -477,7 +477,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
 
-    const auto chi_vals = logspace(1e-3, 5e3, 500);
+    const auto chi_vals = logspace(1e-3, 5e3, 1000);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
@@ -489,6 +489,17 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     Apsq_arr.setcontent(n, Apsq.data());
     alglib::spline1dinterpolant Apsq_spline;
     alglib::spline1dbuildcubic(chi_arr, Apsq_arr, Apsq_spline);
+
+    std::ofstream debug_ofs("Ekin_debug.csv");
+    debug_ofs << "i,chi,Apsq,Apsq_spline\n";
+    for ( size_t i = 0; i < n; i ++)
+    {
+        const double chi = chi_vals[i];
+        const double Apsq_val = Apsq[i];
+        const double Apsq_spline_val = alglib::spline1dcalc(Apsq_spline, chi);
+        debug_ofs << i << "," << chi << "," << Apsq_val << "," << Apsq_spline_val << "\n";
+    }
+    debug_ofs.close();
 
     #pragma omp parallel for
     for (size_t kk = 0; kk < nk; kk++) {
@@ -512,8 +523,8 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         double error;
         const double tol = 1e-6;
 
-        // P_vals[kk] = fac2 * boost::math::quadrature::gauss_kronrod<double, 61>::integrate(integrand, log_chi_min, log_chi_max, max_iter, tol, &error);
-        P_vals[kk] = fac2 * boost::math::quadrature::trapezoidal(integrand, log_chi_min, log_chi_max, tol);
+        P_vals[kk] = fac2 * boost::math::quadrature::gauss<double, 256>::integrate(integrand, log_chi_min, log_chi_max);
+        // P_vals[kk] = fac2 * boost::math::quadrature::trapezoidal(integrand, log_chi_min, log_chi_max, tol);
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);
