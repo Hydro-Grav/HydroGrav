@@ -57,3 +57,5 @@ CMakeCache.txt
 
 # Matplotlibcpp
 /include/matplotlibcpp.h
+
+/data/
