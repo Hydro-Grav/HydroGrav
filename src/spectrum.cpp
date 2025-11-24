@@ -178,7 +178,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 {
     const auto kinetic_spectrum = zetaKin(kRs_vals, profile);
 
-    // kinetic_spectrum.write("zetakin_debug.csv");
+    kinetic_spectrum.write("zetakin_debug.csv");
 
     alglib::real_1d_array x_arr, y_arr;
     x_arr.setlength(kinetic_spectrum.K().size());

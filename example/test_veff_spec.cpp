@@ -5,32 +5,40 @@
 
 int main() {
 
-    // const auto vw = 0.577499;
-    // const auto alN = 0.010780;
-    // const auto TN = 94.049935;
-    // const auto beta = 1794.730595 * 9.868763e-15;
-    // const auto Rs = 0.001409/(9.868763e-15);
-    // const auto dtau = 10 * Rs;
-    // const auto cs_p = 0.573788;
-    // const auto cs_m = 0.562375;
-    // const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
-
-    const auto vw = 0.7;
-    const auto alN = 0.1;
-    const auto TN = 100;
-    const auto beta = 100 * 9.868763e-15;
-    const auto Rs = 0.1/(9.868763e-15);
+    const auto vw = 0.578923;
+    const auto alN = 0.011077;
+    const auto TN = 93.565632;
+    const auto beta = 1746.781564 * 9.868763e-15;
+    const auto Rs = 0.001448/(9.868763e-15);
     const auto dtau = 10 * Rs;
     const auto cs_p = 0.573788;
     const auto cs_m = 0.562375;
-    // const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
-    const auto nuc_type = "exp";
+    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+
+    std::cout << "Rs * beta = " << Rs * beta << std::endl;
+
+    // const auto vw = 0.7;
+    // const auto alN = 0.1;
+    // const auto TN = 100;
+    // const auto beta = 100 * 9.868763e-15;
+    // const auto Rs = 0.1/(9.868763e-15);
+    // const auto dtau = 10 * Rs;
+    // const auto cs_p = 0.573788;
+    // const auto cs_m = 0.562375;
+    // // const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+    // const auto nuc_type = "exp";
 
     const PhaseTransition::Universe un;
 
     PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1./3., 1./3.);
 
+    params.print();
+
     const Hydrodynamics::FluidProfile profile(params);
+
+    std::cout << "xi_min = " << profile.xi_min() << ", xi_max = " << profile.xi_max() << std::endl;
+    std::cout << "type = " << profile.mode_str() << std::endl;
+    std::cout << "vw = " << params.vw() << std::endl;
 
     profile.write("fluid_profile.csv");
 
@@ -39,7 +47,6 @@ int main() {
     #endif
 
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    for(double kRs : kRs_vals) { std::cout << "k = " << kRs << "\n";}
     Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params);
 
     OmegaGW.write("gw_spectrum.csv");
@@ -48,13 +55,14 @@ int main() {
     OmegaGW.plot("gw_spectrum.png");
     #endif
 
-    // std::vector<double> vw_vals = {0.1, 0.3, 0.5, 0.6, 0.7, 0.9};
 
+    // fig 1
+    // std::vector<double> vw_vals = {0.1, 0.3, 0.5, 0.6, 0.7, 0.9};
     // for ( double vw : vw_vals ) {
     //     const auto alN = 0.1;
     //     const auto TN = 100;
     //     const auto beta = 100 * 9.868763e-15;
-    //     const auto Rs = 0.1/(9.868763e-15);
+    //     const auto Rs = PhaseTransition::Rs_approx(vw, beta);
     //     const auto dtau = 10 * Rs;
     //     const auto cs_p = 0.573788;
     //     const auto cs_m = 0.562375;
@@ -70,7 +78,33 @@ int main() {
 
     //     OmegaGW_exp.write("data/" + std::to_string(vw) + "_exp.csv");
     //     OmegaGW_sim.write("data/" + std::to_string(vw) + "_sim.csv");
+    // }
 
+    // fig 6
+    // std::vector<double> vw_vals = {0.1, 0.3, 0.5, 0.6, 0.7, 0.9};
+    // std::vector<double> RsH_vals = {0.001, 0.01, 0.1, 1.0};
+
+    // for ( double vw : vw_vals ) {
+    //     for ( double RsH : RsH_vals ) {
+
+    //         const auto alN = 0.1;
+    //         const auto TN = PhaseTransition::dflt_PTParams::TN;
+    //         const auto Hs = PhaseTransition::dflt_universe::Hs;
+    //         const auto Rs = RsH / Hs;
+    //         const auto beta = PhaseTransition::Rs_approx(vw, Rs);
+    //         const auto dtau = 10 * Rs;
+
+    //         std::cout << "vw = " << vw << ", RsH = " << RsH << ", Rs = " << Rs << ", beta = " << beta << std::endl;
+
+    //         const PhaseTransition::Universe un;
+
+    //         PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, "exp", un, 1./3., 1./3.);
+
+    //         const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    //         Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params);
+
+    //         OmegaGW.write("data/fig_6/" + std::to_string(vw) + "_RsH_" + std::to_string(RsH) + ".csv");
+    //     }
     // }
 
     return 0;

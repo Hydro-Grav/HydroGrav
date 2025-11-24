@@ -94,7 +94,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
 
     LevinIntegrator levin(16);
-    boost::math::quadrature::gauss<double, 32> integrator;
+    boost::math::quadrature::gauss<double, 64> integrator;
 
     #pragma omp parallel for
     for (size_t j = 0; j < M; ++j) {
