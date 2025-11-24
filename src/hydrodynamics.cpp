@@ -108,90 +108,83 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
 
         const double xi_min = prof.xi_min();
         const double xi_max = prof.xi_max();
+    
+        const auto mode = prof.mode();
 
         if ( chi < chi_threshold ) {
 
-            // const auto n = xi_vals.size();
-            // std::vector<double> f_sin_integrand(n);
-            // std::vector<double> f_cos_integrand(n);
-            // std::vector<double> l_sin_integrand(n);
+            // for (size_t i = 0; i + 1 < N; ++i) {
+            //     const double xi_i = xi_vals[i];
 
-            // for (size_t i = 0; i < n; i++) {
-            //     const auto xi = xi_vals[i];
-            //     if(xi < xi_min || xi > xi_max) { continue; }
-            //     const auto v_prof = v_vals[i];
-            //     const auto la_prof = la_vals[i];
-                
-            //     const auto chi_xi = chi * xi;
-            //     const auto sin_cx = std::sin(chi_xi);
-            //     const auto cos_cx = std::cos(chi_xi);
+            //     if(xi_i < xi_min || xi_i > xi_max) { continue; }
+            //     const double xi_ip1 = xi_vals[i + 1];
+            //     const double dx = xi_ip1 - xi_i;
 
-            //     f_sin_integrand[i] = - v_prof * sin_cx;
-            //     f_sin_integrand[i] = v_prof * xi * cos_cx;
-            //     l_sin_integrand[i] = xi * la_prof * sin_cx;
+            //     const double sin_chi_xi_i = std::sin(chi * xi_i);
+            //     const double sin_chi_xi_ip1 = std::sin(chi * xi_ip1);
+
+            //     const double y_fsin_i = -v_vals[i] * sin_chi_xi_i;
+            //     const double y_fsin_ip1 = -v_vals[i + 1] * sin_chi_xi_ip1;
+            //     f_sin_int += 0.5 * (y_fsin_i + y_fsin_ip1) * dx;
+
+            //     const double y_fcos_i = v_vals[i] * xi_i * std::cos(chi * xi_i);
+            //     const double y_fcos_ip1 = v_vals[i + 1] * xi_ip1 * std::cos(chi * xi_ip1);
+            //     f_cos_int += 0.5 * (y_fcos_i + y_fcos_ip1) * dx;
+
+            //     const double y_lsin_i = la_vals[i] * xi_i * sin_chi_xi_i;
+            //     const double y_lsin_ip1 = la_vals[i + 1] * xi_ip1 * sin_chi_xi_ip1;
+            //     l_sin_int += 0.5 * (y_lsin_i + y_lsin_ip1) * dx;
             // }
 
-            // f_sin_int = simpson_integrate(xi_vals, f_sin_integrand);
-            // f_cos_int = simpson_integrate(xi_vals, f_cos_integrand);
-            // l_sin_int = simpson_integrate(xi_vals, l_sin_integrand);
+            auto integrand_f_sin = [&](double xi) -> double {
 
-            for (size_t i = 0; i + 1 < N; ++i) {
-                const double xi_i = xi_vals[i];
+                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
+                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
+                const auto chi_xi = chi * xi;
+                const auto sin_cx = std::sin(chi_xi);
 
-                if(xi_i < xi_min || xi_i > xi_max) { continue; }
-                const double xi_ip1 = xi_vals[i + 1];
-                const double dx = xi_ip1 - xi_i;
+                return sin_term * sin_cx;
+            };
 
-                const double sin_chi_xi_i = std::sin(chi * xi_i);
-                const double sin_chi_xi_ip1 = std::sin(chi * xi_ip1);
+            auto integrand_f_cos = [&](double xi) -> double {
 
-                const double y_fsin_i = -v_vals[i] * sin_chi_xi_i;
-                const double y_fsin_ip1 = -v_vals[i + 1] * sin_chi_xi_ip1;
-                f_sin_int += 0.5 * (y_fsin_i + y_fsin_ip1) * dx;
+                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
+                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
+                const auto chi_xi = chi * xi;
+                const auto cos_cx = std::cos(chi_xi);
 
-                const double y_fcos_i = v_vals[i] * xi_i * std::cos(chi * xi_i);
-                const double y_fcos_ip1 = v_vals[i + 1] * xi_ip1 * std::cos(chi * xi_ip1);
-                f_cos_int += 0.5 * (y_fcos_i + y_fcos_ip1) * dx;
+                return cos_term * cos_cx;
+            };
 
-                const double y_lsin_i = la_vals[i] * xi_i * sin_chi_xi_i;
-                const double y_lsin_ip1 = la_vals[i + 1] * xi_ip1 * sin_chi_xi_ip1;
-                l_sin_int += 0.5 * (y_lsin_i + y_lsin_ip1) * dx;
+            auto integrand_l_sin = [&](double xi) -> double {
+
+                const auto sin_term = alglib::spline1dcalc(l_sin_spline, xi);
+
+                if(sin_term == 0) {return 0.0;}
+
+                double sin_cx = std::sin(chi * xi);
+                return sin_term * sin_cx;
+            };
+
+            boost::math::quadrature::gauss<double, 32> integrator;
+            if ( mode == 0 || mode == 2) { //deflagration or detonation
+                f_cos_int = integrator.integrate(integrand_f_cos, xi_min, xi_max);
+                f_sin_int = integrator.integrate(integrand_f_sin, xi_min, xi_max);
+                l_sin_int = integrator.integrate(integrand_l_sin, xi_min, xi_max);
+            } else {
+                
+                // hybrid, split regions up
+                const double vw = prof.params()->vw();
+                
+                f_cos_int += integrator.integrate(integrand_f_cos, xi_min, vw);
+                f_cos_int += integrator.integrate(integrand_f_cos, vw, xi_max);
+
+                f_sin_int += integrator.integrate(integrand_f_sin, xi_min, vw);
+                f_sin_int += integrator.integrate(integrand_f_sin, vw, xi_max);
+
+                l_sin_int += integrator.integrate(integrand_l_sin, xi_min, vw);
+                l_sin_int += integrator.integrate(integrand_l_sin, vw, xi_max);
             }
-
-            // auto integrand_f_sin = [&](double xi) -> double {
-
-            //     const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
-            //     const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
-            //     const auto chi_xi = chi * xi;
-            //     const auto sin_cx = std::sin(chi_xi);
-
-            //     return sin_term * sin_cx;
-            // };
-
-            // auto integrand_f_cos = [&](double xi) -> double {
-
-            //     const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
-            //     const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
-            //     const auto chi_xi = chi * xi;
-            //     const auto cos_cx = std::cos(chi_xi);
-
-            //     return cos_term * cos_cx;
-            // };
-
-            // auto integrand_l_sin = [&](double xi) -> double {
-
-            //     const auto sin_term = alglib::spline1dcalc(l_sin_spline, xi);
-
-            //     if(sin_term == 0) {return 0.0;}
-
-            //     double sin_cx = std::sin(chi * xi);
-            //     return sin_term * sin_cx;
-            // };
-
-            // boost::math::quadrature::gauss<double, 32> integrator;
-            // f_cos_int = integrator.integrate(integrand_f_cos, xi_min, xi_max);
-            // f_sin_int = integrator.integrate(integrand_f_sin, xi_min, xi_max);
-            // l_sin_int = integrator.integrate(integrand_l_sin, xi_min, xi_max);
 
         } else {
             auto f_sin_func = [&](double xi) -> double {
