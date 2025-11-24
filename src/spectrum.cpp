@@ -478,7 +478,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     std::vector<double> P_vals(nk);
 
     const double chi_min = 1e-3;
-    const double chi_max = 5e3;
+    const double chi_max = 1e4;
     const auto chi_vals = logspace(chi_min, chi_max, 2000);
     const auto n = chi_vals.size();
 

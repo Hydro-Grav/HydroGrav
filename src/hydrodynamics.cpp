@@ -94,6 +94,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
 
     LevinIntegrator levin(16);
+    boost::math::quadrature::gauss<double, 32> integrator;
 
     #pragma omp parallel for
     for (size_t j = 0; j < M; ++j) {
@@ -113,66 +114,47 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
 
         if ( chi < chi_threshold ) {
 
-            // for (size_t i = 0; i + 1 < N; ++i) {
-            //     const double xi_i = xi_vals[i];
-
-            //     if(xi_i < xi_min || xi_i > xi_max) { continue; }
-            //     const double xi_ip1 = xi_vals[i + 1];
-            //     const double dx = xi_ip1 - xi_i;
-
-            //     const double sin_chi_xi_i = std::sin(chi * xi_i);
-            //     const double sin_chi_xi_ip1 = std::sin(chi * xi_ip1);
-
-            //     const double y_fsin_i = -v_vals[i] * sin_chi_xi_i;
-            //     const double y_fsin_ip1 = -v_vals[i + 1] * sin_chi_xi_ip1;
-            //     f_sin_int += 0.5 * (y_fsin_i + y_fsin_ip1) * dx;
-
-            //     const double y_fcos_i = v_vals[i] * xi_i * std::cos(chi * xi_i);
-            //     const double y_fcos_ip1 = v_vals[i + 1] * xi_ip1 * std::cos(chi * xi_ip1);
-            //     f_cos_int += 0.5 * (y_fcos_i + y_fcos_ip1) * dx;
-
-            //     const double y_lsin_i = la_vals[i] * xi_i * sin_chi_xi_i;
-            //     const double y_lsin_ip1 = la_vals[i + 1] * xi_ip1 * sin_chi_xi_ip1;
-            //     l_sin_int += 0.5 * (y_lsin_i + y_lsin_ip1) * dx;
-            // }
-
             auto integrand_f_sin = [&](double xi) -> double {
 
-                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
-                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
+                const auto sin_amp = alglib::spline1dcalc(f_sin_spline, xi);
+
+                if(sin_amp == 0) {return 0.0;}
+
                 const auto chi_xi = chi * xi;
                 const auto sin_cx = std::sin(chi_xi);
 
-                return sin_term * sin_cx;
+                return sin_amp * sin_cx;
             };
 
             auto integrand_f_cos = [&](double xi) -> double {
 
-                const auto sin_term = alglib::spline1dcalc(f_sin_spline, xi);
-                const auto cos_term = alglib::spline1dcalc(f_cos_spline, xi);
+                const auto cos_amp = alglib::spline1dcalc(f_cos_spline, xi);
+
+                if(cos_amp == 0) {return 0.0;}
+
                 const auto chi_xi = chi * xi;
                 const auto cos_cx = std::cos(chi_xi);
 
-                return cos_term * cos_cx;
+                return cos_amp * cos_cx;
             };
 
             auto integrand_l_sin = [&](double xi) -> double {
 
-                const auto sin_term = alglib::spline1dcalc(l_sin_spline, xi);
+                const auto sin_amp = alglib::spline1dcalc(l_sin_spline, xi);
 
-                if(sin_term == 0) {return 0.0;}
+                if(sin_amp == 0) {return 0.0;}
 
                 double sin_cx = std::sin(chi * xi);
-                return sin_term * sin_cx;
+                return sin_amp * sin_cx;
             };
 
-            boost::math::quadrature::gauss<double, 32> integrator;
-            if ( mode == 0 || mode == 2) { //deflagration or detonation
+            if ( mode == 0 || mode == 2) { 
+                // deflagration or detonation
                 f_cos_int = integrator.integrate(integrand_f_cos, xi_min, xi_max);
                 f_sin_int = integrator.integrate(integrand_f_sin, xi_min, xi_max);
                 l_sin_int = integrator.integrate(integrand_l_sin, xi_min, xi_max);
-            } else {// hybrid, split regions up
-            
+            } else {
+                // hybrid, split regions up
                 f_cos_int += integrator.integrate(integrand_f_cos, xi_min, vw);
                 f_cos_int += integrator.integrate(integrand_f_cos, vw, xi_max);
 
@@ -196,12 +178,13 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
                 return alglib::spline1dcalc(l_sin_spline, xi);
             };
 
-            if ( mode == 0 || mode == 2) { //deflagration or detonation
+            if ( mode == 0 || mode == 2) { 
+                // deflagration or detonation
                 f_sin_int = levin.integrate_sin(f_sin_func, chi, xi_min, xi_max);
                 f_cos_int = levin.integrate_cos(f_cos_func, chi, xi_min, xi_max);
                 l_sin_int = levin.integrate_sin(l_sin_func, chi, xi_min, xi_max);
-            } else {// hybrid, split regions up
-                
+            } else {
+                // hybrid, split regions up
                 f_sin_int += levin.integrate_sin(f_sin_func, chi, xi_min, vw);
                 f_sin_int += levin.integrate_sin(f_sin_func, chi, vw, xi_max);
 
