@@ -178,7 +178,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 {
     const auto kinetic_spectrum = zetaKin(kRs_vals, profile);
 
-    kinetic_spectrum.write("zetakin_debug.csv");
+    // kinetic_spectrum.write("zetakin_debug.csv");
 
     alglib::real_1d_array x_arr, y_arr;
     x_arr.setlength(kinetic_spectrum.K().size());
@@ -479,7 +479,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
 
     const double chi_min = 1e-3;
     const double chi_max = 1e4;
-    const auto chi_vals = logspace(chi_min, chi_max, 2000);
+    const auto chi_vals = logspace(chi_min, chi_max, 5000);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
@@ -507,10 +507,10 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
             const double T_tilde = fac3*chi;
             return lt_dist(T_tilde) * power(chi, 7) * Apsq_val;
         };
-
+        
         const double log_chi_min = std::log(chi_min);
         const double log_chi_max = std::log(chi_max);
-
+            
         P_vals[kk] = fac2 * boost::math::quadrature::gauss<double, 1024>::integrate(integrand, log_chi_min, log_chi_max);
     }
 
