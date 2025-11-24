@@ -108,7 +108,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
 
         const double xi_min = prof.xi_min();
         const double xi_max = prof.xi_max();
-    
+        const double vw = prof.params()->vw();
         const auto mode = prof.mode();
 
         if ( chi < chi_threshold ) {
@@ -171,11 +171,8 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
                 f_cos_int = integrator.integrate(integrand_f_cos, xi_min, xi_max);
                 f_sin_int = integrator.integrate(integrand_f_sin, xi_min, xi_max);
                 l_sin_int = integrator.integrate(integrand_l_sin, xi_min, xi_max);
-            } else {
-                
-                // hybrid, split regions up
-                const double vw = prof.params()->vw();
-                
+            } else {// hybrid, split regions up
+            
                 f_cos_int += integrator.integrate(integrand_f_cos, xi_min, vw);
                 f_cos_int += integrator.integrate(integrand_f_cos, vw, xi_max);
 
@@ -199,9 +196,21 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
                 return alglib::spline1dcalc(l_sin_spline, xi);
             };
 
-            f_sin_int = levin.integrate_sin(f_sin_func, chi, xi_min, xi_max);
-            f_cos_int = levin.integrate_cos(f_cos_func, chi, xi_min, xi_max);
-            l_sin_int = levin.integrate_sin(l_sin_func, chi, xi_min, xi_max);
+            if ( mode == 0 || mode == 2) { //deflagration or detonation
+                f_sin_int = levin.integrate_sin(f_sin_func, chi, xi_min, xi_max);
+                f_cos_int = levin.integrate_cos(f_cos_func, chi, xi_min, xi_max);
+                l_sin_int = levin.integrate_sin(l_sin_func, chi, xi_min, xi_max);
+            } else {// hybrid, split regions up
+                
+                f_sin_int += levin.integrate_sin(f_sin_func, chi, xi_min, vw);
+                f_sin_int += levin.integrate_sin(f_sin_func, chi, vw, xi_max);
+
+                f_cos_int += levin.integrate_cos(f_cos_func, chi, xi_min, vw);
+                f_cos_int += levin.integrate_cos(f_cos_func, chi, vw, xi_max);
+
+                l_sin_int += levin.integrate_sin(l_sin_func, chi, xi_min, vw);
+                l_sin_int += levin.integrate_sin(l_sin_func, chi, vw, xi_max);
+            }
         }
 
         double fd_j = fac * inv_chi * (f_cos_int + inv_chi * f_sin_int);
