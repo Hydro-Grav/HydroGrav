@@ -18,6 +18,9 @@
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 #include <boost/math/quadrature/trapezoidal.hpp>
+#include <boost/math/quadrature/tanh_sinh.hpp>
+#include <boost/math/quadrature/sinh_sinh.hpp>
+#include <boost/math/quadrature/naive_monte_carlo.hpp>
 
 #include "maths_ops.hpp"
 #include "phasetransition.hpp"
@@ -286,12 +289,12 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
                     return z_fac2 * ptRs4_inv * zk_ptRs_val * dlt;
                 };
 
-                const double z_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(z_integrand, -1.0, 1.0, 5, 1e-6);
+                const double z_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(z_integrand, -1.0, 1.0, 6, 1e-8);
 
                 return pRs * zk_pRs_fac * z_result;
             };
 
-            double pRs_result = boost::math::quadrature::gauss_kronrod<double, 15>::integrate(pRs_integrand, log(pRs_minimum), log(pRs_maximum), 5, 1e-6);
+            double pRs_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(pRs_integrand, log(pRs_minimum), log(pRs_maximum), 6, 1e-8);
             GW_P_vals[kk] = prefac * kRs3 * pRs_result;
         }
     }
@@ -509,8 +512,11 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         
         const double log_chi_min = std::log(chi_min);
         const double log_chi_max = std::log(chi_max);
-            
-        P_vals[kk] = fac2 * boost::math::quadrature::gauss<double, 1024>::integrate(integrand, log_chi_min, log_chi_max);
+
+        boost::math::quadrature::gauss_kronrod<double, 61> integrator;
+        const auto y = integrator.integrate(integrand, log_chi_min, log_chi_max, 10, 1e-12);
+
+        P_vals[kk] = fac2 * y;
     }
 
     return PowerSpec(kRs_vals, P_vals, prof);

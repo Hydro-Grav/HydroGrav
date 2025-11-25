@@ -94,7 +94,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
 
     LevinIntegrator levin(16);
-    boost::math::quadrature::gauss<double, 64> integrator;
+    boost::math::quadrature::gauss<double, 15> integrator;
 
     #pragma omp parallel for
     for (size_t j = 0; j < M; ++j) {
@@ -156,12 +156,11 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
             } else {
                 // hybrid, split regions up
                 f_cos_int += integrator.integrate(integrand_f_cos, xi_min, vw);
-                f_cos_int += integrator.integrate(integrand_f_cos, vw, xi_max);
-
                 f_sin_int += integrator.integrate(integrand_f_sin, xi_min, vw);
-                f_sin_int += integrator.integrate(integrand_f_sin, vw, xi_max);
-
                 l_sin_int += integrator.integrate(integrand_l_sin, xi_min, vw);
+
+                f_sin_int += integrator.integrate(integrand_f_sin, vw, xi_max);
+                f_cos_int += integrator.integrate(integrand_f_cos, vw, xi_max);
                 l_sin_int += integrator.integrate(integrand_l_sin, vw, xi_max);
             }
 
@@ -186,12 +185,11 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
             } else {
                 // hybrid, split regions up
                 f_sin_int += levin.integrate_sin(f_sin_func, chi, xi_min, vw);
-                f_sin_int += levin.integrate_sin(f_sin_func, chi, vw, xi_max);
-
                 f_cos_int += levin.integrate_cos(f_cos_func, chi, xi_min, vw);
-                f_cos_int += levin.integrate_cos(f_cos_func, chi, vw, xi_max);
-
                 l_sin_int += levin.integrate_sin(l_sin_func, chi, xi_min, vw);
+
+                f_cos_int += levin.integrate_cos(f_cos_func, chi, vw, xi_max);
+                f_sin_int += levin.integrate_sin(f_sin_func, chi, vw, xi_max);
                 l_sin_int += levin.integrate_sin(l_sin_func, chi, vw, xi_max);
             }
         }
@@ -228,12 +226,12 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
         Apsq[j] = 0.25 * (f*f + csq * l*l);
     }
 
-    // std::ofstream ofs("Ap_sq_debug.csv");
-    // ofs << "chi,Apsq,fd,l\n";
-    // for (size_t j = 0; j < m; j++) {
-    //     ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
-    // }
-    // ofs.close();
+    std::ofstream ofs("Ap_sq_debug.csv");
+    ofs << "chi,Apsq,fd,l\n";
+    for (size_t j = 0; j < m; j++) {
+        ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
+    }
+    ofs.close();
 
     return Apsq;
 }
