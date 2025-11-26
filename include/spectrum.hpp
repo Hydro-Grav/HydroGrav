@@ -45,6 +45,7 @@ class PowerSpec {
     const PhaseTransition::PTParams* params() const { return params_; }; // PT parameters
 
     double max() const; // Max value of power spectrum
+    double f_peak() const; // peak frequency of power spectrum
 
     void write(const std::string& filename="spectrum.csv") const;
 

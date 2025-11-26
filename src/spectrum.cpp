@@ -66,6 +66,13 @@ double PowerSpec::max() const {
     return *std::max_element(Pv.begin(), Pv.end());
 }
 
+double PowerSpec::f_peak() const {
+    const auto &Pv = P();
+    const auto it = std::max_element(Pv.begin(), Pv.end());
+    const auto idx = std::distance(Pv.begin(), it);
+    return freq_vals_[idx];
+}
+
 void PowerSpec::write(const std::string& filename) const {
     std::cout << "Writing power spectrum to disk... ";
     std::ofstream file(filename);
