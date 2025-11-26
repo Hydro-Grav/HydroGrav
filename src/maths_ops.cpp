@@ -77,13 +77,13 @@ std::vector<double> logspace(double start, double stop, std::size_t num) {
     TODO - rename to FilonIntegrator
 */
 
-LevinIntegrator::LevinIntegrator(int n_points) : n_points_(n_points) {
+FilonQuadrature::FilonQuadrature(int n_points) : n_points_(n_points) {
     if (n_points < 3) {
-        throw std::invalid_argument("LevinIntegrator requires at least 3 points");
+        throw std::invalid_argument("FilonQuadrature requires at least 3 points");
     }
 }
 
-double LevinIntegrator::filon_integrate_interval(
+double FilonQuadrature::filon_integrate_interval(
     const std::vector<double>& f_vals,
     const std::vector<double>& x_vals,
     double omega,
@@ -166,7 +166,7 @@ double LevinIntegrator::filon_integrate_interval(
     return result;
 }
 
-double LevinIntegrator::integrate_sin(
+double FilonQuadrature::integrate_sin(
     const std::function<double(double)>& f,
     double omega,
     double a,
@@ -212,7 +212,7 @@ double LevinIntegrator::integrate_sin(
     return total;
 }
 
-double LevinIntegrator::integrate_cos(
+double FilonQuadrature::integrate_cos(
     const std::function<double(double)>& f,
     double omega,
     double a,

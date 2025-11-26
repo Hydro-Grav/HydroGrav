@@ -83,13 +83,13 @@ class CubicSpline {
 /**
  * @brief Filon-type integrator for highly oscillatory integrals.
  */
-class LevinIntegrator {
+class FilonQuadrature {
 public:
     /**
      * @brief Construct a Filon-type integrator.
      * @param n_points Order of polynomial approximation (default: 8)
      */
-    LevinIntegrator(int n_points = 8);
+    FilonQuadrature(int n_points = 8);
     
     /**
      * @brief Integrate f(x) * sin(omega * x) from a to b.

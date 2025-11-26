@@ -94,7 +94,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     alglib::spline1dinterpolant f_sin_spline, f_cos_spline, l_sin_spline;
     create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
 
-    LevinIntegrator levin(config::filon_polynomial_order);
+    FilonQuadrature levin(config::filon_polynomial_order);
     boost::math::quadrature::gauss<double, config::fd_l_gauss_legendre_samples> integrator;
 
     #pragma omp parallel for
