@@ -588,8 +588,6 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation() const {
     const auto TmTN = get_TmTN(wmwN);
     if (TmTN <= TpTN) throw std::invalid_argument("Detonation IC failed: Tm>Tp required!");
 
-    std::cout << "IC det: vm=" << vm << ", vmUF=" << vmUF << ", wmwN=" << wmwN << ", TmTN=" << TmTN << "\n";
-
     const state_type y0 = {xi0, wmwN, TmTN};
     
     return {vmUF, y0};
@@ -782,7 +780,6 @@ double FluidProfile::find_TmTN_veff(const deriv_func& dydv) const {
 
     // find TmTN that minimise residual
     const auto TmTN = golden_section_minimize(safe_residual, bracket[0], bracket[1]);
-    // std::cout << "TmTN=" << TmTN << ", bracket=[" << bracket[0] << ", " << bracket[1] << "]\n";
     if (TmTN < 0.0) throw std::runtime_error("find_TmTN_veff failed (TmTN < 0)!");
 
     return TmTN;
@@ -996,9 +993,6 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         // solver will find xi_sh < cp if shock is exactly xi_sh=cp (numerical error)
         // ensures difference isn't too large!
         const auto cp = std::sqrt(cpsq_);
-        // if (xi_sol_tmp.front() < cp && std::abs(xi_sol_tmp.front() - cp) > 1e-4) {
-        //     std::cout << "Warning: Check fluid profiles are physically reasonable (xi_sh < cp)\n";
-        // }
 
         const auto xi_sh = std::max(xi_sol_tmp.front(), cp);
         if (xi_sh > 1.0) {
@@ -1018,7 +1012,6 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         // check alp okay
         auto alp_wall = [this] (double vp, double vm) {
             const auto alp = get_alp_wall(vp, vm);
-            // std::cout << "alp=" << alp << ", alN=" << alN_ << "\n"; 
 
             if (alp >= alN_) throw std::invalid_argument("alpha_+ must be < alpha_N");
             if (alp < alp_min_) throw std::invalid_argument("alpha_+ too small for shock");
@@ -1115,11 +1108,8 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         v_sol_tmp = sol.first;
         y_sol_tmp = sol.second;
 
-        std::cout << "TEST\n";
-
         // remove any numerical errors in final point (xi<0)
         if (!y_sol_tmp.empty() && y_sol_tmp.back()[0] < 0.0) {
-            std::cout << "xi<0 triggered\n";
             v_sol_tmp.pop_back();
             y_sol_tmp.pop_back();
         }
@@ -1132,8 +1122,6 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_sol_tmp.push_back(y_sol_tmp[i][2]);
 
             la_sol_tmp.push_back(lambda_b(w_sol_tmp[i]));
-
-            // std::cout << "xi=" << xi_sol_tmp.back() << ", v=" << v_sol_tmp.back() << "\n";
         }
 
         w_end_val = w_sol_tmp.back();
@@ -1161,8 +1149,6 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
         xif = xi_sol_tmp.back();
     }
-
-    // std::cout << "xi=" << xi_sol_tmp.back() << ", v=" << v_sol_tmp.back() << "\n";
 
     // store start/endpoints of profile for integration
     xi_min_integrate_ = xif;
@@ -1340,14 +1326,14 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            std::cout << "Hybrid profile:\n"
-                      << "  vm = " << vm << ", vmUF=" << vmUF << "\n"
-                      << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
-                      << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
-                      << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
-                      << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
-                      << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
-                      << "  xi_sh = " << xi0 << "\n";
+            // std::cout << "Hybrid profile:\n"
+            //           << "  vm = " << vm << ", vmUF=" << vmUF << "\n"
+            //           << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
+            //           << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
+            //           << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
+            //           << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
+            //           << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
+            //           << "  xi_sh = " << xi0 << "\n";
         }
 
     } else { // detonation
