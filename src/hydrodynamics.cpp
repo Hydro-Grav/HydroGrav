@@ -225,12 +225,12 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
         Apsq[j] = 0.25 * (f*f + csq * l*l);
     }
 
-    std::ofstream ofs("Ap_sq_debug.csv");
-    ofs << "chi,Apsq,fd,l\n";
-    for (size_t j = 0; j < m; j++) {
-        ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
-    }
-    ofs.close();
+    // std::ofstream ofs("Ap_sq_debug.csv");
+    // ofs << "chi,Apsq,fd,l\n";
+    // for (size_t j = 0; j < m; j++) {
+    //     ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
+    // }
+    // ofs.close();
 
     return Apsq;
 }

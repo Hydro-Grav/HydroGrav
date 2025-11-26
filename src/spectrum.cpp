@@ -181,7 +181,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 {
     const auto kinetic_spectrum = zetaKin(kRs_vals, profile);
 
-    kinetic_spectrum.write("zetakin_debug.csv");
+    // kinetic_spectrum.write("zetakin_debug.csv");
 
     alglib::real_1d_array x_arr, y_arr;
     x_arr.setlength(kinetic_spectrum.K().size());
@@ -222,6 +222,12 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
 
     const auto ti = std::chrono::high_resolution_clock::now();
+
+    // std::cout << "[DEBUG] Config values: "
+    //           << "pRs_samples=" << config::pRs_samples 
+    //           << ", z_samples=" << config::z_samples 
+    //           << ", pRs_tolerance=" << config::pRs_tolerance 
+    //           << ", z_tolerance=" << config::z_tolerance << "\n";
 
     const auto cs = std::sqrt(params.cpsq());
     const auto tau_s = params.tau_s();
