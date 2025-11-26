@@ -5,14 +5,14 @@
 
 int main() {
 
-    const auto vw = 0.578923;
-    const auto alN = 0.011077;
-    const auto TN = 93.565632;
-    const auto beta = 1746.781564 * 9.868763e-15;
-    const auto Rs = 0.001448/(9.868763e-15);
+    const auto vw = 0.72787;
+    const auto alN = 0.064721;
+    const auto TN = 64.913715;
+    const auto beta = 362.348213 * 6.333703e-15;
+    const auto Rs =  0.006979/(8.784576e-15);
     const auto dtau = 10 * Rs;
-    const auto cs_p = 0.573788;
-    const auto cs_m = 0.562375;
+    const auto cs_p = 0.573157;
+    const auto cs_m = 0.560104;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
     std::cout << "Rs * beta = " << Rs * beta << std::endl;
@@ -30,6 +30,7 @@ int main() {
 
     const PhaseTransition::Universe un;
 
+    // PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, nuc_type, un, cs_p*cs_p, cs_m*cs_m);
     PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1./3., 1./3.);
 
     params.print();

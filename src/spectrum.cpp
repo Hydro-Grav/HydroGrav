@@ -22,6 +22,7 @@
 #include <boost/math/quadrature/sinh_sinh.hpp>
 #include <boost/math/quadrature/naive_monte_carlo.hpp>
 
+#include "config.hpp"
 #include "maths_ops.hpp"
 #include "phasetransition.hpp"
 #include "hydrodynamics.hpp"
@@ -231,16 +232,12 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto nk = kRs_vals.size();
 
-    const double pRs_minimum = 1e-3;
-    const double pRs_maximum = 1e+3;
-    const auto n_pRs = 500;
+    const auto pRs_vals = logspace(config::pRs_minimum, config::pRs_maximum, config::n_pRs); // P = p*Rs
 
-    const auto pRs_vals = logspace(pRs_minimum, pRs_maximum, n_pRs); // P = p*Rs
+    const auto kinetic_spectrum_spline_lower_bound = (1.0 - config::kinetic_spectrum_spline_factor) * find_min_pt(kRs_vals, pRs_vals);
+    const auto kinetic_spectrum_spline_upper_bound = (1.0 + config::kinetic_spectrum_spline_factor) * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
 
-    const auto kinetic_spectrum_spline_lower_bound = 0.99 * find_min_pt(kRs_vals, pRs_vals);
-    const auto kinetic_spectrum_spline_upper_bound = 1.01 * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
-
-    const auto kinetic_spectrum_K_values = logspace(kinetic_spectrum_spline_lower_bound, kinetic_spectrum_spline_upper_bound, 2*n_pRs);
+    const auto kinetic_spectrum_K_values = logspace(kinetic_spectrum_spline_lower_bound, kinetic_spectrum_spline_upper_bound, config::kinetic_spectrum_spline_points);
 
     alglib::spline1dinterpolant log_zk_spline;
     build_kinetic_spectrum_spline(kinetic_spectrum_K_values, profile, log_zk_spline);
@@ -289,12 +286,12 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
                     return z_fac2 * ptRs4_inv * zk_ptRs_val * dlt;
                 };
 
-                const double z_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(z_integrand, -1.0, 1.0, 6, 1e-8);
+                const double z_result = boost::math::quadrature::gauss_kronrod<double, config::z_samples>::integrate(z_integrand, -1.0, 1.0, config::z_max_refinements, config::z_tolerance);
 
                 return pRs * zk_pRs_fac * z_result;
             };
 
-            double pRs_result = boost::math::quadrature::gauss_kronrod<double, 31>::integrate(pRs_integrand, log(pRs_minimum), log(pRs_maximum), 6, 1e-8);
+            double pRs_result = boost::math::quadrature::gauss_kronrod<double, config::pRs_samples>::integrate(pRs_integrand, log(config::pRs_minimum), log(config::pRs_maximum), config::pRs_max_refinements, config::pRs_tolerance);
             GW_P_vals[kk] = prefac * kRs3 * pRs_result;
         }
     }
@@ -479,9 +476,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
 
-    const double chi_min = 1e-3;
-    const double chi_max = 1e4;
-    const auto chi_vals = logspace(chi_min, chi_max, 5000);
+    const auto chi_vals = logspace(config::chi_min, config::chi_max, config::chi_points);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
@@ -510,11 +505,11 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
             return lt_dist(T_tilde) * power(chi, 7) * Apsq_val;
         };
         
-        const double log_chi_min = std::log(chi_min);
-        const double log_chi_max = std::log(chi_max);
+        const double log_chi_min = std::log(config::chi_min);
+        const double log_chi_max = std::log(config::chi_max);
 
-        boost::math::quadrature::gauss_kronrod<double, 61> integrator;
-        const auto y = integrator.integrate(integrand, log_chi_min, log_chi_max, 10, 1e-12);
+        boost::math::quadrature::gauss_kronrod<double, config::Ekin_samples> integrator;
+        const auto y = integrator.integrate(integrand, log_chi_min, log_chi_max, config::Ekin_max_refinements, config::Ekin_tolerance);
 
         P_vals[kk] = fac2 * y;
     }

@@ -82,18 +82,6 @@ class CubicSpline {
 
 /**
  * @brief Filon-type integrator for highly oscillatory integrals.
- * 
- * Implements a Filon-type quadrature method to efficiently compute integrals of the form:
- *   ∫ f(x) * sin(ω*x) dx  or  ∫ f(x) * cos(ω*x) dx
- * 
- * where ω is large (causing standard quadrature methods to fail).
- * 
- * The method works by:
- * 1. Subdividing the interval into subintervals containing a few oscillation periods
- * 2. Approximating f(x) with a polynomial on each subinterval
- * 3. Computing the oscillatory integral analytically for polynomial * sin/cos
- * 
- * This is more stable than pure Levin collocation for varying functions.
  */
 class LevinIntegrator {
 public:

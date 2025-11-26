@@ -69,9 +69,13 @@ std::vector<double> logspace(double start, double stop, std::size_t num) {
     return result;
 }
 
-// ============================================================================
-// Filon-Type Integrator Implementation
-// ============================================================================
+/*
+    The Filon qadrature method below was created using Claude Sonnet 4.5.
+    We do not claim ownership of this code, but we have verified it works
+    as intended. We caution that unexpected results may occur.
+
+    TODO - rename to FilonIntegrator
+*/
 
 LevinIntegrator::LevinIntegrator(int n_points) : n_points_(n_points) {
     if (n_points < 3) {
@@ -253,10 +257,6 @@ double LevinIntegrator::integrate_cos(
     
     return total;
 }
-
-// ============================================================================
-// End Filon-Type Integrator Implementation
-// ============================================================================
 
 // faster than std::pow
 double power(double x, int exp) {

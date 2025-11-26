@@ -23,6 +23,7 @@ TO DO:
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 #include <boost/math/quadrature/trapezoidal.hpp>
 
+#include "config.hpp"
 #include "maths_ops.hpp"
 #include "profile.hpp"
 
@@ -93,15 +94,13 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     alglib::spline1dinterpolant f_sin_spline, f_cos_spline, l_sin_spline;
     create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
 
-    LevinIntegrator levin(16);
-    boost::math::quadrature::gauss<double, 15> integrator;
+    LevinIntegrator levin(config::filon_polynomial_order);
+    boost::math::quadrature::gauss<double, config::fd_l_gauss_legendre_samples> integrator;
 
     #pragma omp parallel for
     for (size_t j = 0; j < M; ++j) {
         const double chi = chi_vals[j];
         const double inv_chi = 1.0 / chi;
-
-        const double chi_threshold = 1e1;
 
         double f_sin_int = 0.0;
         double f_cos_int = 0.0;
@@ -112,7 +111,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
         const double vw = prof.params()->vw();
         const auto mode = prof.mode();
 
-        if ( chi < chi_threshold ) {
+        if ( chi < config::chi_threshold ) {
 
             auto integrand_f_sin = [&](double xi) -> double {
 
