@@ -208,13 +208,16 @@ void example_GW_Spec(const benchmark_point& bp) {
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
 
     const auto OmegaGW_bag = Spectrum::GWSpec2(kRs_vals, params_bag);
-    OmegaGW_bag.write(dir + "GWSpec_bag_" + profile_bag.mode_str() + ".csv");
+    OmegaGW_bag.write(dir + "GWSpec_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
+    OmegaGW_bag.profile().write(dir + "profile_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
 
     const auto OmegaGW_munu = Spectrum::GWSpec2(kRs_vals, params_munu);
-    OmegaGW_munu.write(dir + "GWSpec_munu_" + profile_munu.mode_str() + ".csv");
+    OmegaGW_munu.write(dir + "GWSpec_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
+    OmegaGW_munu.profile().write(dir + "profile_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
 
     const auto OmegaGW_veff = Spectrum::GWSpec2(kRs_vals, params_veff);
-    OmegaGW_veff.write(dir + "GWSpec_veff_" + profile_veff.mode_str() + ".csv");
+    OmegaGW_veff.write(dir + "GWSpec_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
+    OmegaGW_veff.profile().write(dir + "profile_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
 
     // #ifdef ENABLE_MATPLOTLIB
     // profile_bag.plot(dir + "profile_bag_" + profile_bag.mode_str() + ".png");
@@ -384,11 +387,55 @@ int main() {
     const auto gs = 106.75;
     const auto nuc_type = "exp";
 
+    benchmark_point BP0_def(
+        0.4, // vw (def)
+        53.370765185008004,  // Ts
+        0.11384915003991744, // alN_bag
+        0.11384915003991744, // alN_munu
+        953.267, // beta/Hs
+        3.99871e-15, // Hs
+        1.0 / 3.0, // cpsq
+        1.0 / 3.0, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP0/"
+    );
+
+    benchmark_point BP0_hyb(
+        0.6, // vw (hyb)
+        53.370765185008004,  // Ts
+        0.11384915003991744, // alN_bag
+        0.11384915003991744, // alN_munu
+        953.267, // beta/Hs
+        3.99871e-15, // Hs
+        1.0 / 3.0, // cpsq
+        1.0 / 3.0, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP0/"
+    );
+
+    benchmark_point BP0_det(
+        0.8, // vw (det)
+        53.370765185008004,  // Ts
+        0.11384915003991744, // alN_bag
+        0.11384915003991744, // alN_munu
+        953.267, // beta/Hs
+        3.99871e-15, // Hs
+        1.0 / 3.0, // cpsq
+        1.0 / 3.0, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP0/"
+    );
+
     benchmark_point BP1_hyb(
         0.588525, // vw
         98.1547,  // Ts
-        0.00821205, // alN_bag
-        0.00821205, // alN_munu
+        // 0.00821205, // alN_bag (Will)
+        // 0.00821205, // alN_munu (Will)
+        0.00821094, // alN_bag
+        0.00827668, // alN_munu
         1106.16, // betaHs
         1.3763e-14, // Hs
         0.574624 * 0.574624, // cpsq
@@ -401,8 +448,10 @@ int main() {
     benchmark_point BP1_det(
         0.729893, // vw
         98.1547,  // Ts
-        0.00821205, // alN_bag
-        0.00821205, // alN_munu
+        // 0.00821205, // alN_bag (Will)
+        // 0.00821205, // alN_munu (Will)
+        0.00821094, // alN_bag
+        0.00827668, // alN_munu
         1106.16, // betaHs
         1.3763e-14, // Hs
         0.574624 * 0.574624, // cpsq
@@ -415,8 +464,10 @@ int main() {
     benchmark_point BP2_hyb(
         0.594842, // vw (hybrid)
         114.579,  // Ts
-        0.00386107, // alN_bag
-        0.00386107, // alN_munu
+        // 0.00386107, // alN_bag (Will)
+        // 0.00386107, // alN_munu (Will)
+        0.00386064, // alN_bag
+        0.00387911, // alN_munu
         1445.85, // betaHs
         1.86566e-14, // Hs
         0.575068 * 0.575068, // cpsq
@@ -429,8 +480,10 @@ int main() {
     benchmark_point BP2_det(
         0.754187, // vw (detonation)
         114.579,  // Ts
-        0.00386107, // alN_bag
-        0.00386107, // alN_munu
+        // 0.00386107, // alN_bag (Will)
+        // 0.00386107, // alN_munu (Will)
+        0.00386064, // alN_bag
+        0.00387911, // alN_munu
         1445.85, // betaHs
         1.86566e-14, // Hs
         0.575068 * 0.575068, // cpsq
@@ -443,8 +496,10 @@ int main() {
     benchmark_point BP3(
         0.605811, // vw (hybrid)
         90.7257,  // Ts
-        0.0130246, // alN_bag
-        0.0130246, // alN_munu
+        // 0.0130246, // alN_bag (Will)
+        // 0.0130246, // alN_munu (Will)
+        0.0130244, // alN_bag
+        0.0131376, // alN_munu
         1389.28, // betaHs
         1.18307e-14, // Hs
         0.331032, // cpsq
@@ -458,8 +513,10 @@ int main() {
     benchmark_point BP4(
         0.675122, // vw (hybrid)
         52.9772,  // Ts
-        0.0972391, // alN_bag
-        0.0972391, // alN_munu
+        // 0.0972391, // alN_bag (Will)
+        // 0.0972391, // alN_munu (Will)
+        0.0972393, // alN_bag
+        0.103742, // alN_munu
         1231.05, // betaHs
         4.34679e-15, // Hs
         0.56705 * 0.56705, // cpsq
@@ -473,8 +530,10 @@ int main() {
     benchmark_point BP5(
         0.626002, // vw (hybrid)
         76.2128,  // Ts
-        0.0283037, // alN_bag
-        0.0283037, // alN_munu
+        // 0.0283037, // alN_bag (Will)
+        // 0.0283037, // alN_munu (Will)
+        0.0283029, // alN_bag
+        0.0289454, // alN_munu
         941.912, // betaHs
         8.49472e-15, // Hs
         0.572982 * 0.572982, // cpsq
@@ -484,13 +543,13 @@ int main() {
         "benchmark_pts/BP5/"
     );
 
-    // fp fails for veff
-    // Bag gives incorrect hydrodynamic mode (hybrid instead of detonation)
     benchmark_point BP6(
         0.765762, // vw (deflagration)
         47.417670, // Ts
-        0.107000, // alN_bag
-        0.107000, // alN_munu
+        // 0.107000, // alN_bag (Will)
+        // 0.107000, // alN_munu (Will)
+        0.107001, // alN_bag
+        0.10778, // alN_munu
         604.582851, // betaHs
         3.397981e-15, // Hs
         0.570803 * 0.570803, // cpsq
@@ -500,30 +559,71 @@ int main() {
         "benchmark_pts/BP6/3deft/"
     );
 
-    // example_GW_Spec(BP1_hyb);
-    // example_GW_Spec(BP1_det);
+    benchmark_point BP7(
+        0.568989, // vw (deflagration)
+        96.660324, // Ts
+        0.009315, // alN_bag (Will)
+        0.009315, // alN_munu (Will)
+        2084.903549, // betaHs
+        8.485469e-15, // Hs
+        0.574964 * 0.574964, // cpsq
+        0.566480 * 0.566480, // cmsq
+        gs,
+        nuc_type,
+        "benchmark_pts/BP7/"
+    );
 
-    // example_GW_Spec(BP2_hyb);
-    // example_GW_Spec(BP2_det);
+    /*
+    BP1_hyb: alN_bag=0.00821094, alN_munu=0.00827668
+    BP2_hyb: alN_bag=0.00386064, alN_munu=0.00387911
+    BP3: alN_bag=0.0130244, alN_munu=0.0131376
+    BP4: alN_bag=0.0972393, alN_munu=0.103742
+    BP5: alN_bag=0.0283029, alN_munu=0.0289454
+    BP6: alN_bag=0.107001, alN_munu=0.10778
+    */
 
-    // example_GW_Spec(BP3);
-    // example_GW_Spec(BP4);
-    // example_GW_Spec(BP5);
+    std::vector<benchmark_point> bp_list = {BP0_def, BP0_hyb, BP0_det, BP1_hyb, BP1_det, BP2_hyb, BP2_det, BP3, BP4, BP5, BP6, BP7};
+    std::vector<std::string> bp_name = {"BP0_def", "BP0_hyb", "BP0_det", "BP1_hyb", "BP1_det", "BP2_hyb", "BP2_det", "BP3", "BP4", "BP5", "BP6", "BP7"};
 
-    std::vector<benchmark_point> bp_list = {BP1_hyb, BP2_hyb, BP3, BP4, BP5, BP6};
-    std::vector<std::string> bp_name = {"BP1_hyb", "BP2_hyb", "BP3", "BP4", "BP5", "BP6"};
+    // example_GW_Spec2(BP5);
 
-    // const int i = 5;
+    const int i = 4;
     // for (int i = 0; i < bp_list.size(); i++) {
-        // const auto bp = bp_list[i];
-    //     const Hydrodynamics::FluidProfile fp_bag(*bp.get_PTParams_Bag());
-    //     const Hydrodynamics::FluidProfile fp_munu(*bp.get_PTParams_munu());
-        // const Hydrodynamics::FluidProfile fp_veff(*bp.get_PTParams_Veff());
+        const auto bp = bp_list[i];
+        // example_GW_Spec(bp);
+
+        auto params_bag_ptr = bp.get_PTParams_Bag();
+        // auto params_munu_ptr = bp.get_PTParams_munu();
+        // auto params_veff_ptr = bp.get_PTParams_Veff();
+
+        const Hydrodynamics::FluidProfile fp_bag(*params_bag_ptr);
+        // const Hydrodynamics::FluidProfile fp_munu(*params_munu_ptr);
+        // const Hydrodynamics::FluidProfile fp_veff(*params_veff_ptr);
+
+        const auto tau_nl_bag = Spectrum::get_nl_timescale(fp_bag);
+        std::cout << "tau_nl_bag=" << tau_nl_bag << "\n"
+                  << "dtau_bag/Rs=" << tau_nl_bag / params_bag_ptr->Rs() << "\n\n";
+
+        // const auto tau_nl_munu = Spectrum::get_nl_timescale(fp_munu);
+        // std::cout << "tau_nl_munu=" << tau_nl_munu << "\n"
+        //           << "dtau_munu/Rs=" << tau_nl_munu / params_munu_ptr->Rs() << "\n\n";
+
+        // const auto tau_nl_veff = Spectrum::get_nl_timescale(fp_veff);
+        // std::cout << "tau_nl_veff=" << tau_nl_veff << "\n"
+        //           << "dtau_veff/Rs=" << tau_nl_veff / params_veff_ptr->Rs() << "\n\n";
+
+        
+
+        // fp_veff.plot("fp_veff", 0.5, 0.7);
+        // fp_munu.plot("fp_munu");
+        // fp_bag.plot("fp_bag");
 
         // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp_name[i]);
     // }
-    
-    test_FluidProfile(2000);
+
+    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    // const auto OmegaGW_veff = Spectrum::GWSpec2(kRs_vals, *bp.get_PTParams_Veff());
+    // std::cout << "f_peak=" << OmegaGW_veff.f_peak() << "\n";
 
     // no shock found (xi_sol starts before vw so loop in find_shock_idx always continues)
     // const auto vw = 0.620376;
