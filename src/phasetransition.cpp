@@ -403,6 +403,16 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   cpsq_ = csq_s(1.0);
   cmsq_ = csq_b(1.0);
 
+  // calculate alN_bag and alN_munu
+  // const auto theta_s_bag = es_val(1.0) - 3.0 * ps_val(1.0);
+  // const auto theta_b_bag = eb_val(1.0) - 3.0 * pb_val(1.0);
+  // const auto alN_bag = (theta_s_bag - theta_b_bag) / (3.0 * ws_val(1.0));
+
+  // const auto theta_s = es_val(1.0) - ps_val(1.0) / cmsq_;
+  // const auto theta_b = eb_val(1.0) - pb_val(1.0) / cmsq_;
+  // const auto alN_munu = (theta_s - theta_b) / (3.0 * ws_val(1.0));
+  // std::cout << "alN_bag=" << alN_bag << ", alN_munu=" << alN_munu << "\n";
+
   std::cout << "Equation of state read successfully!\n";
 }
 
@@ -567,8 +577,6 @@ void PTParams_Veff::print() const {
   PTParams::print();
   std::cout << "*************************************************\n";
 }
-
-
 
 
 } // namespace PhaseTransition
