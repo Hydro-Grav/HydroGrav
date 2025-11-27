@@ -219,7 +219,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 }
 
 /*** GW power spectrum ***/
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const bool calc_dtau) {
 
     const auto ti = std::chrono::high_resolution_clock::now();
 
@@ -229,12 +229,14 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     //           << ", pRs_tolerance=" << config::pRs_tolerance 
     //           << ", z_tolerance=" << config::z_tolerance << "\n";
 
-    const auto cs = std::sqrt(params.cpsq());
-    const auto tau_s = params.tau_s();
-    const auto tau_fin = params.tau_fin();
-    const auto Rs_inv = 1.0 / params.Rs();
-
     const Hydrodynamics::FluidProfile profile(params);
+
+    const auto cs = std::sqrt(params.cpsq());
+    const auto Rs_inv = 1.0 / params.Rs();
+    
+    const auto tau_s = params.tau_s();
+    const auto dtau = (calc_dtau) ? get_nl_timescale(profile) : dtau_approx(params);
+    const auto tau_fin = tau_s + dtau;
 
     const auto nk = kRs_vals.size();
 
@@ -561,6 +563,11 @@ double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
     const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());    
 
     return std::sqrt(Rs * Rs * Rs / Ek_int);
+}
+
+// approximation used for dtau in arXiv:2308.12943
+double dtau_approx(const PhaseTransition::PTParams& params) {
+    return 10.0 * params.Rs();
 }
 
 double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double Ts, double H0, double Hs, double g0, double gs) {

@@ -109,7 +109,7 @@ PowerSpec norm_spec(const PowerSpec& spec);
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof);
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
 
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const bool calc_dtau=false);
 
 void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline);
 
