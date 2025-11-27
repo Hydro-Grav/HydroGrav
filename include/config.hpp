@@ -33,6 +33,11 @@ namespace config {
     constexpr double pRs_maximum = 1e+3; // default = 1e+3
     constexpr int n_pRs = 500; // default = 500
 
+    /* Bounds for Ekin integration (tau_nl) */
+    constexpr double kRs_minimum = 1e-4; // default = 1e-4
+    constexpr double kRs_maximum = 1e+5; // default = 1e+5
+    constexpr int n_kRs = 5000; // default = 5000
+
     /*  
         Factor for extending kinetic spectrum spline bounds
         beyond min/max pRs values found in GWSpec

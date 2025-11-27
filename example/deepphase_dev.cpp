@@ -513,17 +513,16 @@ int main() {
     std::vector<benchmark_point> bp_list = {BP1_hyb, BP2_hyb, BP3, BP4, BP5, BP6};
     std::vector<std::string> bp_name = {"BP1_hyb", "BP2_hyb", "BP3", "BP4", "BP5", "BP6"};
 
-    // const int i = 5;
+    const int i = 5;
     // for (int i = 0; i < bp_list.size(); i++) {
-        // const auto bp = bp_list[i];
-    //     const Hydrodynamics::FluidProfile fp_bag(*bp.get_PTParams_Bag());
-    //     const Hydrodynamics::FluidProfile fp_munu(*bp.get_PTParams_munu());
-        // const Hydrodynamics::FluidProfile fp_veff(*bp.get_PTParams_Veff());
+        const auto bp = bp_list[i];
+        const auto params_ptr = bp.get_PTParams_Bag();
+        const Hydrodynamics::FluidProfile fp(*params_ptr);
 
-        // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp_name[i]);
+        const auto tau_nl = Spectrum::get_nl_timescale(fp);
+        std::cout << "tau_nl=" << tau_nl << ", dtau/Rs=" << tau_nl / params_ptr->Rs() << "\n";
     // }
     
-    test_FluidProfile(2000);
 
     // no shock found (xi_sol starts before vw so loop in find_shock_idx always continues)
     // const auto vw = 0.620376;

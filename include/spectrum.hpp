@@ -113,6 +113,8 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
 void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline);
 
+double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
+
 /**
  * @brief Calculates prefactor for GW power spectrum $\Omega_{GW}$
  *

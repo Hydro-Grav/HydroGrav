@@ -550,6 +550,19 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
 }
 /***************************/
 
+// computes timescale for non-linearities to appear in fluid (used as sound wave duration)
+double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
+    // tau_nl ~ Rs / sqrt(Omega_K)
+    // Omega_K = avg kinetic energy of sound waves
+    const auto Rs = prof.params()->Rs();
+    const auto kRs_vals = logspace(config::kRs_minimum, config::kRs_maximum, config::n_kRs);
+
+    const auto Ek = Ekin(kRs_vals, prof);
+    const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());    
+
+    return std::sqrt(Rs * Rs * Rs / Ek_int);
+}
+
 double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double Ts, double H0, double Hs, double g0, double gs) {
     // Transfer function (redshift of spectrum - eq 13 arXiv:2308.12943)
     const auto g0gs_rat = g0 / gs;
