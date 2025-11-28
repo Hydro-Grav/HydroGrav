@@ -35,7 +35,7 @@ class PowerSpec {
   public:
     // ctors - pass in momentum (k) and spectrum (P) since P is calculated differently for kinetic/GW
     // PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const PhaseTransition::PTParams& params);
-    PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const Hydrodynamics::FluidProfile& profile);
+    PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const Hydrodynamics::FluidProfile& profile, double dtau=std::numeric_limits<double>::quiet_NaN());
 
     const std::vector<double>& freq() const { return freq_vals_; }; // Frequency
     const std::vector<double>& K() const { return K_vals_; }; // Momentum
@@ -43,6 +43,8 @@ class PowerSpec {
 
     const Hydrodynamics::FluidProfile profile() const { return profile_; }; // fluid profile
     const PhaseTransition::PTParams* params() const { return params_; }; // PT parameters
+
+    const double dtau() const { return dtau_; }; // sound wave duration (only needed for GW spectrum, not Ekin)
 
     double max() const; // Max value of power spectrum
 
@@ -64,6 +66,7 @@ class PowerSpec {
 
   private:
     std::vector<double> freq_vals_, K_vals_, P_vals_;
+    double dtau_;
     const Hydrodynamics::FluidProfile profile_; // fluid profile
     const PhaseTransition::PTParams* params_;
 
@@ -114,6 +117,9 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline);
 
 double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
+
+// approximation used for dtau in arXiv:2308.12943
+double dtau_approx(const PhaseTransition::PTParams& params);
 
 /**
  * @brief Calculates prefactor for GW power spectrum $\Omega_{GW}$

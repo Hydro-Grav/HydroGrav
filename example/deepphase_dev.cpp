@@ -373,45 +373,32 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
 }
 
 void compare_dtau_calc(const benchmark_point& bp) {
-    // Suppress console output
-    std::streambuf* original_cout_buffer = std::cout.rdbuf();
-    std::cout.rdbuf(nullptr);
 
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
 
+    // bag
     auto params_bag_ptr = bp.get_PTParams_Bag();
-    const Hydrodynamics::FluidProfile fp_bag(*params_bag_ptr);
-    const auto tau_nl_bag = Spectrum::get_nl_timescale(fp_bag);
     const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, *params_bag_ptr); // dflt dtau
+    OmegaGW_bag.write(bp.dir() + "dtau_comparison/gw_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
+
     const auto OmegaGW_bag_dtau = Spectrum::GWSpec(kRs_vals, *params_bag_ptr, true); // calc dtau
-
-    OmegaGW_bag.write(bp.dir() + "gw_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
-    OmegaGW_bag_dtau.write(bp.dir() + "gw_bag_dtau_" + OmegaGW_bag_dtau.profile().mode_str() + ".csv");
+    OmegaGW_bag_dtau.write(bp.dir() + "dtau_comparison/gw_bag_dtau_" + OmegaGW_bag_dtau.profile().mode_str() + ".csv");
     
+    // munu
     auto params_munu_ptr = bp.get_PTParams_munu();
-    const Hydrodynamics::FluidProfile fp_munu(*params_munu_ptr);
-    const auto tau_nl_munu = Spectrum::get_nl_timescale(fp_munu);
     const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, *params_munu_ptr);
+    OmegaGW_munu.write(bp.dir() + "dtau_comparison/gw_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
+
     const auto OmegaGW_munu_dtau = Spectrum::GWSpec(kRs_vals, *params_munu_ptr, true);
+    OmegaGW_munu_dtau.write(bp.dir() + "dtau_comparison/gw_munu_dtau_" + OmegaGW_munu.profile().mode_str() + ".csv");
 
-    OmegaGW_munu.write(bp.dir() + "gw_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
-    OmegaGW_munu_dtau.write(bp.dir() + "gw_munu_dtau_" + OmegaGW_munu.profile().mode_str() + ".csv");
-
+    // veff
     auto params_veff_ptr = bp.get_PTParams_Veff();
-    const Hydrodynamics::FluidProfile fp_veff(*params_veff_ptr);
-    const auto tau_nl_veff = Spectrum::get_nl_timescale(fp_veff);
     const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, *params_veff_ptr);
+    OmegaGW_veff.write(bp.dir() + "dtau_comparison/gw_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
+
     const auto OmegaGW_veff_dtau = Spectrum::GWSpec(kRs_vals, *params_veff_ptr, true);
-
-    OmegaGW_veff.write(bp.dir() + "gw_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
-    OmegaGW_veff_dtau.write(bp.dir() + "gw_veff_dtau_" + OmegaGW_veff_dtau.profile().mode_str() + ".csv");
-
-    // Restore console output
-    std::cout.rdbuf(original_cout_buffer);
-
-
-
-    std::cout << bp.name() << ": dtau/Rs=" << tau_nl_bag / params_bag_ptr->Rs() << " (bag), " << tau_nl_munu / params_munu_ptr->Rs() << " (munu), " << tau_nl_veff / params_veff_ptr->Rs() << " (veff)\n";
+    OmegaGW_veff_dtau.write(bp.dir() + "dtau_comparison/gw_veff_dtau_" + OmegaGW_veff_dtau.profile().mode_str() + ".csv");
 
     return;
 }
@@ -608,6 +595,7 @@ int main() {
         "benchmark_pts/BP6/3deft/"
     );
 
+    // bag gets mode wrong
     benchmark_point BP7(
         0.568989, // vw (deflagration)
         96.660324, // Ts
@@ -636,18 +624,12 @@ int main() {
 
     // example_GW_Spec2(BP5);
 
-    const int i = 7;
+    const int i = 10;
     // for (int i = 0; i < bp_list.size(); i++) {
         const auto bp = bp_list[i];
-        // example_GW_Spec(bp);
+        example_GW_Spec(bp);
 
         // compare_dtau_calc(bp);
-
-        const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-        const auto params = bp.get_PTParams_Veff();
-        const auto OmegaGW = Spectrum::GWSpec(kRs_vals, *params, true);
-
-        OmegaGW.write("test_spectra.csv");
 
         // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp.name());
     // }
