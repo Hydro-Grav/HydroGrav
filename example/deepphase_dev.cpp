@@ -183,34 +183,20 @@ void example_GW_Spec(const benchmark_point& bp) {
 
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
-    const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-    const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-    const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, nuc_type, un, veff_file);
-
-    un.print();
-    params_munu.print();
-
-    // Write fluid profiles to disk
-    // const Hydrodynamics::FluidProfile profile_bag(params_bag);
-    // profile_bag.write(dir + "profile_bag_" + profile_bag.mode_str() + ".csv");
-
-    // const Hydrodynamics::FluidProfile profile_munu(params_munu);
-    // profile_munu.write(dir + "profile_munu_" + profile_munu.mode_str() + ".csv");
-
-    // const Hydrodynamics::FluidProfile profile_veff(params_veff);
-    // profile_veff.write(dir + "profile_veff_" + profile_veff.mode_str() + ".csv");
-
     // Define GW spectrum
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
 
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
     const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
     OmegaGW_bag.write(dir + "GWSpec_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
     OmegaGW_bag.profile().write(dir + "profile_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
 
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
     const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
     OmegaGW_munu.write(dir + "GWSpec_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
     OmegaGW_munu.profile().write(dir + "profile_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
 
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, nuc_type, un, veff_file);
     const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
     OmegaGW_veff.write(dir + "GWSpec_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
     OmegaGW_veff.profile().write(dir + "profile_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
@@ -624,31 +610,27 @@ int main() {
 
     // example_GW_Spec2(BP5);
 
-    const int i = 10;
+    // const int i = 10;
     // for (int i = 0; i < bp_list.size(); i++) {
-        const auto bp = bp_list[i];
-        example_GW_Spec(bp);
+    //     const auto bp = bp_list[i];
+    //     example_GW_Spec(bp);
 
-        // compare_dtau_calc(bp);
+    //     // compare_dtau_calc(bp);
 
-        // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp.name());
+    //     // Hydrodynamics::plot_profiles(fp_bag, fp_munu, fp_veff, "fp_combined_" + bp.name());
     // }
 
-    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
-    // const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, *bp.get_PTParams_Veff());
-    // std::cout << "f_peak=" << OmegaGW_veff.f_peak() << "\n";
-
     // no shock found (xi_sol starts before vw so loop in find_shock_idx always continues)
-    // const auto vw = 0.620376;
-    // const auto alN = 0.00412303;
+    const auto vw = 0.620376;
+    const auto alN = 0.00412303;
 
-    // const auto TN = PhaseTransition::dflt_PTParams::TN;
-    // const auto beta = PhaseTransition::dflt_PTParams::beta;
-    // const auto Rs = PhaseTransition::Rs_approx(vw, beta);
+    const auto TN = PhaseTransition::dflt_PTParams::TN;
+    const auto beta = PhaseTransition::dflt_PTParams::beta;
+    const auto Rs = PhaseTransition::Rs_approx(vw, beta);
 
-    // const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, PhaseTransition::default_universe());
-    // const Hydrodynamics::FluidProfile profile(params);
-    // profile.plot("test_prof");
+    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, PhaseTransition::default_universe());
+    const Hydrodynamics::FluidProfile profile(params);
+    profile.plot("test_prof");
 
     /************************ CLOCK / PROFILER *************************/
     const auto tf = std::chrono::high_resolution_clock::now();

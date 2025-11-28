@@ -47,6 +47,7 @@ class PowerSpec {
     const double dtau() const { return dtau_; }; // sound wave duration (only needed for GW spectrum, not Ekin)
 
     double max() const; // Max value of power spectrum
+    double f_peak() const; // Peak spectrum frequency
 
     void write(const std::string& filename="spectrum.csv") const;
 

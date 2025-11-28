@@ -75,6 +75,13 @@ double PowerSpec::max() const {
     return *std::max_element(Pv.begin(), Pv.end());
 }
 
+double PowerSpec::f_peak() const {
+    const auto &Pv = P();
+    const auto it = std::max_element(Pv.begin(), Pv.end());
+    const auto idx = std::distance(Pv.begin(), it);
+    return freq_vals_[idx];
+}
+
 void PowerSpec::write(const std::string& filename) const {
     namespace fs = std::filesystem;
 
@@ -112,6 +119,7 @@ void PowerSpec::write(const std::string& filename) const {
     file << "#   Rs = " << params_->Rs() << "\n";
     file << "#   nuc_type = " << params_->nuc_type() << "\n";
     file << "#   dtau/Rs (sound wave duration) = " << dtau() / params_->Rs() << "\n";
+    file << "#   f_peak = " << f_peak() << "\n";
     file << "#\n";
 
     file << "# Fluid Parameters:\n";
