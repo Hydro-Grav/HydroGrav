@@ -5,6 +5,7 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <variant>
 
 #include "ap.h"
 #include "interpolation.h"
@@ -74,7 +75,7 @@ class FluidProfile {
     void write(const std::string& filename = "fp.csv") const; // write bubble profile to disk
     
     #ifdef ENABLE_MATPLOTLIB
-    void plot(const std::string& filename = "fp.png") const; // Plots bubble profiles
+    void plot(const std::string& filename = "fp.png", double xi_min = 0.0, double xi_max = 1.0) const; // Plots bubble profiles
     #endif
 
   private:
