@@ -7,7 +7,6 @@ TEST_CASE("Tests functionality of the PowerSpec class.", "[powerSpec]") {
                                          PhaseTransition::dflt_PTParams::TN,
                                          PhaseTransition::dflt_PTParams::beta,
                                          PhaseTransition::dflt_PTParams::Rs,
-                                         PhaseTransition::dflt_PTParams::dtau,
                                          PhaseTransition::dflt_PTParams::nuc_type,
                                          PhaseTransition::default_universe());
     Hydrodynamics::FluidProfile profile(params);

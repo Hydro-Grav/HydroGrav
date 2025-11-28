@@ -67,7 +67,7 @@ const Universe& default_universe() {
 }
 
 /************************************ PTParams ************************************/
-PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un)
     : un_(un),
       vw_(vw),
       alN_(alN),
@@ -75,10 +75,19 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, dou
       wNeN_rat_(std::numeric_limits<double>::quiet_NaN()),
       beta_(beta),
       Rs_(Rs),
-      tau_s_(),
-      tau_fin_(),
-      dtau_(dtau),
+      tau_s_(1.0 / un.Hs()),
       nuc_type_(nuc_type) {
+
+      /*
+      Note on Hs_conformal:
+      Usual definition of conformal Hubble rate is Hs_conformal = as*Hs, but here we include a redshift factor 1/a0 (i.e. so this is Hs_conformal as measured today)
+      tau_s should be defined as 1.0 / Hs_conformal (don't understand why!), but this breaks calculation
+      since tau_s is too large -> Si and Ci integrals are const for such large values so dlt=0 -> OmegaGW=0
+
+      const auto asa0_rat = std::pow(un_.g0() / un_.gs(), 1./3.) * un_.T0() / un_.Ts(); // a_* / a_0
+      const auto Hs_conformal = un_.Hs() * asa0_rat; // conformal Hubble rate at PT as measured today
+      tau_s_ = 1.0 / Hs_conformal;
+      */
 
       // check valid vw
       if (vw_ < 0.0 ) {
@@ -103,12 +112,6 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, dou
         throw std::invalid_argument("Unphysical transition rate parameter passed into PTParams. Must have beta > 0.");
       }
 
-      // check valid sound wave duration
-      if (dtau_ < 0.0) {
-        std::cout << "Warning: dtau < 0. Taking |dtau| as input instead.";
-        dtau_ = std::abs(dtau);
-      }
-
       // check valid bubble nucleation type
       const char* allowed_nuc[] = {"exp", "sim"};
       const auto m = sizeof(allowed_nuc) / sizeof(allowed_nuc[0]);
@@ -119,19 +122,6 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, dou
         std::cout << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
         nuc_type_ = dflt_PTParams::nuc_type;
       }
-
-      // define duration of sound waves
-      tau_s_ = 1.0 / un_.Hs();
-      tau_fin_ = tau_s_ + dtau_;
-      
-      // Note on Hs_conformal:
-      // Usual definition of conformal Hubble rate is Hs_conformal = as*Hs, but here we include a redshift factor 1/a0 (i.e. so this is Hs_conformal as measured today)
-      // tau_s should be defined as 1.0 / Hs_conformal (don't understand why!), but this breaks calculation
-      // since tau_s is too large -> Si and Ci integrals are const for such large values so dlt=0 -> OmegaGW=0
-
-      // const auto asa0_rat = std::pow(un_.g0() / un_.gs(), 1./3.) * un_.T0() / un_.Ts(); // a_* / a_0
-      // const auto Hs_conformal = un_.Hs() * asa0_rat; // conformal Hubble rate at PT as measured today
-      // tau_s_ = 1.0 / Hs_conformal;
     }
 
 // Protected:
@@ -143,7 +133,6 @@ void PTParams::print() const {
             << std::setw(35) << "Wall velocity:" << "vw=" << vw_ << "\n"
             << std::setw(35) << "PT strength parameter:" << "alN=" << alN_ << "\n"
             << std::setw(35) << "Transition rate parameter:" << "beta=" << beta_ << "\n"
-            << std::setw(35) << "PT duration" << "dtau=" << dtau_ << "\n"
             << std::setw(35) << "Mean bubble separation:" << "Rs=" << Rs_ << "\n";
 }
 
@@ -158,11 +147,11 @@ bool PTParams::is_valid_model(const char* model, const char* allowed_models[], c
 }
 
 /********************************** PTParams_Bag **********************************/
-PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un) // Bag model
-    : PTParams_Bag(vw, alN, TN, beta, Rs, dtau, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0) {}
+PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un) // Bag model
+    : PTParams_Bag(vw, alN, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0) {}
 
-PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq) // full ctor
-    : PTParams(vw, alN, TN, beta, Rs, dtau, nuc_type, un),
+PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, double cpsq, double cmsq) // full ctor
+    : PTParams(vw, alN, TN, beta, Rs, nuc_type, un),
       cpsq_(cpsq),
       cmsq_(cmsq) {
 
@@ -289,10 +278,10 @@ bool EquationOfState::is_valid() const
 /********************************** PTParams_Veff *********************************/
 // New primary constructor
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data)
-    : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::Rs, dflt_PTParams::dtau, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
+    : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::Rs, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
 
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
-    : PTParams(vw, alN, TN, beta, Rs, dtau, nuc_type, un),
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
+    : PTParams(vw, alN, TN, beta, Rs, nuc_type, un),
       cpsq_(),
       cmsq_() {
     
@@ -304,8 +293,8 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename)
     : PTParams_Veff(vw, alN, TN, EquationOfState::from_file(veff_eos_filename)) {}
 
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
-    : PTParams_Veff(vw, alN, TN, beta, Rs, dtau, nuc_type, un, EquationOfState::from_file(veff_eos_filename)) {}
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
+    : PTParams_Veff(vw, alN, TN, beta, Rs, nuc_type, un, EquationOfState::from_file(veff_eos_filename)) {}
 
 // Private initialization method
 void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {

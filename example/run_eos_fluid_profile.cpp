@@ -13,7 +13,6 @@ int main() {
     const auto TN = PhaseTransition::dflt_PTParams::TN;
     const auto beta = PhaseTransition::dflt_PTParams::beta;
     const auto Rs = PhaseTransition::dflt_PTParams::Rs;
-    const auto dtau = PhaseTransition::dflt_PTParams::dtau;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
     const PhaseTransition::Universe un;
@@ -48,7 +47,7 @@ int main() {
     /* 
         Secondly, we construct the PTParams object
     */
-    PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, Rs, dtau, nuc_type, un, eos_data);
+    PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, Rs, nuc_type, un, eos_data);
 
     /*
         Lastly, we use this to compute the fluid profile
@@ -81,7 +80,7 @@ int main() {
         This can then be passed to PTParams_Veff. Additionally, PTParams_Veff itself can be 
         initialised from the file path (for backwards compatibility, might not make it to release)
     */
-    PhaseTransition::PTParams_Veff params_from_path(vw, alN, TN, beta, Rs, dtau, nuc_type, un, eos_path);
+    PhaseTransition::PTParams_Veff params_from_path(vw, alN, TN, beta, Rs, nuc_type, un, eos_path);
 
     const Hydrodynamics::FluidProfile profile_from_path(params_from_path);
 

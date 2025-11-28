@@ -73,8 +73,7 @@ struct dflt_PTParams {
   static constexpr double vw = 0.8;              // Wall velocity
   static constexpr double alN = 0.1;           // PT strength 
   static constexpr double beta = 1e-12;            // Transition rate param
-  static constexpr double Rs = Rs_approx(vw, beta);   
-  static constexpr double dtau = 10.0 * Rs;         // PT duration
+  static constexpr double Rs = Rs_approx(vw, beta);
   static constexpr double TN = dflt_universe::Ts;     // Nucleation temperature
   static constexpr double cpsq = 1.0 / 3.0;      // speed of sound squared (symmetric phase)
   static constexpr double cmsq = cpsq;           // speed of sound squared (broken phase
@@ -87,7 +86,6 @@ units:
 [vw] = dimensionless (0 < vw < 1)
 [alN] = dimensionless (alN > 0)
 [beta] = GeV
-[dtau] = 1/GeV
 */
 
 /**
@@ -100,10 +98,17 @@ units:
 class PTParams {
   public:
     // ctor
-    PTParams(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un);
 
     enum class ModelType { Bag, Veff }; // equation of state model
     virtual ModelType eos() const = 0;
+    inline std::string eos_to_string() const {
+        switch (eos()) {
+            case ModelType::Bag:  return "Bag";
+            case ModelType::Veff: return "Veff";
+            default:              return "Unknown";
+        }
+    }
 
     Universe un() const { return un_; } // universe parameters
 
@@ -115,10 +120,10 @@ class PTParams {
 
     // GW parameters
     double beta() const { return beta_; } // inverse PT duration
+    double betaHs() const { return beta_ / un_.Hs(); } // beta/Hs
     double Rs() const { return Rs_; } // characteristic length scale R_*
     double tau_s() const { return tau_s_; } // start time of PT
     double tau_fin() const { return tau_fin_; } // end time of PT
-    double dtau() const { return dtau_; } // PT duration
     const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
 
     // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
@@ -129,7 +134,7 @@ class PTParams {
 
   protected:
     const Universe un_;
-    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_, dtau_;
+    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_;
     const char *nuc_type_;
 
     virtual void print() const;
@@ -141,8 +146,8 @@ class PTParams {
 class PTParams_Bag : public PTParams {
   public:
     // ctors
-    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un);
-    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
+    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un);
+    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
 
     ModelType eos() const override { return ModelType::Bag; }
 
@@ -184,11 +189,11 @@ class PTParams_Veff : public PTParams {
 public:
   // These use the new eos_data
   PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data);
-  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
 
   // Backward compatibile
   PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
-  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, double dtau, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
 
   ModelType eos() const override { return ModelType::Veff; }
 

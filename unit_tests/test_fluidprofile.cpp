@@ -8,7 +8,6 @@ TEST_CASE("Tests the FluidProfile class for correct behavior and integration.", 
                                          PhaseTransition::dflt_PTParams::TN,
                                          PhaseTransition::dflt_PTParams::beta,
                                          PhaseTransition::dflt_PTParams::Rs,
-                                         PhaseTransition::dflt_PTParams::dtau,
                                          PhaseTransition::dflt_PTParams::nuc_type,
                                          PhaseTransition::default_universe());
     Hydrodynamics::FluidProfile profile(params);

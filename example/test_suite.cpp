@@ -12,14 +12,13 @@ int main() {
         const auto TN = 100;
         const auto beta = 100 * 9.868763e-15;
         const auto Rs = PhaseTransition::Rs_approx(vw, beta);
-        const auto dtau = 10 * Rs;
         const auto cs_p = 0.573788;
         const auto cs_m = 0.562375;
 
         const PhaseTransition::Universe un;
 
-        PhaseTransition::PTParams_Bag params_exp(vw, alN, TN, beta, Rs, dtau, "exp", un, 1./3., 1./3.);
-        PhaseTransition::PTParams_Bag params_sim(vw, alN, TN, beta, Rs, dtau, "sim", un, 1./3., 1./3.);
+        PhaseTransition::PTParams_Bag params_exp(vw, alN, TN, beta, Rs, "exp", un, 1./3., 1./3.);
+        PhaseTransition::PTParams_Bag params_sim(vw, alN, TN, beta, Rs, "sim", un, 1./3., 1./3.);
 
         const auto kRs_vals = logspace(1e-3, 1e+3, 100);
         Spectrum::PowerSpec OmegaGW_exp = Spectrum::zetaKin(kRs_vals, params_exp);
@@ -38,7 +37,6 @@ int main() {
             const auto Hs = PhaseTransition::dflt_universe::Hs;
             const auto Rs = RsH / Hs;
             const auto beta = PhaseTransition::Rs_approx(vw, Rs);
-            const auto dtau = 10 * Rs;
 
             std::cout << "vw = " << vw << ", RsH = " << RsH << ", Rs = " << Rs << ", beta = " << beta << std::endl;
 
@@ -47,25 +45,25 @@ int main() {
             const auto kRs_vals = logspace(1e-3, 1e+3, 100);
 
             try {
-            PhaseTransition::PTParams_Bag params_01(vw, 0.1, TN, beta, Rs, dtau, "exp", un, 1./3., 1./3.);
+            PhaseTransition::PTParams_Bag params_01(vw, 0.1, TN, beta, Rs, "exp", un, 1./3., 1./3.);
             Spectrum::PowerSpec OmegaGW_01 = Spectrum::GWSpec(kRs_vals, params_01);
             OmegaGW_01.write("data/fig_6a/" + std::to_string(vw) + "_RsH_" + std::to_string(RsH) + ".csv");
             } catch(...) { std::cout << "Failed for fig_6a\n";}
 
             try {
-            PhaseTransition::PTParams_Bag params_001(vw, 0.01, TN, beta, Rs, dtau, "exp", un, 1./3., 1./3.);
+            PhaseTransition::PTParams_Bag params_001(vw, 0.01, TN, beta, Rs, "exp", un, 1./3., 1./3.);
             Spectrum::PowerSpec OmegaGW_001 = Spectrum::GWSpec(kRs_vals, params_001);
             OmegaGW_001.write("data/fig_6b/" + std::to_string(vw) + "_RsH_" + std::to_string(RsH) + ".csv");
             } catch(...) { std::cout << "Failed for fig_6b\n";}
 
             try {
-            PhaseTransition::PTParams_Bag params_0001(vw, 0.001, TN, beta, Rs, dtau, "exp", un, 1./3., 1./3.);
+            PhaseTransition::PTParams_Bag params_0001(vw, 0.001, TN, beta, Rs, "exp", un, 1./3., 1./3.);
             Spectrum::PowerSpec OmegaGW_0001 = Spectrum::GWSpec(kRs_vals, params_0001);
             OmegaGW_0001.write("data/fig_6c/" + std::to_string(vw) + "_RsH_" + std::to_string(RsH) + ".csv");
             } catch(...) { std::cout << "Failed for fig_6c\n";}
 
             try {
-                PhaseTransition::PTParams_Bag params_00001(vw, 0.0001, TN, beta, Rs, dtau, "exp", un, 1./3., 1./3.);
+                PhaseTransition::PTParams_Bag params_00001(vw, 0.0001, TN, beta, Rs, "exp", un, 1./3., 1./3.);
                 Spectrum::PowerSpec OmegaGW_00001 = Spectrum::GWSpec(kRs_vals, params_00001);
                 OmegaGW_00001.write("data/fig_6d/" + std::to_string(vw) + "_RsH_" + std::to_string(RsH) + ".csv");
             } catch(...) { std::cout << "Failed for fig_6d\n";}
