@@ -281,9 +281,7 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfS
     : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::Rs, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
 
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
-    : PTParams(vw, alN, TN, beta, Rs, nuc_type, un),
-      cpsq_(),
-      cmsq_() {
+    : PTParams(vw, alN, TN, beta, Rs, nuc_type, un) {
     
     std::cout << "Note: PTParams_Veff must be given alN defined for mu nu model!" << std::endl;
     initialize_from_eos_data(eos_data);
@@ -386,11 +384,6 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
 
   cmsq_array.setcontent(n, cmsq_vals_.data());
   alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
-
-  // estimate cpsq, cmsq (needed to determine hydrodynamic mode)
-  // Note: not perfect, since cpsq = csq_s(Tp/TN), cmsq = csq_b(Tm/TN) and Tp,Tm != TN in general
-  cpsq_ = csq_s(1.0);
-  cmsq_ = csq_b(1.0);
 
   // calculate alN_bag and alN_munu
   // const auto theta_s_bag = es_val(1.0) - 3.0 * ps_val(1.0);

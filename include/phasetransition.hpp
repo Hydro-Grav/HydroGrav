@@ -129,8 +129,8 @@ class PTParams {
     // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
     // void print() const;
     
-    virtual double cpsq(double TTN = -1.0) const = 0; // speed of sound squared (symmetric phase)
-    virtual double cmsq(double TTN = -1.0) const = 0; // speed of sound squared (broken phase)
+    virtual double cpsq() const = 0; // speed of sound squared (symmetric phase)
+    virtual double cmsq() const = 0; // speed of sound squared (broken phase)
 
   protected:
     const Universe un_;
@@ -151,8 +151,8 @@ class PTParams_Bag : public PTParams {
 
     ModelType eos() const override { return ModelType::Bag; }
 
-    double cpsq(double TTN = -1.0) const override { return cpsq_; }
-    double cmsq(double TTN = -1.0) const override { return cmsq_; }
+    double cpsq() const override { return cpsq_; }
+    double cmsq() const override { return cmsq_; }
 
     void print() const override;
 
@@ -213,10 +213,13 @@ public:
   double TTN_min() const { return veff_TTN_vals_.front(); }
   double TTN_max() const { return veff_TTN_vals_.back(); }
 
-  double cpsq(double T = -1.0) const override { return cpsq_; }
-  double cmsq(double T = -1.0) const override { return cmsq_; }
   double csq_s(double TTN) const { return alglib::spline1dcalc(cpsq_fit_, TTN); } // WARNING: spline can go out of bounds
   double csq_b(double TTN) const { return alglib::spline1dcalc(cmsq_fit_, TTN); }
+
+  // estimate cpsq, cmsq (needed to determine hydrodynamic mode)
+  // Note: not perfect, since cpsq = csq_s(Tp/TN), cmsq = csq_b(Tm/TN) and Tp,Tm != TN in general
+  double cpsq() const override { return csq_s(1.0); }
+  double cmsq() const override { return csq_b(1.0); }
 
   double pN() const { return pN_; }
   double eN() const { return eN_; }
@@ -231,7 +234,6 @@ public:
   void print() const override;
 
 private:
-  double cpsq_, cmsq_; // remove when cs(T) implemented
   std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;
   std::vector<double> cpsq_vals_, cmsq_vals_; // cs^2(T) values
   alglib::spline1dinterpolant veff_ps_interp_, veff_pb_interp_, veff_es_interp_, veff_eb_interp_, veff_ws_interp_, veff_wb_interp_;
