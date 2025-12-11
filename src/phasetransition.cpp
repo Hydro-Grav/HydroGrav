@@ -276,6 +276,8 @@ bool EquationOfState::is_valid() const
 }
 
 /********************************** PTParams_Veff *********************************/
+// NOTE: PTParams_Veff only uses alN to check if hydrodynamic mode agrees with Bag model!
+
 // New primary constructor
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data)
     : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::Rs, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
