@@ -213,6 +213,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
 
 // |A_+|^2
 std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfile& prof) {
+    // NOTE: csq here defined in terms of background fluid (i.e. csq in symmetric phase at T=TN)
     const auto csq = prof.params()->cpsq();
     const auto [fd_int, l_int] = fluid_profile_integrals(chi_vals, prof);
     const auto m = chi_vals.size();
