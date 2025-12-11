@@ -155,8 +155,8 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
     {
         std::vector<prof_type> profiles;
 
-        // define hydrodynamic mode
-        mode_ = get_mode_bag(vw_, cmsq_, alN_);
+        // define hydrodynamic mode for bag model
+        const auto mode_bag = get_mode_bag(vw_, cmsq_, alN_);
 
         // check alN large enough for shock (deflag/hybrid only)
         if (mode_ == 0 || mode_ == 1) {
@@ -174,15 +174,25 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
                 if (cpsq_ == 1.0 / std::sqrt(3.0) && cmsq_ == cpsq_) { // bag
                     std::cout << "Calculating fluid profile using Bag equation of state\n";
                 } else { // mu nu
-                    std::cout << "Calculating fluid profile using modified Bag equation of state\n";
+                    std::cout << "Calculating fluid profile using modified Bag equation of state (mu nu model)\n";
                 }
+
                 bag_params_ = &dynamic_cast<const PhaseTransition::PTParams_Bag&>(params);
+                mode_ = mode_bag;
                 profiles = solve_profile(n);
                 break;
             case PhaseTransition::PTParams::ModelType::Veff:
                 std::cout << "Calculating fluid profile using generic equation of state from Veff\n";
-                std::cout << "Warning: alN stored in PTParams is not used for Veff EoS!\n";
+
                 veff_params_ = &dynamic_cast<const PhaseTransition::PTParams_Veff&>(params);
+                mode_ = get_mode_veff(vw_, cmsq_);
+
+                // check if hydrodynamic modes agree between bag and veff
+                if (mode_ != mode_bag) {
+                    std::cout << "Warning: hydrodynamic modes do not agree between Bag and Veff EoS! Using mode (veff) for fluid profile.\n";
+                    std::cout << "mode (bag): " << mode_bag << ", mode (veff): " << mode_ << "\n";
+                }
+
                 profiles = solve_profile_veff(n);
                 break;
             default:
@@ -593,7 +603,6 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation() const {
     return {vmUF, y0};
 }
 
-
 // lambda profiles
 double FluidProfile::lambda_b(double wowN) const {
     // la(xi) behind bubble wall (detonations)
@@ -607,6 +616,29 @@ double FluidProfile::lambda_s(double wowN) const {
 
 /*****************************************************************************************/
 /**************************************** Veff EoS ***************************************/
+int FluidProfile::get_mode_veff(double vw, double cmsq) const {
+    const auto cm = std::sqrt(cmsq);
+
+    if (vw < cm) return 0; // deflagration
+
+    // calculate Jouguet detonation velocity from matching eqs
+    const auto vm = cm; // vJ_det=vp when |vm|=cm
+    const auto TpTN = 1.0;
+
+    std::function<std::array<double, 2>(std::array<double, 2>)> matching_helper = [this, vm, TpTN] (std::array<double, 2> vp_TmTN_guess) {
+        return matching_eqs_wall(vp_TmTN_guess[0], TpTN, vm, vp_TmTN_guess[1]); // vp_TmTN_guess = {vp_guess, TmTN_guess}
+    };
+
+    // solve matching eqs
+    const std::array<double, 2> vp_TmTN_guess = {vm, 0.98*veff_params_->TTN_max()}; // {vm, TmTN}
+    const auto sol = newton_solve_2d(matching_helper, vp_TmTN_guess);
+
+    const auto vJ_det = sol[0]; // vp
+    if (abs(vJ_det) <= cm) throw std::invalid_argument("Invalid Jouguet detonation velocity calculated (|vJ_det| <= cm)!");
+
+    if (vw < vJ_det) return 1; // hybrid
+    return 2; // detonation
+}
 
 // change these to lambda functions in solve?
 double FluidProfile::lambda_s_veff(double ToTN, const double eN, const double wN_inv) const {
@@ -672,6 +704,9 @@ std::array<double, 2> FluidProfile::matching_eqs_shock2(double v1, double T1TN, 
 std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const {        
     if (TmTN < veff_params_->TTN_min() || TmTN > veff_params_->TTN_max()) {
         throw std::out_of_range("Tm/TN is called out of bounds for spline!");
+    }
+    if (TpTN < veff_params_->TTN_min() || TpTN > veff_params_->TTN_max()) {
+        throw std::out_of_range("Tp/TN is called out of bounds for spline!");
     }
 
     const auto pp = veff_params_->ps_val(TpTN); // p_+, e_+

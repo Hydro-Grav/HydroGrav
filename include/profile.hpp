@@ -125,8 +125,9 @@ class FluidProfile {
     double lambda_b(double wowN) const;
     double lambda_s(double wowN) const;
 
-    /*************************************************************/
     /************************** Veff EoS *************************/  
+    int get_mode_veff(double vw, double cmsq) const;
+
     // matching eqs
     std::array<double, 2> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
     std::array<double, 2> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
@@ -149,7 +150,6 @@ class FluidProfile {
     double lambda_s_veff(double ToTN, const double eN, const double wN_inv) const;
     double lambda_b_veff(double ToTN, const double eN, const double wN_inv) const;
 
-    /*************************************************************/
     /********************** Both Bag/Veff EoS ********************/  
     double w_from_matching(double wp, double vp, double vm) const;
 
