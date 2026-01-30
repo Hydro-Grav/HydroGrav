@@ -128,6 +128,95 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
     return;
 }
 
+// generate data for veff solution space plot
+// std::array<double, 2> wall_matching_resi(const PhaseTransition::PTParams_Veff& veff_params, double vp, double vm, double TpTN, double TmTN) {
+//     // if (TmTN < veff_params.TTN_min() || TmTN > veff_params.TTN_max()) {
+//     //     throw std::out_of_range("Tm/TN is called out of bounds for spline!");
+//     // }
+//     // if (TpTN < veff_params.TTN_min() || TpTN > veff_params.TTN_max()) {
+//     //     throw std::out_of_range("Tp/TN is called out of bounds for spline!");
+//     // }
+
+//     const auto pp = veff_params.ps_val(TpTN); // p_+, e_+
+//     const auto ep = veff_params.es_val(TpTN);
+
+//     const auto pm = veff_params.pb_val(TmTN); // p_-, e_-
+//     const auto em = veff_params.eb_val(TmTN);
+
+//     // using regular form seems to make detonation IC calculation go out of bounds for Tm
+//     const auto eq1 = vp * vm * (em - ep) - (pm - pp);
+//     const auto eq2 = vm * (em + pp) - vp * (ep + pm);
+//     // const auto eq1 = vp * vm - (pm - pp) / (em - ep);
+//     // const auto eq2 = vm / vp - (ep + pm) / (em + pp);
+
+//     return std::array<double, 2>{eq1, eq2};
+// }
+
+// void veff_solution_space(const PhaseTransition::PTParams_Veff& veff_params, const std::string& filename) {
+//     const auto TpTN_vals = linspace(veff_params.TTN_min(), veff_params.TTN_max(), 5);
+//     const auto vm_vals = linspace(0.01, 0.99, 1000);
+
+//     std::ofstream file(filename);
+//     file << "TpTN,vm,vp,TmTN,cm\n";
+
+//     for (const auto TpTN : TpTN_vals) {
+//         for (const auto vm : vm_vals) {
+//             auto wall_matching_helper = [veff_params, vm, TpTN] (const std::array<double, 2>& vpTm_guess) {
+//                 return wall_matching_resi(veff_params, vpTm_guess[0], vm, TpTN, vpTm_guess[1]);
+//             };
+
+//             const std::array<double, 2> vpTm_guess = {vm, TpTN}; // {vp, TmTN}
+//             const auto sol = newton_solve_2d(wall_matching_helper, vpTm_guess);
+
+//             const auto vp = sol[0];
+//             const auto TmTN = sol[1];
+
+//             if (TmTN < veff_params.TTN_min() || TmTN > veff_params.TTN_max()) continue;
+
+//             const auto cm = std::sqrt(veff_params.csq_b(TmTN));
+
+//             file << TpTN << "," << vm << "," << vp << "," << TmTN << "," << cm << "\n";
+//         }
+//     }
+
+//     file.close();
+
+//     return;
+// }
+
+// void veff_solution_space(const PhaseTransition::PTParams_Veff& veff_params, const std::string& filename) {
+//     const auto TpTN_vals = linspace(veff_params.TTN_min(), veff_params.TTN_max(), 5);
+//     const auto TmTN_vals = linspace(veff_params.TTN_min(), veff_params.TTN_max(), 100);
+
+//     std::ofstream file(filename);
+//     file << "TpTN,vm,vp,TmTN,cm\n";
+
+//     for (const auto TpTN : TpTN_vals) {
+//         for (const auto TmTN : TmTN_vals) {
+//             auto wall_matching_helper = [veff_params, TpTN, TmTN] (const std::array<double, 2>& vpvm_guess) {
+//                 return wall_matching_resi(veff_params, vpvm_guess[0], vpvm_guess[1], TpTN, TmTN);
+//             };
+
+//             // could guess vp & vm from bag model? Need to calc alp from TpTN somehow though
+//             const std::array<double, 2> vpvm_guess = {0.5, 0.5}; // {vp, vm}
+//             const auto sol = newton_solve_2d(wall_matching_helper, vpvm_guess);
+
+//             const auto vp = sol[0];
+//             const auto vm = sol[1];
+
+//             // if (TmTN < veff_params.TTN_min() || TmTN > veff_params.TTN_max()) continue;
+
+//             const auto cm = std::sqrt(veff_params.csq_b(TmTN));
+
+//             file << TpTN << "," << vm << "," << vp << "," << TmTN << "," << cm << "\n";
+//         }
+//     }
+
+//     file.close();
+
+//     return;
+// }
+
 /****************************** FluidProfile class ******************************/
 
     /********************** Notation for fluid parameters **********************/
@@ -171,10 +260,10 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         // calculate fluid profiles v(xi), w(xi), la(xi)
         switch (params.eos()) {
             case PhaseTransition::PTParams::ModelType::Bag:
-                if (cpsq_ == 1.0 / std::sqrt(3.0) && cmsq_ == cpsq_) { // bag
-                    std::cout << "Calculating fluid profile using Bag equation of state\n";
+                if (cpsq_ == 1.0 / 3.0 && cmsq_ == cpsq_) { // bag
+                    std::cout << "Calculating fluid profile using Bag equation of state (cpsq=cmsq=1/3)\n";
                 } else { // mu nu
-                    std::cout << "Calculating fluid profile using modified Bag equation of state (mu nu model)\n";
+                    std::cout << "Calculating fluid profile using modified Bag equation of state (cpsq=" << cpsq_ << ", cmsq=" << cmsq_ << ")\n";
                 }
 
                 bag_params_ = &dynamic_cast<const PhaseTransition::PTParams_Bag&>(params);
@@ -182,7 +271,8 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
                 profiles = solve_profile(n);
                 break;
             case PhaseTransition::PTParams::ModelType::Veff:
-                std::cout << "Calculating fluid profile using generic equation of state from Veff\n";
+                std::cout << "Calculating fluid profile using generic equation of state from Veff\n"
+                          << "(NOTE: PTParams_Veff only uses alN to check if hydrodynamic mode agrees with Bag model!)\n";
 
                 veff_params_ = &dynamic_cast<const PhaseTransition::PTParams_Veff&>(params);
                 mode_ = get_mode_veff(vw_, cmsq_);
@@ -362,7 +452,7 @@ double FluidProfile::v1UF_from_shock(double xi_sh) const {
 }
 */
 std::pair<double, double> FluidProfile::wT_from_shock(double xi_sh) const { // w1/wN
-    // alpha_1 w1 = alpha_N wN
+    // w1*gammaSq(v1)*v1 = wN*gammaSq(v2)*v2, v2=xi_sh, v1*v2=cpsq
     const auto xi_sh_sq = xi_sh * xi_sh;
     const auto w1wN = (xi_sh_sq - cpsq_ * cpsq_) / (cpsq_ * (1.0 - xi_sh_sq));
 
@@ -507,7 +597,7 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
 void FluidProfile::test_alN_residual(const deriv_func& dydv, double vm, const size_t n) const {
     std::cout << "Running test for alN residual... ";
 
-    const auto vpUF_vals = linspace(1e-3, 0.999, n);
+    const auto vpUF_vals = linspace(0.10, 0.13, n);
     std::vector<double> resi_vals(n);
 
     for (int i = 0; i < n; i++) {
@@ -531,7 +621,7 @@ void FluidProfile::test_alN_residual(const deriv_func& dydv, double vm, const si
     plt::xlabel("vpUF");
     plt::ylabel("residual");
     // plt::xlim(0.0015, 0.002);
-    plt::ylim(0.0, 0.1);
+    // plt::ylim(0.0, 0.1);
     plt::grid(true);
     plt::save("alN_resi.png");
     #endif
@@ -846,12 +936,14 @@ double FluidProfile::T2TN_residual_veff(const deriv_func& dydv, double TmTN, con
 
 std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_resi, const size_t n) const {
     // matching at wall: vm,Tm -> vp,Tp
-    auto wall_matching_helper = [this, vm, TmTN] (std::array<double, 2>& yp_guess) {
+    auto wall_matching_helper = [this, vm, TmTN] (const std::array<double, 2>& yp_guess) {
         return matching_eqs_wall(yp_guess[0], yp_guess[1], vm, TmTN); // yp = {vp, TpTN}
     };
 
     const std::array<double, 2> yp_guess = {0.9 * vw_, 1.1 * TmTN}; // {vp, Tp}
     const auto sol = newton_solve_2d(wall_matching_helper, yp_guess);
+    // const bool dev_mode = (test_resi) ? true : false;
+    // const auto sol = newton_solve_2d(wall_matching_helper, yp_guess, 1e-8, 100, 1e-8, dev_mode);
 
     // fluid in front of wall
     const auto vp = sol[0];
@@ -859,6 +951,21 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 
     const auto wpwN = w_from_matching(wmwN, vm, vp);
     const auto TpTN = sol[1];
+
+    // if (test_resi) {
+    //     std::cout << "resi=(" << matching_eqs_wall(vp, TpTN, vm, TmTN)[0] << ", " << matching_eqs_wall(vp, TpTN, vm, TmTN)[1] << ")\n";
+    // }
+
+    // double vp, TpTN;
+    // if (test_resi) {
+    //     vp = 0.507773;
+    //     TpTN = 1.06844;
+    // } else {
+    //     vp = sol[0];
+    //     TpTN = sol[1];
+    // }
+    // const auto vpUF = mu(vw_, abs(vp));
+    // const auto wpwN = w_from_matching(wmwN, vm, vp);
 
     const state_type yp = {vw_, wpwN, TpTN}; // {xi_w, wpwN, TpTN}
 
@@ -868,7 +975,6 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
     // find shock & truncate solution
     const auto find_sh = find_shock_idx_veff(v_sol_tmp, y_sol_tmp, test_resi);
     const auto sh_idx = std::min(find_sh, v_sol_tmp.size() - 1);
-    // const auto sh_idx = std::min(find_shock_idx_veff(v_sol_tmp, y_sol_tmp, test_resi), v_sol_tmp.size() - 1);
 
     // re-integrate for final profile
     // avoids insufficient no. points for integrating profile when shock is close to vpUF
@@ -1005,6 +1111,12 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         // hybrid and deflagration ICs the same for xi_w < xi < xi_sh
         // v(xi_sh) = v1UF, w(xi_sh) = w1wN, T(xi_sh) = T1TN
 
+        // double vpUF;
+        // if (cpsq_ == 1.0 / 3.0) {
+        //     vpUF = 0.11555;
+        // } else {
+        //     vpUF = 0.114069;
+        // }
         const auto vpUF = find_vpUF(dydv);
         const auto vp = mu(vw_, vpUF);
 
@@ -1119,14 +1231,14 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            // std::cout << "Hybrid profile:\n"
-            //           << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
-            //           << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
-            //           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
-            //           << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
-            //           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
-            //           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-            //           << "  xi_sh = " << xi_sh << "\n";
+            std::cout << "Hybrid profile:\n"
+                      << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
+                      << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
+                      << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
+                      << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+                      << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+                      << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+                      << "  xi_sh = " << xi_sh << "\n";
         }
 
     } else { // detonation
@@ -1337,6 +1449,10 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             const auto xi0_rf = vw_;
 
             const auto vmUF = mu(vw_, abs(vm));
+
+            // TO DO: fix this issue
+            if (vmUF < 0.0) throw std::runtime_error("solve_profile_veff failed (vmUF < 0)!"); // fails if detonation part of solution is too small
+
             const state_type y0 = {xi0_rf, wmwN, TmTN}; // {xi0, wmwN, TmTN}
             auto [v_sol_rf_tmp, y_sol_rf_tmp] = rk4_solver(dydv, vmUF, 1e-10, y0, n);
 
@@ -1361,14 +1477,14 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            // std::cout << "Hybrid profile:\n"
-            //           << "  vm = " << vm << ", vmUF=" << vmUF << "\n"
-            //           << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
-            //           << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
-            //           << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
-            //           << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
-            //           << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
-            //           << "  xi_sh = " << xi0 << "\n";
+            std::cout << "Hybrid profile (veff):\n"
+                      << "  vm = " << vm << ", vmUF=" << vmUF << "\n"
+                      << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
+                      << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
+                      << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+                      << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
+                      << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
+                      << "  xi_sh = " << xi0 << "\n";
         }
 
     } else { // detonation
