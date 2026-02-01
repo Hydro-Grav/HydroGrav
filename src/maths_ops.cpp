@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <functional>
 #include <cassert>
+#include <numeric>
 // #include <matplotlibcpp.h>
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
@@ -564,6 +565,77 @@ double simpson_2d_nonuniform_flat_weighted(
     }
 
     return total;
+}
+
+double wasserstein_distance_1d(std::vector<double> u_values, 
+                                std::vector<double> u_weights,
+                                std::vector<double> v_values, 
+                                std::vector<double> v_weights) {
+    
+    // Check inputs
+    if (u_values.size() != u_weights.size() || v_values.size() != v_weights.size()) {
+        throw std::invalid_argument("Values and weights must be the same size!");
+    }
+
+    // Check for sufficient points
+    if (u_values.size() < 3 || v_values.size() < 3) {
+        throw std::invalid_argument("At least 3 points required in each distribution for Wasserstein distance calculation.");
+    }
+    
+    // Normalize weights
+    double u_sum = 0.0, v_sum = 0.0;
+    for (double w : u_weights) {
+        if (w < 0.0) throw std::invalid_argument("Weights must be non-negative!");
+        u_sum += w;
+    }
+    for (double w : v_weights) {
+        if (w < 0.0) throw std::invalid_argument("Weights must be non-negative!");
+        v_sum += w;
+    }
+    for (double& w : u_weights) w /= u_sum;
+    for (double& w : v_weights) w /= v_sum;
+    
+    // Create (value, weight) pairs and sort
+    std::vector<std::pair<double, double>> u_dist, v_dist;
+    for (size_t i = 0; i < u_values.size(); i++) {
+        u_dist.push_back({u_values[i], u_weights[i]});
+    }
+    for (size_t i = 0; i < v_values.size(); i++) {
+        v_dist.push_back({v_values[i], v_weights[i]});
+    }
+    
+    std::sort(u_dist.begin(), u_dist.end());
+    std::sort(v_dist.begin(), v_dist.end());
+    
+    // Merge the two sorted arrays and compute distance
+    size_t i = 0, j = 0;
+    double u_cdf = 0.0, v_cdf = 0.0;
+    double distance = 0.0;
+    double prev_x = std::min(u_dist[0].first, v_dist[0].first);
+    
+    while (i < u_dist.size() || j < v_dist.size()) {
+        // Find next position
+        double u_x = (i < u_dist.size()) ? u_dist[i].first : INFINITY;
+        double v_x = (j < v_dist.size()) ? v_dist[j].first : INFINITY;
+        double curr_x = std::min(u_x, v_x);
+        
+        // Add area: |CDF_u - CDF_v| * width
+        distance += std::abs(u_cdf - v_cdf) * (curr_x - prev_x);
+        
+        // Update CDFs at this position
+        if (std::abs(curr_x - u_x) < 1e-15 && i < u_dist.size()) {
+            u_cdf += u_dist[i].second;
+            i++;
+        }
+        if (std::abs(curr_x - v_x) < 1e-15 && j < v_dist.size()) {
+            v_cdf += v_dist[j].second;
+            j++;
+        }
+        
+        prev_x = curr_x;
+    }
+    
+    return distance;
 }
 
 // Im(Si(x))=0 for real x

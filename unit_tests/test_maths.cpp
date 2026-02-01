@@ -196,3 +196,138 @@ TEST_CASE("ALGLIB function", "[alglib]") {
     }
 
 }
+
+TEST_CASE("Test 1D Wasserstein distance on spectra", "[wasserstein]") {
+
+    const size_t N = 401;
+    const double fmin = 1e-3;
+    const double fmax = 1e3;
+    const double tol  = 1e-3;
+
+    // Log-spaced frequencies
+    std::vector<double> freq(N);
+    for (size_t i = 0; i < N; ++i) {
+        double t = static_cast<double>(i) / (N - 1);
+        freq[i] = fmin * std::pow(fmax / fmin, t);
+    }
+
+    // Transform to log-frequency (positions for Wasserstein distance)
+    std::vector<double> log_freq(N);
+    for (size_t i = 0; i < N; ++i) {
+        log_freq[i] = std::log(freq[i]);
+    }
+
+    // Gaussian in log-frequency
+    auto log_gaussian = [](double x, double mu, double sigma) {
+        return std::exp(-0.5 * std::pow((x - mu) / sigma, 2));
+    };
+
+    std::vector<double> s1(N), s2(N), s3(N);
+
+    const double mu1 = 0.0;
+    const double mu2 = 0.5;     // known shift in log-space
+    const double sigma = 0.4;
+
+    for (size_t i = 0; i < N; ++i) {
+        double lx = std::log(freq[i]);
+        s1[i] = log_gaussian(lx, mu1, sigma);
+        s2[i] = log_gaussian(lx, mu2, sigma);
+        s3[i] = log_gaussian(lx, mu1, sigma); // identical to s1
+    }
+
+    SECTION("Zero distance for identical spectra") {
+        // log_freq is positions, s1 and s3 are weights
+        double W = wasserstein_distance_1d(log_freq, s1, log_freq, s3);
+        REQUIRE(W == Approx(0.0).margin(1e-6));
+    }
+
+    SECTION("Correct distance for shifted distributions") {
+        // For identical shapes shifted by Δ in log-frequency space:
+        // W1 ≈ |Δ| when distributions are well-separated relative to their width
+        double W = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
+        
+        // The Wasserstein distance for Gaussians with identical variance
+        // but shifted means is exactly |μ2 - μ1|
+        REQUIRE(W == Approx(std::abs(mu2 - mu1)).epsilon(tol));
+    }
+
+    SECTION("Symmetry of Wasserstein distance") {
+        double W12 = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
+        double W21 = wasserstein_distance_1d(log_freq, s2, log_freq, s1);
+
+        REQUIRE(W12 == Approx(W21).epsilon(1e-10));
+    }
+
+    SECTION("Triangle inequality") {
+        // For three distributions: W(s1,s3) <= W(s1,s2) + W(s2,s3)
+        std::vector<double> s4(N);
+        const double mu4 = 1.0;
+        for (size_t i = 0; i < N; ++i) {
+            double lx = std::log(freq[i]);
+            s4[i] = log_gaussian(lx, mu4, sigma);
+        }
+        
+        double W13 = wasserstein_distance_1d(log_freq, s1, log_freq, s3);
+        double W12 = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
+        double W23 = wasserstein_distance_1d(log_freq, s2, log_freq, s3);
+        
+        REQUIRE(W13 <= W12 + W23 + 1e-10);
+    }
+
+    SECTION("Handles non-normalized weights correctly") {
+        // Wasserstein distance normalizes weights internally
+        std::vector<double> s1_scaled = s1;
+        for (auto& val : s1_scaled) val *= 2.0;
+        
+        double W_normal = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
+        double W_scaled = wasserstein_distance_1d(log_freq, s1_scaled, log_freq, s2);
+        
+        REQUIRE(W_normal == Approx(W_scaled).epsilon(1e-10));
+    }
+
+    SECTION("Throws on size mismatch") {
+        std::vector<double> short_freq(10);
+        std::vector<double> short_spec(10);
+        
+        // Mismatch between u_values and u_weights
+        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, short_spec, log_freq, s2));
+        
+        // Mismatch between v_values and v_weights
+        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, s1, short_freq, s2));
+    }
+
+    SECTION("Throws on insufficient points") {
+        std::vector<double> f = {1.0, 2.0};
+        std::vector<double> s = {1.0, 1.0};
+        REQUIRE_THROWS(wasserstein_distance_1d(f, s, f, s));
+    }
+
+    SECTION("Throws on negative or zero weights") {
+        auto bad_spec = s1;
+        bad_spec[10] = -1.0;
+        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, bad_spec, log_freq, s2));
+        
+        bad_spec[10] = 0.0;
+        // Zero weights should be allowed (just ignored)
+        REQUIRE_NOTHROW(wasserstein_distance_1d(log_freq, bad_spec, log_freq, s2));
+    }
+
+    SECTION("Works with different frequency grids") {
+        // Create a different frequency grid for s2
+        std::vector<double> freq2(N);
+        std::vector<double> log_freq2(N);
+        std::vector<double> s2_different_grid(N);
+        
+        for (size_t i = 0; i < N; ++i) {
+            double t = static_cast<double>(i) / (N - 1);
+            freq2[i] = fmin * std::pow(fmax / fmin, t) * 1.1; // slightly shifted grid
+            log_freq2[i] = std::log(freq2[i]);
+            s2_different_grid[i] = log_gaussian(log_freq2[i], mu2, sigma);
+        }
+        
+        // Should still compute distance correctly
+        double W = wasserstein_distance_1d(log_freq, s1, log_freq2, s2_different_grid);
+        REQUIRE(W > 0.0);
+        REQUIRE(W == Approx(std::abs(mu2 - mu1)).epsilon(0.1)); // larger tolerance due to grid mismatch
+    }
+}

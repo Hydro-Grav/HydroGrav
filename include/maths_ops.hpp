@@ -188,6 +188,11 @@ double simpson_2d_nonuniform_flat_weighted(
     const std::vector<double>& dy                        // size (ny-2)/2
 );
 
+double wasserstein_distance_1d(std::vector<double> u_values, 
+                                std::vector<double> u_weights,
+                                std::vector<double> v_values, 
+                                std::vector<double> v_weights);
+
 double Si(double x);
 double Ci(double x);
 std::pair<double, double> SiCi(double x, const size_t n=1000);
