@@ -17,7 +17,7 @@ TEST_CASE("Tests functionality of the PowerSpec class.", "[powerSpec]") {
     Spectrum::PowerSpec spec(K_vals, P_vals, profile);
 
     SECTION("Test max") {
-        REQUIRE(spec.max() == Approx(25.0).epsilon(1e-10));
+        REQUIRE(spec.peak_vals().second == Approx(25.0).epsilon(1e-10));
     }
 
     // there's no test here...?
