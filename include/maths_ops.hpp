@@ -188,11 +188,6 @@ double simpson_2d_nonuniform_flat_weighted(
     const std::vector<double>& dy                        // size (ny-2)/2
 );
 
-double wasserstein_distance_1d(std::vector<double> u_values, 
-                                std::vector<double> u_weights,
-                                std::vector<double> v_values, 
-                                std::vector<double> v_weights);
-
 double Si(double x);
 double Ci(double x);
 std::pair<double, double> SiCi(double x, const size_t n=1000);
@@ -219,5 +214,18 @@ template <typename T, typename Func>
 std::array<T,2> newton_solve_2d(const Func& F, std::array<T,2> x0, T tol=1e-8, int max_iter=100, T h=1e-8);
 
 #include "solvers.tpp"
+
+double wasserstein_distance_1d(std::vector<double> u_values, 
+                                std::vector<double> u_weights,
+                                std::vector<double> v_values, 
+                                std::vector<double> v_weights);
+
+double L1_norm(const std::vector<double>& x_values,
+               const std::vector<double>& dist1,
+               const std::vector<double>& dist2);
+
+double L2_norm(const std::vector<double>& x_values,
+               const std::vector<double>& dist1,
+               const std::vector<double>& dist2);
 
 #endif // INCLUDE_MATHS_OPS_HPP_H
