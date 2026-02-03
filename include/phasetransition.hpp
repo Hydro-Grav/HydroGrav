@@ -27,9 +27,10 @@ struct dflt_universe { // in units hbar = c = kB = 1
   static constexpr double g0 = 3.91;
 
   // values at start of PT
-  static constexpr double Ts = 50.0; // GeV
+  static constexpr double Ts = 52.9772; // GeV
   static constexpr double gs = 106.75;
-  static constexpr double Hs = std::pow(4.0 * std::pow(M_PI, 3) * gs * std::pow(Ts, 4) / (45.0 * mP * mP), 0.5);
+  static constexpr double Hs = 4.34679e-15;
+  // static constexpr double Hs = std::pow(4.0 * std::pow(M_PI, 3) * gs * std::pow(Ts, 4) / (45.0 * mP * mP), 0.5);
 };
 
 /**
@@ -70,13 +71,15 @@ constexpr double Rs_approx(double vw, double beta) { return std::pow(8 * M_PI, 1
 
 // DO NOT CHANGE DEFAULT VALS
 struct dflt_PTParams {
-  static constexpr double vw = 0.8;              // Wall velocity
-  static constexpr double alN = 0.1;           // PT strength 
-  static constexpr double beta = 1e-12;            // Transition rate param
-  static constexpr double Rs = Rs_approx(vw, beta);
-  static constexpr double TN = dflt_universe::Ts;     // Nucleation temperature
-  static constexpr double cpsq = 1.0 / 3.0;      // speed of sound squared (symmetric phase)
-  static constexpr double cmsq = cpsq;           // speed of sound squared (broken phase
+  static constexpr double vw = 0.675122; // Wall velocity
+  static constexpr double alN_bag = 0.0972393; // PT strength 
+  static constexpr double alN_munu = 0.103742; // PT strength (mu nu)
+  static constexpr double betaHs = 1231.05; // Transition rate param / Hs
+  static constexpr double beta = betaHs * dflt_universe::Hs; // Transition rate parameter
+  static constexpr double Rs = Rs_approx(vw, beta); // mean bubble separation
+  static constexpr double TN = dflt_universe::Ts; // Nucleation temperature
+  static constexpr double cpsq = 0.56705 * 0.56705; // speed of sound squared (symmetric phase)
+  static constexpr double cmsq = 0.539046 * 0.539046; // speed of sound squared (broken phase)
   static constexpr const char* nuc_type = "exp"; // bubble nucleation type
 };
 

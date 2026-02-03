@@ -9,7 +9,7 @@ int main() {
     */
 
     const auto vw = PhaseTransition::dflt_PTParams::vw;
-    const auto alN = PhaseTransition::dflt_PTParams::alN;
+    const auto alN = PhaseTransition::dflt_PTParams::alN_bag;
     const auto TN = PhaseTransition::dflt_PTParams::TN;
     const auto beta = PhaseTransition::dflt_PTParams::beta;
     const auto Rs = PhaseTransition::dflt_PTParams::Rs;

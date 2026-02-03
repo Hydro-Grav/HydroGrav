@@ -3,7 +3,7 @@
 int main(int argc, char* argv[]) {
     // Defaults
     auto vw = PhaseTransition::dflt_PTParams::vw;
-    auto alN = PhaseTransition::dflt_PTParams::alN;
+    auto alN = PhaseTransition::dflt_PTParams::alN_bag;
     auto beta = PhaseTransition::dflt_PTParams::beta;
     auto Rs = PhaseTransition::dflt_PTParams::Rs;
     auto TN = PhaseTransition::dflt_PTParams::TN;

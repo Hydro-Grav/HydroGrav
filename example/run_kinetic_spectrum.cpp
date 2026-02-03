@@ -6,7 +6,7 @@ int main(int argc, char* argv[]) {
 
     // define PT parameters
     const auto vw = PhaseTransition::dflt_PTParams::vw;
-    const auto alN = PhaseTransition::dflt_PTParams::alN;
+    const auto alN = PhaseTransition::dflt_PTParams::alN_bag;
     const auto beta = PhaseTransition::dflt_PTParams::beta;
     const auto Rs = PhaseTransition::dflt_PTParams::Rs;
     const auto TN = PhaseTransition::dflt_PTParams::TN;
