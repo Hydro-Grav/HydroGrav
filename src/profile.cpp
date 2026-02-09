@@ -130,12 +130,12 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
 
 // generate data for veff solution space plot
 // std::array<double, 2> wall_matching_resi(const PhaseTransition::PTParams_Veff& veff_params, double vp, double vm, double TpTN, double TmTN) {
-//     // if (TmTN < veff_params.TTN_min() || TmTN > veff_params.TTN_max()) {
-//     //     throw std::out_of_range("Tm/TN is called out of bounds for spline!");
-//     // }
-//     // if (TpTN < veff_params.TTN_min() || TpTN > veff_params.TTN_max()) {
-//     //     throw std::out_of_range("Tp/TN is called out of bounds for spline!");
-//     // }
+//     if (TmTN < veff_params.TTN_min() || TmTN > veff_params.TTN_max()) {
+//         throw std::runtime_error("Tm/TN is called out of bounds for spline!");
+//     }
+//     if (TpTN < veff_params.TTN_min() || TpTN > veff_params.TTN_max()) {
+//         throw std::runtime_error("Tp/TN is called out of bounds for spline!");
+//     }
 
 //     const auto pp = veff_params.ps_val(TpTN); // p_+, e_+
 //     const auto ep = veff_params.es_val(TpTN);
@@ -166,43 +166,16 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
 //             };
 
 //             const std::array<double, 2> vpTm_guess = {vm, TpTN}; // {vp, TmTN}
-//             const auto sol = newton_solve_2d(wall_matching_helper, vpTm_guess);
+//             std::array<double, 2> sol;
+//             try {
+//                 sol = newton_solve_2d(wall_matching_helper, vpTm_guess);
+//             } catch (const std::runtime_error& e) {
+//                 std::cerr << "Warning: " << e.what() << " for TpTN=" << TpTN << ", vm=" << vm << "\n";
+//                 continue; // skip points where solver fails to converge
+//             }
 
 //             const auto vp = sol[0];
 //             const auto TmTN = sol[1];
-
-//             if (TmTN < veff_params.TTN_min() || TmTN > veff_params.TTN_max()) continue;
-
-//             const auto cm = std::sqrt(veff_params.csq_b(TmTN));
-
-//             file << TpTN << "," << vm << "," << vp << "," << TmTN << "," << cm << "\n";
-//         }
-//     }
-
-//     file.close();
-
-//     return;
-// }
-
-// void veff_solution_space(const PhaseTransition::PTParams_Veff& veff_params, const std::string& filename) {
-//     const auto TpTN_vals = linspace(veff_params.TTN_min(), veff_params.TTN_max(), 5);
-//     const auto TmTN_vals = linspace(veff_params.TTN_min(), veff_params.TTN_max(), 100);
-
-//     std::ofstream file(filename);
-//     file << "TpTN,vm,vp,TmTN,cm\n";
-
-//     for (const auto TpTN : TpTN_vals) {
-//         for (const auto TmTN : TmTN_vals) {
-//             auto wall_matching_helper = [veff_params, TpTN, TmTN] (const std::array<double, 2>& vpvm_guess) {
-//                 return wall_matching_resi(veff_params, vpvm_guess[0], vpvm_guess[1], TpTN, TmTN);
-//             };
-
-//             // could guess vp & vm from bag model? Need to calc alp from TpTN somehow though
-//             const std::array<double, 2> vpvm_guess = {0.5, 0.5}; // {vp, vm}
-//             const auto sol = newton_solve_2d(wall_matching_helper, vpvm_guess);
-
-//             const auto vp = sol[0];
-//             const auto vm = sol[1];
 
 //             // if (TmTN < veff_params.TTN_min() || TmTN > veff_params.TTN_max()) continue;
 
@@ -793,10 +766,10 @@ std::array<double, 2> FluidProfile::matching_eqs_shock2(double v1, double T1TN, 
 
 std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const {        
     if (TmTN < veff_params_->TTN_min() || TmTN > veff_params_->TTN_max()) {
-        throw std::out_of_range("Tm/TN is called out of bounds for spline!");
+        throw std::runtime_error("Tm/TN is called out of bounds for spline!");
     }
     if (TpTN < veff_params_->TTN_min() || TpTN > veff_params_->TTN_max()) {
-        throw std::out_of_range("Tp/TN is called out of bounds for spline!");
+        throw std::runtime_error("Tp/TN is called out of bounds for spline!");
     }
 
     const auto pp = veff_params_->ps_val(TpTN); // p_+, e_+
@@ -840,7 +813,7 @@ void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) co
     plt::plot(TmTN_vals, resi_vals);
     plt::xlabel("TmTN");
     plt::ylabel("residual");
-    // plt::xlim(1.0, 1.1);
+    plt::xlim(TmTN_vals.front(), TmTN_vals.back());
     plt::grid(true);
     plt::save("T2_resi.png");
     #endif
@@ -1178,14 +1151,14 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = get_TmTN(w_end_val);
             la_end_val = lambda_b(w_end_val);
 
-            // std::cout << "Deflagration profile:\n"
-            //           << "  vm = " << vm << ", vmUF = " << mu(vw_, abs(vm)) << "\n"
-            //           << "  wmwN = " << w_end_val << ", TmTN = " << T_end_val << "\n"
-            //           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
-            //           << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
-            //           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
-            //           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-            //           << "  xi_sh = " << xi_sh << "\n";
+            std::cout << "Deflagration profile:\n"
+                      << "  vm = " << vm << ", vmUF = " << mu(vw_, abs(vm)) << "\n"
+                      << "  wmwN = " << w_end_val << ", TmTN = " << T_end_val << "\n"
+                      << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
+                      << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
+                      << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+                      << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+                      << "  xi_sh = " << xi_sh << "\n";
                       
 
         } else { // hybrid

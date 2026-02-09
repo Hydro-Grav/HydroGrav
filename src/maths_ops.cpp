@@ -1007,14 +1007,14 @@ double L2_norm(const std::vector<double>& x_values,
 }
 
 /**
- * Calculate L1 norm (Manhattan distance) between two distributions
+ * Calculate L1 norm (Manhattan distance) between two distributions. For log(x) values, normalises distributions such that
+ * ∫ P(log(x)) dlog(x) = 1
  * 
  * L1 = ∫ |P1(x) - P2(x)| dx
  * 
  * @param x_values Positions/coordinates
  * @param dist1 First distribution values
  * @param dist2 Second distribution values
- * @param normalize If true, normalize distributions before comparison
  * @return L1 norm between the two distributions
  */
 double L1_norm(const std::vector<double>& x_values,
