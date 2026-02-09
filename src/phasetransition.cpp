@@ -201,7 +201,7 @@ EquationOfState EquationOfState::from_file(const std::string& filename)
   }
 
   std::cout << "Reading equation of state from file: " << filename << "\n"
-            << "Note: File must be formatted as T, pb, ps, eb, es (comma separated) with header line\n";
+            << "Note: File must be formatted as T, ps, pb, es, eb (comma separated) with header line\n";
   
   std::ifstream file(filename);
   if (!file) 
@@ -230,10 +230,10 @@ EquationOfState EquationOfState::from_file(const std::string& filename)
     }
 
     T_vals.push_back(values[0]);
-    pb_vals.push_back(values[1]);
-    ps_vals.push_back(values[2]);
-    eb_vals.push_back(values[3]);
-    es_vals.push_back(values[4]);
+    ps_vals.push_back(values[1]);
+    pb_vals.push_back(values[2]);
+    es_vals.push_back(values[3]);
+    eb_vals.push_back(values[4]);
   }
 
   std::cout << "Equation of state read successfully! (" << T_vals.size() << " data points)\n";
