@@ -211,7 +211,31 @@ template <typename T, typename Func>
 T newton_solve_1d(const Func& F, T x0, T tol=1e-8, int max_iter=100, T h=1e-8);
 
 template <typename T, typename Func>
+T newton_solve_1d_bounded(
+    const Func& f,
+    T x0,
+    T x_min,
+    T x_max,
+    T tol = 1e-8,
+    int max_iter = 100,
+    T h = 1e-8,
+    T bound_margin = 1e-6
+);
+
+template <typename T, typename Func>
 std::array<T,2> newton_solve_2d(const Func& F, std::array<T,2> x0, T tol=1e-8, int max_iter=100, T h=1e-8);
+
+template <typename T, typename Func>
+std::array<T,2> newton_solve_2d_bounded(
+    const Func& F,
+    std::array<T,2> x0,
+    std::array<T,2> x_min,  // Lower bounds
+    std::array<T,2> x_max,  // Upper bounds
+    T tol = 1e-8,
+    int max_iter = 100,
+    T h = 1e-8,
+    T bound_margin = 1e-6  // Stay this far from boundaries
+);
 
 #include "solvers.tpp"
 
@@ -227,5 +251,8 @@ double L1_norm(const std::vector<double>& x_values,
 double L2_norm(const std::vector<double>& x_values,
                const std::vector<double>& dist1,
                const std::vector<double>& dist2);
+
+double sigmoid_transform(double s, double xmin, double xmax);
+double inverse_sigmoid_transform(double x, double xmin, double xmax);
 
 #endif // INCLUDE_MATHS_OPS_HPP_H

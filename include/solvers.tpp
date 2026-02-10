@@ -43,6 +43,93 @@ T newton_solve_1d(
 }
 
 template <typename T, typename Func>
+T newton_solve_1d_bounded(
+    const Func& f,
+    T x0,
+    T x_min,
+    T x_max,
+    T tol,
+    int max_iter,
+    T h,
+    T bound_margin
+) {
+    static_assert(std::is_floating_point<T>::value,
+                  "newton_solve_1d_bounded requires floating-point T");
+
+    // Clamp initial guess to valid range
+    x0 = std::clamp(x0, x_min + bound_margin, x_max - bound_margin);
+
+    for (int iter = 0; iter < max_iter; ++iter) {
+        // Evaluate function
+        T fx = f(x0);
+        
+        // Check convergence
+        if (std::abs(fx) < tol) return x0;
+
+        // Compute derivative with adaptive one-sided differences
+        T df;
+        bool use_forward = (x0 + h <= x_max - bound_margin);
+        bool use_backward = (x0 - h >= x_min + bound_margin);
+        
+        if (use_forward) {
+            // Forward difference
+            T fh = f(x0 + h);
+            df = (fh - fx) / h;
+        } else if (use_backward) {
+            // Backward difference
+            T fh = f(x0 - h);
+            df = (fx - fh) / h;
+        } else {
+            // At boundary - use small central difference
+            T h_small = std::min(x0 - x_min, x_max - x0) * 0.1;
+            T fh_plus = f(x0 + h_small);
+            T fh_minus = f(x0 - h_small);
+            df = (fh_plus - fh_minus) / (2.0 * h_small);
+        }
+
+        // Check for zero derivative
+        if (std::abs(df) < 1e-14) {
+            // Derivative too small - try bisection step instead
+            if (fx > 0) {
+                x0 -= 0.01 * (x_max - x_min);
+            } else {
+                x0 += 0.01 * (x_max - x_min);
+            }
+            x0 = std::clamp(x0, x_min + bound_margin, x_max - bound_margin);
+            continue;
+        }
+
+        // Compute Newton step
+        T dx = -fx / df;
+
+        // Step limiting
+        T alpha = 1.0;
+        T x_new = x0 + dx;
+        
+        if (x_new > x_max - bound_margin) {
+            // Would exceed upper bound
+            alpha = (x_max - bound_margin - x0) / dx;
+        } else if (x_new < x_min + bound_margin) {
+            // Would exceed lower bound
+            alpha = (x_min + bound_margin - x0) / dx;
+        }
+
+        // Apply limited step
+        x0 += alpha * dx;
+
+        // Safety clamp
+        x0 = std::clamp(x0, x_min + bound_margin, x_max - bound_margin);
+
+        // Check step convergence
+        if (std::abs(alpha * dx) < tol) {
+            return x0;
+        }
+    }
+
+    throw std::runtime_error("newton_solve_1d_bounded did not converge");
+}
+
+template <typename T, typename Func>
 std::array<T,2> newton_solve_2d(
     const Func& F,
     std::array<T,2> x0,
@@ -100,6 +187,143 @@ std::array<T,2> newton_solve_2d(
     }
 
     throw std::runtime_error("Newton's method 2D did not converge");
+}
+
+template <typename T, typename Func>
+std::array<T,2> newton_solve_2d_bounded(
+    const Func& F,
+    std::array<T,2> x0,
+    std::array<T,2> x_min,  // Lower bounds
+    std::array<T,2> x_max,  // Upper bounds
+    T tol,
+    int max_iter,
+    T h,
+    T bound_margin
+) {
+    static_assert(std::is_floating_point<T>::value,
+                  "newton_solve_2d_bounded requires floating-point T");
+
+    using result_t = decltype(F(x0));
+    static_assert(std::is_same<result_t, std::array<T, 2>>::value,
+                  "F must return std::array<T, 2>");
+
+    // Clamp initial guess to valid range
+    for (int j = 0; j < 2; ++j) {
+        x0[j] = std::clamp(x0[j], x_min[j] + bound_margin, x_max[j] - bound_margin);
+    }
+
+    // Inline solver for 2×2 linear systems
+    auto solve_linear_2x2 = [](const std::array<std::array<T,2>,2>& A,
+                               const std::array<T,2>& b) {
+        T det = A[0][0]*A[1][1] - A[0][1]*A[1][0];
+        if (std::fabs(det) < T(1e-14))
+            throw std::runtime_error("Jacobian is singular!");
+        std::array<T,2> x;
+        x[0] = ( b[0]*A[1][1] - b[1]*A[0][1]) / det;
+        x[1] = ( A[0][0]*b[1] - A[1][0]*b[0]) / det;
+        return x;
+    };
+
+    for (int iter = 0; iter < max_iter; ++iter) {
+        // Evaluate F(x0)
+        auto fx = F(x0);
+
+        T norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
+        if (norm < tol) return x0;
+
+        // Compute Jacobian with adaptive one-sided derivatives
+        std::array<std::array<T,2>,2> J{};
+        for (int j = 0; j < 2; ++j) {
+            auto xh = x0;
+            
+            // Choose forward or backward difference based on proximity to bounds
+            bool use_forward = (x0[j] + h <= x_max[j] - bound_margin);
+            bool use_backward = (x0[j] - h >= x_min[j] + bound_margin);
+            
+            if (use_forward) {
+                // Forward difference
+                xh[j] += h;
+                auto fh = F(xh);
+                for (int i = 0; i < 2; ++i) {
+                    J[i][j] = (fh[i] - fx[i]) / h;
+                }
+            } else if (use_backward) {
+                // Backward difference
+                xh[j] -= h;
+                auto fh = F(xh);
+                for (int i = 0; i < 2; ++i) {
+                    J[i][j] = (fx[i] - fh[i]) / h;
+                }
+            } else {
+                // Stuck at boundary - use small central difference
+                T h_small = std::min(x0[j] - x_min[j], x_max[j] - x0[j]) * 0.1;
+                auto xh_plus = x0;
+                auto xh_minus = x0;
+                xh_plus[j] += h_small;
+                xh_minus[j] -= h_small;
+                auto fh_plus = F(xh_plus);
+                auto fh_minus = F(xh_minus);
+                for (int i = 0; i < 2; ++i) {
+                    J[i][j] = (fh_plus[i] - fh_minus[i]) / (2.0 * h_small);
+                }
+            }
+        }
+
+        // Compute Newton step
+        std::array<T,2> minus_fx = { -fx[0], -fx[1] };
+        std::array<T,2> dx;
+        try {
+            dx = solve_linear_2x2(J, minus_fx);
+        } catch (const std::runtime_error&) {
+            // Singular Jacobian - try gradient descent step instead
+            T grad_norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
+            if (grad_norm < tol) return x0;
+            
+            dx[0] = -0.01 * fx[0] / grad_norm;
+            dx[1] = -0.01 * fx[1] / grad_norm;
+        }
+
+        // Step limiting: ensure we don't go out of bounds
+        T alpha = 1.0;  // Step size multiplier
+        
+        for (int j = 0; j < 2; ++j) {
+            T x_new = x0[j] + dx[j];
+            
+            // Calculate maximum allowed step to stay within bounds
+            if (dx[j] > 0) {
+                // Moving toward upper bound
+                T max_step = (x_max[j] - bound_margin - x0[j]);
+                if (dx[j] > max_step) {
+                    T alpha_j = max_step / dx[j];
+                    alpha = std::min(alpha, alpha_j);
+                }
+            } else if (dx[j] < 0) {
+                // Moving toward lower bound
+                T max_step = (x_min[j] + bound_margin - x0[j]);
+                if (dx[j] < max_step) {
+                    T alpha_j = max_step / dx[j];
+                    alpha = std::min(alpha, alpha_j);
+                }
+            }
+        }
+
+        // Apply limited step
+        x0[0] += alpha * dx[0];
+        x0[1] += alpha * dx[1];
+
+        // Safety clamp (shouldn't be needed but just in case)
+        for (int j = 0; j < 2; ++j) {
+            x0[j] = std::clamp(x0[j], x_min[j] + bound_margin, x_max[j] - bound_margin);
+        }
+
+        // Check convergence
+        T step_norm = std::sqrt(dx[0]*dx[0] + dx[1]*dx[1]) * alpha;
+        if (step_norm < tol) {
+            return x0;
+        }
+    }
+
+    throw std::runtime_error("newton_solve_2d_bounded did not converge");
 }
 
 // RK4 solver: works with std::vector<T> or std::array<T, N>
