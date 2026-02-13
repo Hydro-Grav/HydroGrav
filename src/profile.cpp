@@ -227,7 +227,7 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
             alp_max_ = alp_minmax[1];
 
             // alN > alp > alp_min (can't properly constrain from above since we need alp)
-            if (alN_ <= alp_min_) throw std::invalid_argument("alN too small for shock!");
+            if (alN_ <= alp_min_) throw std::runtime_error("alN too small for shock!");
         }
 
         // calculate fluid profiles v(xi), w(xi), la(xi)
@@ -248,12 +248,17 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
                           << "(NOTE: PTParams_Veff only uses alN to check if hydrodynamic mode agrees with Bag model!)\n";
 
                 veff_params_ = &dynamic_cast<const PhaseTransition::PTParams_Veff&>(params);
-                mode_ = get_mode_veff(vw_, cmsq_);
+                // mode_ = get_mode_veff(vw_, cmsq_);
+                try {
+                    mode_ = get_mode_veff(vw_, cmsq_);
+                } catch (std::exception& e) {
+                    std::cout << "WARNING: get_mode_veff() failed! Using get_mode_bag() to estimate hydrodynamic mode instead!\n";
+                    mode_ = mode_bag;
+                }
 
                 // check if hydrodynamic modes agree between bag and veff
                 if (mode_ != mode_bag) {
-                    std::cout << "Warning: hydrodynamic modes do not agree between Bag and Veff EoS! Using mode (veff) for fluid profile.\n";
-                    std::cout << "mode (bag): " << mode_bag << ", mode (veff): " << mode_ << "\n";
+                    std::cout << "WARNING: hydrodynamic modes do not agree between bag (mode=" << mode_bag << ") and Veff (mode=" << mode_ << ") EoS! Using hydrodynamic mode from Veff.\n";
                 }
 
                 profiles = solve_profile_veff(n);
@@ -635,16 +640,16 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation() const {
     const auto alp = alN_; // alpha_+ = alpha_N
 
     const auto vm = vm_from_matching(vp, alp);
-    if (abs(vm) >= vw_) throw std::invalid_argument("Detonation IC failed: vm<vw required!");
+    if (abs(vm) >= vw_) throw std::runtime_error("Detonation IC failed: vm<vw required!");
 
     const auto vmUF = mu(vw_, abs(vm));
-    if (abs(vmUF) >= 1.0) throw std::invalid_argument("Detonation IC failed: vmUF must be <1!");
+    if (abs(vmUF) >= 1.0) throw std::runtime_error("Detonation IC failed: vmUF must be <1!");
     
     const auto wmwN = w_from_matching(wpwN, vp, vm);
-    if (wmwN <= wpwN) throw std::invalid_argument("Detonation IC failed: wm>wp required!");
+    if (wmwN <= wpwN) throw std::runtime_error("Detonation IC failed: wm>wp required!");
 
     const auto TmTN = get_TmTN(wmwN);
-    if (TmTN <= TpTN) throw std::invalid_argument("Detonation IC failed: Tm>Tp required!");
+    if (TmTN <= TpTN) throw std::runtime_error("Detonation IC failed: Tm>Tp required!");
 
     const state_type y0 = {xi0, wmwN, TmTN};
     
@@ -683,13 +688,13 @@ int FluidProfile::get_mode_veff(double vw, double cmsq) const {
     };
 
     // solve matching eqs
-    const std::array<double, 2> vp_TmTN_guess = {vm, 0.98*veff_params_->TTN_max()}; // {vm, TmTN}
+    const std::array<double, 2> vp_TmTN_guess = {vm, 0.5*(TmTN_max - TmTN_min)}; // {vm, TmTN}
     const std::array<double, 2> bounds_min = {vp_min, TmTN_min};
     const std::array<double, 2> bounds_max = {vp_max, TmTN_max};
     const auto sol = newton_solve_2d_bounded(matching_helper, vp_TmTN_guess, bounds_min, bounds_max);
 
     const auto vJ_det = sol[0]; // vp
-    if (abs(vJ_det) <= cm) throw std::invalid_argument("Invalid Jouguet detonation velocity calculated (|vJ_det| <= cm)!");
+    if (abs(vJ_det) <= cm) throw std::runtime_error("Invalid Jouguet detonation velocity calculated (|vJ_det| <= cm)!");
 
     if (vw < vJ_det) return 1; // hybrid
     return 2; // detonation
@@ -710,7 +715,7 @@ double FluidProfile::lambda_b_veff(double ToTN, const double eN, const double wN
 
 std::array<double, 2> FluidProfile::matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const {    
     if (T1TN < veff_params_->TTN_min() || T1TN > veff_params_->TTN_max()) {
-        throw std::out_of_range("T1/TN is called out of bounds for spline!");
+        throw std::runtime_error("T1/TN is called out of bounds for spline!");
     }
 
     // const auto p2 = veff_params_->ps_val(T2TN); // p_2, e_2
@@ -731,10 +736,10 @@ std::array<double, 2> FluidProfile::matching_eqs_shock(double pN, double eN, dou
 
 std::array<double, 2> FluidProfile::matching_eqs_shock2(double v1, double T1TN, double v2, double T2TN) const {    
     if (T1TN < veff_params_->TTN_min() || T1TN > veff_params_->TTN_max()) {
-        throw std::out_of_range("T1/TN is called out of bounds for spline!");
+        throw std::runtime_error("T1/TN is called out of bounds for spline!");
     }
     if (T2TN < veff_params_->TTN_min() || T2TN > veff_params_->TTN_max()) {
-        throw std::out_of_range("T2/TN is called out of bounds for spline!");
+        throw std::runtime_error("T2/TN is called out of bounds for spline!");
     }
 
     const auto p1 = veff_params_->ps_val(T1TN); // p_1, e_1
@@ -763,18 +768,24 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
     const auto pm = veff_params_->pb_val(TmTN); // p_-, e_-
     const auto em = veff_params_->eb_val(TmTN);
 
+    // const double scale1 = std::max(std::abs(pm - pp), 1e-12);
+    // const double scale2 = std::max(std::abs(vp*(ep + pm)), 1e-12);
+
+    // const auto eq1 = (vp * vm * (em - ep) - (pm - pp)) / scale1;
+    // const auto eq2 = (vm * (em + pp) - vp * (ep + pm)) / scale2;
+
     // using regular form seems to make detonation IC calculation go out of bounds for Tm
     const auto eq1 = vp * vm * (em - ep) - (pm - pp);
     const auto eq2 = vm * (em + pp) - vp * (ep + pm);
-    // const auto eq1 = vp * vm - (pm - pp) / (em - ep);
-    // const auto eq2 = vm / vp - (ep + pm) / (em + pp);
+    // // const auto eq1 = vp * vm - (pm - pp) / (em - ep);
+    // // const auto eq2 = vm / vp - (ep + pm) / (em + pp);
 
     return {eq1, eq2};
 }
 
 // testing purposes
 void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) const {
-    std::cout << "Running test for T2/TN residual... ";
+    std::cout << "Running test for T2/TN residual...\n";
 
     const auto TmTN_vals = linspace(veff_params_->TTN_min(), veff_params_->TTN_max(), n);
     // const auto TmTN_vals = linspace(1.0, 1.1, n);
@@ -788,6 +799,7 @@ void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) co
         } catch (std::exception& e) {
             // std::cout << "failed for Tm/TN=" << TmTN_vals[i] << "\n";
             std::cout << e.what() << " for Tm/TN=" << TmTN_vals[i] << "\n";
+            const auto vm = (mode_ == 0) ? vw_ : std::sqrt(veff_params_->csq_b(TmTN_vals[i]));
         }
 
         resi_vals[i] = resi;
@@ -888,8 +900,8 @@ double FluidProfile::T2TN_residual_veff(const deriv_func& dydv, double TmTN, con
     auto shock_matching_helper = [this, v1, T1TN, xi_sh] (double T2TN_guess) {
         return matching_eqs_shock2(v1, T1TN, xi_sh, T2TN_guess)[1]; // v2 = xi_sh
     };
-    // const auto T2TN = newton_solve_1d_bounded(shock_matching_helper, 1.0, veff_params_->TTN_min(), veff_params_->TTN_max());
-    const auto T2TN = newton_solve_1d(shock_matching_helper, 1.0);
+    const auto T2TN = newton_solve_1d_bounded(shock_matching_helper, 1.0, veff_params_->TTN_min(), veff_params_->TTN_max());
+    // const auto T2TN = newton_solve_1d(shock_matching_helper, 1.0);
 
     return abs(T2TN - 1.0);
 }
@@ -906,7 +918,8 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
     };
 
     // solve matching eqs
-    const std::array<double, 2> yp_guess = {0.9*vw_, TmTN + 1e-4}; // {vp, Tp}
+    // const std::array<double, 2> yp_guess = {0.9*vw_, TmTN + 1e-4}; // {vp, Tp}
+    const std::array<double, 2> yp_guess = {0.9*vm, TmTN}; // {vp, Tp}
     const std::array<double, 2> bounds_min = {vp_min, TpTN_min};
     const std::array<double, 2> bounds_max = {vp_max, TpTN_max};
     const auto sol = newton_solve_2d_bounded(matching_helper, yp_guess, bounds_min, bounds_max);
@@ -1000,31 +1013,31 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff() const {
     std::function<std::array<double, 2>(std::array<double, 2>)> matching_helper = [this, vp, TpTN] (std::array<double, 2> ym_guess) {
         return matching_eqs_wall(vp, TpTN, ym_guess[0], ym_guess[1]); // ym_guess = {vm_guess, TmTN_guess}
     };
-    
+
     // solve matching eqs
-    const auto vp_min = 0.0;
-    const auto vp_max = 1.0;
-    const auto TpTN_min = veff_params_->TTN_min();
-    const auto TpTN_max = veff_params_->TTN_max();
+    const auto vm_min = 0.0;
+    const auto vm_max = 1.0;
+    const auto TmTN_min = veff_params_->TTN_min();
+    const auto TmTN_max = veff_params_->TTN_max();
 
-    const std::array<double, 2> bounds_min = {vp_min, TpTN_min};
-    const std::array<double, 2> bounds_max = {vp_max, TpTN_max};
+    const std::array<double, 2> bounds_min = {vm_min, TmTN_min};
+    const std::array<double, 2> bounds_max = {vm_max, TmTN_max};
 
-    const std::array<double, 2> vm_TmTN_guess = {vp, TpTN}; // {vm, TmTN}
+    const std::array<double, 2> vm_TmTN_guess = {0.9*vp, TpTN + 1e-3}; // {vm, TmTN}
     const auto sol = newton_solve_2d_bounded(matching_helper, vm_TmTN_guess, bounds_min, bounds_max);
 
     // fluid behind wall
     const auto vm = sol[0];
-    if (abs(vm) >= abs(vp)) throw std::invalid_argument("|vm| must be < |vp|=vw for detonation");
+    if (abs(vm) >= abs(vp)) throw std::runtime_error("|vm| must be < |vp|=vw for detonation");
 
     const auto vmUF = mu(vw_, abs(vm));
-    if (vmUF < 0.0) throw std::invalid_argument("vmUF must be > 0 for detonation");
+    if (vmUF < 0.0) throw std::runtime_error("vmUF must be > 0 for detonation");
 
     const auto TmTN = sol[1];
-    if (TmTN <= TpTN) throw std::invalid_argument("Tm/TN must be > Tp/TN for detonation");
+    if (TmTN <= TpTN) throw std::runtime_error("Tm/TN must be > Tp/TN for detonation");
 
     const auto wmwN = w_from_matching(wpwN, vp, vm);
-    if (wmwN <= wpwN) throw std::invalid_argument("wm/wN must be > wp/wN for detonation");
+    if (wmwN <= wpwN) throw std::runtime_error("wm/wN must be > wp/wN for detonation");
 
     const state_type y0 = {xi0, wmwN, TmTN};
     return {vmUF, y0};
@@ -1041,7 +1054,7 @@ double FluidProfile::w_from_matching(double wp, double vp, double vm) const {
 std::vector<prof_type> FluidProfile::solve_profile(int n) {
     // check valid hydrodynamic mode
     if (!(mode_ == 0 || mode_ == 1 || mode_ == 2)) {
-            throw std::invalid_argument("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
+            throw std::runtime_error("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
     }
 
     std::cout << "Solving fluid profile for hydrodynamic mode=";
@@ -1104,7 +1117,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
         const auto xi_sh = std::max(xi_sol_tmp.front(), cp);
         if (xi_sh > 1.0) {
-            throw std::invalid_argument("Shock must be less than speed of light (cp <= xi_sh < 1)");
+            throw std::runtime_error("Shock must be less than speed of light (cp <= xi_sh < 1)");
         }
 
         const auto wpwN = w_sol_tmp.back();
@@ -1121,9 +1134,9 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         auto alp_wall = [this] (double vp, double vm) {
             const auto alp = get_alp_wall(vp, vm);
 
-            if (alp >= alN_) throw std::invalid_argument("alpha_+ must be < alpha_N");
-            if (alp < alp_min_) throw std::invalid_argument("alpha_+ too small for shock");
-            if (alp > alp_max_) throw std::invalid_argument("alpha_+ too large for shock");
+            if (alp >= alN_) throw std::runtime_error("alpha_+ must be < alpha_N");
+            if (alp < alp_min_) throw std::runtime_error("alpha_+ too small for shock");
+            if (alp > alp_max_) throw std::runtime_error("alpha_+ too large for shock");
 
             return alp;
         };
@@ -1324,7 +1337,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
     } else if (mode_ == 2){
         std::cout << "detonation";
     } else {
-        throw std::invalid_argument("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
+        throw std::runtime_error("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
     }
     std::cout << "\n";
 
