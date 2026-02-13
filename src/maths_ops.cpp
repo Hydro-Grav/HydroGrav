@@ -877,7 +877,35 @@ std::array<double, 2> find_bracket(const std::function<double(double)>& residual
 
     const auto& S = segs[chosen_seg];
 
-    // --- 4. Construct bracket from that segment --------------------------
+    // --- 4. Check if a turning point (local minimum) exists --------------
+    // A turning point exists if the minimum is strictly interior to the segment
+    // and the function decreases then increases (has lower neighbors on both sides)
+    bool has_turning_point = false;
+    
+    if (idx_min > S.i0 && idx_min < S.i1) {
+        // Minimum is interior to segment
+        // Check if it's a local minimum (lower than both neighbors)
+        if (ys[idx_min] < ys[idx_min - 1] && ys[idx_min] < ys[idx_min + 1]) {
+            has_turning_point = true;
+        }
+    }
+    
+    // Alternative check: scan for any interior local minimum in the segment
+    if (!has_turning_point) {
+        for (int j = S.i0 + 1; j < S.i1; ++j) {
+            if (ys[j] < ys[j - 1] && ys[j] < ys[j + 1]) {
+                has_turning_point = true;
+                break;
+            }
+        }
+    }
+    
+    if (!has_turning_point) {
+        return {std::numeric_limits<double>::quiet_NaN(),
+                std::numeric_limits<double>::quiet_NaN()};
+    }
+
+    // --- 5. Construct bracket from that segment --------------------------
     double dx  = (b - a) / NSAMPLES;
     double left  = std::max(a, xs[S.i0] - PAD_MULT * dx);
     double right = std::min(b, xs[S.i1] + PAD_MULT * dx);
