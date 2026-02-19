@@ -331,6 +331,7 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   alglib::spline1dbuildcubic(veff_TTN_array, veff_ps_array, veff_ps_interp_);
   alglib::spline1dbuildcubic(veff_TTN_array, veff_es_array, veff_es_interp_);
   alglib::spline1dbuildcubic(veff_TTN_array, veff_ws_array, veff_ws_interp_);
+  // alglib::spline1dfit(veff_TTN_array, veff_ps_array, basis_size, smooth_fac, veff_ps_interp_, rep);
 
   veff_pb_array.setcontent(n, veff_pb_vals_.data());
   veff_eb_array.setcontent(n, veff_eb_vals_.data());
@@ -443,19 +444,33 @@ void PTParams_Veff::plot_thermo(const std::string& filename) const {
 
 void PTParams_Veff::plot_thermo2(const std::string& filename) const {
     const auto n = veff_TTN_vals_.size();
-    std::vector<double> es_spline_vals(n), eb_spline_vals(n), ps_spline_vals(n), pb_spline_vals(n), ws_spline_vals(n), wb_spline_vals(n);
+    std::vector<double> es_spline_vals(n), eb_spline_vals(n), ps_spline_vals(n), pb_spline_vals(n), ws_spline_vals(n), wb_spline_vals(n),
+                        veff_es_vals_norm(n), veff_eb_vals_norm(n), veff_ps_vals_norm(n), veff_pb_vals_norm(n), veff_ws_vals_norm(n), veff_wb_vals_norm(n);
+
+    // normalisation constants
+    const auto es_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
+    const auto eb_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
+    const auto ps_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
+    const auto pb_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
 
     for (int i = 0; i < n; i++) {
       const auto TTN = veff_TTN_vals_[i];
 
-      es_spline_vals[i] = alglib::spline1dcalc(veff_es_interp_, TTN);
-      eb_spline_vals[i] = alglib::spline1dcalc(veff_eb_interp_, TTN);
+      es_spline_vals[i] = alglib::spline1dcalc(veff_es_interp_, TTN) / es_TN;
+      eb_spline_vals[i] = alglib::spline1dcalc(veff_eb_interp_, TTN) / eb_TN;
 
-      ps_spline_vals[i] = alglib::spline1dcalc(veff_ps_interp_, TTN);
-      pb_spline_vals[i] = alglib::spline1dcalc(veff_pb_interp_, TTN);
+      ps_spline_vals[i] = alglib::spline1dcalc(veff_ps_interp_, TTN) / ps_TN;
+      pb_spline_vals[i] = alglib::spline1dcalc(veff_pb_interp_, TTN) / pb_TN;
 
-      ws_spline_vals[i] = alglib::spline1dcalc(veff_ws_interp_, TTN);
-      wb_spline_vals[i] = alglib::spline1dcalc(veff_wb_interp_, TTN);
+      ws_spline_vals[i] = alglib::spline1dcalc(veff_ws_interp_, TTN) / (es_TN + ps_TN);
+      wb_spline_vals[i] = alglib::spline1dcalc(veff_wb_interp_, TTN) / (eb_TN + pb_TN);
+
+      veff_es_vals_norm[i] = veff_es_vals_[i] / es_TN;
+      veff_eb_vals_norm[i] = veff_eb_vals_[i] / eb_TN;
+      veff_ps_vals_norm[i] = veff_ps_vals_[i] / ps_TN;
+      veff_pb_vals_norm[i] = veff_pb_vals_[i] / pb_TN;
+      veff_ws_vals_norm[i] = veff_ws_vals_[i] / (es_TN + ps_TN);
+      veff_wb_vals_norm[i] = veff_wb_vals_[i] / (eb_TN + pb_TN);
     }  
 
     std::map<std::string, std::string> data;
@@ -468,50 +483,56 @@ void PTParams_Veff::plot_thermo2(const std::string& filename) const {
     plt::figure_size(2400, 1600);
 
     plt::subplot2grid(3, 2, 0, 0);
-    plt::plot(veff_TTN_vals_, veff_es_vals_, data);
+    // plt::plot(veff_TTN_vals_, veff_es_vals_, data);
+    plt::plot(veff_TTN_vals_, veff_es_vals_norm, data);
     plt::plot(veff_TTN_vals_, es_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("es");
+    plt::ylabel("es/es(TN)");
     plt::grid(true);
     plt::legend();
 
     plt::subplot2grid(3, 2, 0, 1);
-    plt::plot(veff_TTN_vals_, veff_eb_vals_, data);
+    // plt::plot(veff_TTN_vals_, veff_eb_vals_, data);
+    plt::plot(veff_TTN_vals_, veff_eb_vals_norm, data);
     plt::plot(veff_TTN_vals_, eb_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("eb");
+    plt::ylabel("eb/eb(TN)");
     plt::grid(true);
     plt::legend();
 
     plt::subplot2grid(3, 2, 1, 0);
-    plt::plot(veff_TTN_vals_, veff_ps_vals_, data);
+    // plt::plot(veff_TTN_vals_, veff_ps_vals_, data);
+    plt::plot(veff_TTN_vals_, veff_ps_vals_norm, data);
     plt::plot(veff_TTN_vals_, ps_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("ps");
+    plt::ylabel("ps/ps(TN)");
     plt::grid(true);
     plt::legend();
 
     plt::subplot2grid(3, 2, 1, 1);
-    plt::plot(veff_TTN_vals_, veff_pb_vals_, data);
+    // plt::plot(veff_TTN_vals_, veff_pb_vals_, data);
+    plt::plot(veff_TTN_vals_, veff_pb_vals_norm, data);
     plt::plot(veff_TTN_vals_, pb_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("pb");
+    plt::ylabel("pb/pb(TN)");
     plt::grid(true);
     plt::legend();
 
     plt::subplot2grid(3, 2, 2, 0);
-    plt::plot(veff_TTN_vals_, veff_ws_vals_, data);
+    // plt::plot(veff_TTN_vals_, veff_ws_vals_, data);
+    plt::plot(veff_TTN_vals_, veff_ws_vals_norm, data);
     plt::plot(veff_TTN_vals_, ws_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("ws");
+    plt::ylabel("ws/ws(TN)");
     plt::grid(true);
     plt::legend();
 
     plt::subplot2grid(3, 2, 2, 1);
-    plt::plot(veff_TTN_vals_, veff_wb_vals_, data);
+    // plt::plot(veff_TTN_vals_, veff_wb_vals_, data);
+    plt::plot(veff_TTN_vals_, veff_wb_vals_norm, data);
     plt::plot(veff_TTN_vals_, wb_spline_vals, spline);
     plt::xlabel("T/TN");
-    plt::ylabel("wb");
+    plt::ylabel("wb/wb(TN)");
     plt::grid(true);
     plt::legend();
 
