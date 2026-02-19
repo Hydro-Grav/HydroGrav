@@ -8,9 +8,12 @@
 #include <functional>
 #include <cassert>
 #include <numeric>
+#include <memory>
 // #include <matplotlibcpp.h>
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
+#include <gsl/gsl_multimin.h>
+#include <gsl/gsl_vector.h>
 
 #include "ap.h"
 #include "solvers.h"
@@ -1087,4 +1090,216 @@ double L1_norm(const std::vector<double>& x_values,
     
     // Integrate
     return simpson_integrate(x_values, abs_diff);
+}
+
+std::array<double, 2> bisection_2d(
+    std::function<std::array<double, 2>(std::array<double, 2>)> F,
+    std::array<double, 2> lower,
+    std::array<double, 2> upper,
+    double tol,
+    int max_iter,
+    bool dev) {
+    
+    for (int iter = 0; iter < max_iter; ++iter) {
+        // Midpoint
+        std::array<double, 2> mid = {
+            0.5 * (lower[0] + upper[0]),
+            0.5 * (lower[1] + upper[1])
+        };
+        
+        auto res_mid = F(mid);
+        double res_norm = std::sqrt(res_mid[0]*res_mid[0] + res_mid[1]*res_mid[1]);
+        
+        if (dev) {
+            std::cout << "Bisection iter " << iter << ": mid=(" << mid[0] << ", " << mid[1] 
+                    << "), r1=" << res_mid[0] << ", r2=" << res_mid[1] << ", residual=" << res_norm << "\n";
+        }
+        
+        if (res_norm < tol) {
+            return mid;
+        }
+        
+        // Evaluate at corners to decide which quadrant to keep
+        auto res_lower = F(lower);
+        auto res_upper = F(upper);
+        auto res_mixed1 = F({lower[0], upper[1]});
+        auto res_mixed2 = F({upper[0], lower[1]});
+        
+        // Find quadrant with best sign change properties
+        // Strategy: keep the quadrant where residuals have opposite signs
+        
+        struct Quadrant {
+            std::array<double, 2> corner1;
+            std::array<double, 2> corner2;
+            double score;
+        };
+        
+        std::vector<Quadrant> quadrants = {
+            {lower, mid, 0.0},                          // Lower-left
+            {{mid[0], lower[1]}, {upper[0], mid[1]}, 0.0}, // Lower-right
+            {{lower[0], mid[1]}, {mid[0], upper[1]}, 0.0}, // Upper-left
+            {mid, upper, 0.0}                           // Upper-right
+        };
+        
+        // Score each quadrant by how well it brackets the root
+        for (auto& quad : quadrants) {
+            auto r1 = F(quad.corner1);
+            auto r2 = F(quad.corner2);
+            
+            // Prefer quadrants with sign changes
+            double score = 0.0;
+            if (r1[0] * r2[0] < 0) score += 1.0;
+            if (r1[1] * r2[1] < 0) score += 1.0;
+            
+            // Prefer quadrants with smaller residuals
+            score += 0.1 / (std::abs(r1[0]) + std::abs(r1[1]) + 
+                           std::abs(r2[0]) + std::abs(r2[1]) + 1e-12);
+            
+            quad.score = score;
+        }
+        
+        // Choose best quadrant
+        auto best = std::max_element(quadrants.begin(), quadrants.end(),
+            [](const Quadrant& a, const Quadrant& b) { return a.score < b.score; });
+        
+        lower = best->corner1;
+        upper = best->corner2;
+        
+        // Check convergence
+        double bracket_size = std::sqrt(
+            (upper[0] - lower[0])*(upper[0] - lower[0]) + 
+            (upper[1] - lower[1])*(upper[1] - lower[1])
+        );
+        
+        if (bracket_size < tol) {
+            return mid;
+        }
+    }
+    
+    // Return midpoint if max iterations reached
+    return {0.5 * (lower[0] + upper[0]), 0.5 * (lower[1] + upper[1])};
+}
+
+std::array<double, 2> grid_search_2d(std::function<std::array<double, 2>(std::array<double, 2>)> F, 
+                                           const std::array<double, 2>& bounds_min, 
+                                           const std::array<double, 2>& bounds_max, 
+                                           const int n1, const int n2, 
+                                           const bool write_search, const std::string& filename)
+{
+    double best_residual_norm = std::numeric_limits<double>::infinity();
+    std::array<double, 2> best_x = {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity()};
+
+    const auto x1_min = bounds_min[0];
+    const auto x1_max = bounds_max[0];
+    const auto x2_min = bounds_min[1];
+    const auto x2_max = bounds_max[1];
+
+    std::unique_ptr<std::ofstream> out;
+    if (write_search) {
+        out = std::make_unique<std::ofstream>(filename);
+        *out << std::setprecision(12);
+        *out << "x1,x2,eq1,eq2,norm\n";
+    }
+    
+    for (int i = 0; i < n1; ++i) {
+        double x1 = x1_min + i * (x1_max - x1_min) / n1;
+        for (int j = 0; j < n2; ++j) {
+            double x2 = x2_min + j * (x2_max - x2_min) / n2;
+            
+            try {
+                auto res = F({x1, x2});
+                double res_norm = std::sqrt(res[0]*res[0] + res[1]*res[1]);
+
+                if (out) {
+                    *out << x1 << "," << x2 << "," << res[0] << "," << res[1] 
+                         << "," << res_norm << "\n";
+                }
+                
+                if (res_norm < best_residual_norm) {
+                    best_residual_norm = res_norm;
+                    best_x = {x1, x2};
+                }
+            } catch (...) {
+                continue;
+            }
+        }
+    }
+
+    out.reset();
+
+    return best_x;
+}
+
+// nelder-mead 2d minimiser
+static double nelder_mead_2d_objective(const gsl_vector* x, void* params) {
+    auto* p = static_cast<NelderMead2DParams*>(params);
+
+    const std::array<double, 2> args = {
+        gsl_vector_get(x, 0),
+        gsl_vector_get(x, 1)
+    };
+
+    try {
+        const auto r = p->func(args);
+        return std::sqrt(r[0] + r[1]); // squared residual
+    } catch (const std::exception&) {
+        return 1e10;
+    }
+}
+
+std::array<double, 2> nelder_mead_minimise_2d(
+    const std::function<std::array<double, 2>(const std::array<double, 2>&)>& func,
+    double x0,
+    double x1,
+    double step0,
+    double step1,
+    double tol,
+    int max_iter)
+{
+    NelderMead2DParams params{func};
+
+    gsl_multimin_function gsl_func;
+    gsl_func.n      = 2;
+    gsl_func.f      = &nelder_mead_2d_objective;
+    gsl_func.params = &params;
+
+    gsl_vector* x = gsl_vector_alloc(2);
+    gsl_vector_set(x, 0, x0);
+    gsl_vector_set(x, 1, x1);
+
+    gsl_vector* step_size = gsl_vector_alloc(2);
+    gsl_vector_set(step_size, 0, step0);
+    gsl_vector_set(step_size, 1, step1);
+
+    gsl_multimin_fminimizer* minimizer = 
+        gsl_multimin_fminimizer_alloc(gsl_multimin_fminimizer_nmsimplex2, 2);
+    gsl_multimin_fminimizer_set(minimizer, &gsl_func, x, step_size);
+
+    int status = GSL_CONTINUE;
+    int iter   = 0;
+
+    while (status == GSL_CONTINUE && iter < max_iter) {
+        ++iter;
+        status = gsl_multimin_fminimizer_iterate(minimizer);
+        if (status) break;
+        const double simplex_size = gsl_multimin_fminimizer_size(minimizer);
+        status = gsl_multimin_test_size(simplex_size, tol);
+    }
+
+    const double x0_sol = gsl_vector_get(minimizer->x, 0);
+    const double x1_sol = gsl_vector_get(minimizer->x, 1);
+    const double fval   = minimizer->fval;
+
+    gsl_multimin_fminimizer_free(minimizer);
+    gsl_vector_free(x);
+    gsl_vector_free(step_size);
+
+    if (status != GSL_SUCCESS) {
+        throw std::runtime_error(
+            "Nelder-Mead minimisation failed to converge after " +
+            std::to_string(iter) + " iterations. Final residual: " +
+            std::to_string(fval));
+    }
+
+    return {x0_sol, x1_sol};
 }

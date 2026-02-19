@@ -27,11 +27,14 @@
 #include <stdexcept>
 #include <iostream>
 
-// #include <gsl/gsl_integration.h>
+// #include <gsl/gsl_multimin.h>
+#include <gsl/gsl_vector.h>
 
 #include "interpolation.h"
 
 #include "ap.h"
+
+const static double minimiser_tol = 1e-4;
 
 /**
  * @brief Cubic spline interpolation class.
@@ -234,8 +237,17 @@ std::array<T,2> newton_solve_2d_bounded(
     T tol = 1e-8,
     int max_iter = 100,
     T h = 1e-8,
-    T bound_margin = 1e-6  // Stay this far from boundaries
+    T bound_margin = 1e-6,  // Stay this far from boundaries
+    bool dev = false
 );
+
+std::array<double, 2> bisection_2d(
+    std::function<std::array<double, 2>(std::array<double, 2>)> F,
+    std::array<double, 2> lower,
+    std::array<double, 2> upper,
+    double tol=1e-8,
+    int max_iter=50,
+    bool dev=false);
 
 #include "solvers.tpp"
 
@@ -252,7 +264,27 @@ double L2_norm(const std::vector<double>& x_values,
                const std::vector<double>& dist1,
                const std::vector<double>& dist2);
 
-double sigmoid_transform(double s, double xmin, double xmax);
-double inverse_sigmoid_transform(double x, double xmin, double xmax);
+std::array<double, 2> grid_search_2d(std::function<std::array<double, 2>(std::array<double, 2>)> F, 
+                                     const std::array<double, 2>& bounds_min, 
+                                     const std::array<double, 2>& bounds_max, 
+                                     const int n1=50, const int n2=50,
+                                     const bool write_search=false,
+                                     const std::string& filename="grid_search.csv");
+                        
+// nelder-mead 2d minimiser
+struct NelderMead2DParams {
+    const std::function<std::array<double, 2>(const std::array<double, 2>&)>& func;
+};
+
+static double nelder_mead_2d_objective(const gsl_vector* x, void* params);
+
+std::array<double, 2> nelder_mead_minimise_2d(
+    const std::function<std::array<double, 2>(const std::array<double, 2>&)>& func,
+    double x0,
+    double x1,
+    double step0 = 0.1,
+    double step1 = 0.01,
+    double tol = 1e-8,
+    int max_iter = 10000);
 
 #endif // INCLUDE_MATHS_OPS_HPP_H

@@ -137,7 +137,7 @@ class FluidProfile {
     double find_TmTN_veff(const deriv_func& dydv) const;
     double T2TN_residual_veff(const deriv_func& dydv, double TmTN, const size_t n=1000) const;
     std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_resi=false, const size_t n=1000) const;
-    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false, const double tol=1e-5) const;
+    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false) const;
     
     // dev
     void test_residual_veff(const deriv_func& dydv, const size_t n) const;

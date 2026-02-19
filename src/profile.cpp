@@ -249,10 +249,12 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
 
                 veff_params_ = &dynamic_cast<const PhaseTransition::PTParams_Veff&>(params);
                 // mode_ = get_mode_veff(vw_, cmsq_);
+                std::cout << "Determining hydrodynamic mode from EoS...\n";
                 try {
                     mode_ = get_mode_veff(vw_, cmsq_);
+                    std::cout << "Hydrodynamic mode determined successfully!\n";
                 } catch (std::exception& e) {
-                    std::cout << "WARNING: get_mode_veff() failed! Using get_mode_bag() to estimate hydrodynamic mode instead!\n";
+                    std::cout << "WARNING: " << e.what() << " Using get_mode_bag() to estimate hydrodynamic mode instead!\n";
                     mode_ = mode_bag;
                 }
 
@@ -678,23 +680,51 @@ int FluidProfile::get_mode_veff(double vw, double cmsq) const {
     const auto vm = cm; // vJ_det=vp when |vm|=cm
     const auto TpTN = 1.0;
 
-    const auto vp_min = 0.0;
+    const auto vp_min = vm; // vp > vm for detonations
     const auto vp_max = 1.0;
-    const auto TmTN_min = veff_params_->TTN_min();
+    const auto TmTN_min = TpTN; // Tm > Tp for detonations
     const auto TmTN_max = veff_params_->TTN_max();
+
+    if (veff_params_->TTN_min() > TmTN_min)
+        throw std::runtime_error("TmTN_min lies outside of bounds of EoS, check for bad EoS data!");
+
+    const std::array<double, 2> bounds_min = {vp_min, TmTN_min};
+    const std::array<double, 2> bounds_max = {vp_max, TmTN_max};
 
     auto matching_helper = [this, vm, TpTN](const std::array<double, 2>& vp_TmTN) {
         return matching_eqs_wall(vp_TmTN[0], TpTN, vm, vp_TmTN[1]);
     };
 
+    // rough grid search to find initial guess for {vp, TmTN}
+    const auto vp_TmTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max);
+
     // solve matching eqs
-    const std::array<double, 2> vp_TmTN_guess = {vm, 0.5*(TmTN_max - TmTN_min)}; // {vm, TmTN}
-    const std::array<double, 2> bounds_min = {vp_min, TmTN_min};
-    const std::array<double, 2> bounds_max = {vp_max, TmTN_max};
-    const auto sol = newton_solve_2d_bounded(matching_helper, vp_TmTN_guess, bounds_min, bounds_max);
+    std::array<double, 2> sol;
+    try { // solve using bounded newton's method
+        sol = newton_solve_2d_bounded(matching_helper, vp_TmTN_guess, bounds_min, bounds_max);
+    } catch (std::exception& e) { // nelder-mead minimisation method fallback (needed for noisy EoS)
+        std::cout << "WARNING: " << e.what()
+                  << " Solving matching eqs by minimising residuals instead!\n";
+        
+        auto matching_helper2 = [this, vm, TpTN](const std::array<double, 2>& vp_TmTN) {
+            const auto resi = matching_eqs_wall(vp_TmTN[0], TpTN, vm, vp_TmTN[1]);
+            return std::array<double, 2>{resi[0] * resi[0], resi[1] * resi[1]};
+        };
+
+        sol = nelder_mead_minimise_2d(matching_helper2, vp_TmTN_guess[0], vp_TmTN_guess[1]);
+        // std::cout << "vm=" << vm << ", vp=" << sol[0] << ", TmTN=" << sol[1] << ", r1=" << matching_helper(sol)[0] << ", r2=" << matching_helper(sol)[1] << "\n";
+
+        const auto resi = matching_helper({sol[0], sol[1]});
+        if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
+            throw std::runtime_error("Solving matching equations failed in get_mode_veff (residual too large)! Input EoS may have too much noise!");
+        }
+    }
 
     const auto vJ_det = sol[0]; // vp
     if (abs(vJ_det) <= cm) throw std::runtime_error("Invalid Jouguet detonation velocity calculated (|vJ_det| <= cm)!");
+    
+    const auto TmTN = sol[1];
+    if (TmTN < TpTN) throw std::runtime_error("Invalid temperature for Jouguet detonation solution (TmTN < TpTN)!");
 
     if (vw < vJ_det) return 1; // hybrid
     return 2; // detonation
@@ -768,17 +798,11 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
     const auto pm = veff_params_->pb_val(TmTN); // p_-, e_-
     const auto em = veff_params_->eb_val(TmTN);
 
-    // const double scale1 = std::max(std::abs(pm - pp), 1e-12);
-    // const double scale2 = std::max(std::abs(vp*(ep + pm)), 1e-12);
+    const double p_scale = std::max({std::abs(pp), std::abs(pm), 1e+6});
+    const double e_scale = std::max({std::abs(ep), std::abs(em), 1e+7});
 
-    // const auto eq1 = (vp * vm * (em - ep) - (pm - pp)) / scale1;
-    // const auto eq2 = (vm * (em + pp) - vp * (ep + pm)) / scale2;
-
-    // using regular form seems to make detonation IC calculation go out of bounds for Tm
-    const auto eq1 = vp * vm * (em - ep) - (pm - pp);
-    const auto eq2 = vm * (em + pp) - vp * (ep + pm);
-    // // const auto eq1 = vp * vm - (pm - pp) / (em - ep);
-    // // const auto eq2 = vm / vp - (ep + pm) / (em + pp);
+    const auto eq1 = (vp * vm * (em - ep) - (pm - pp)) / p_scale;
+    const auto eq2 = (vm * (em + pp) - vp * (ep + pm)) / e_scale;
 
     return {eq1, eq2};
 }
@@ -797,9 +821,7 @@ void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) co
             resi = T2TN_residual_veff(dydv, TmTN_vals[i]);
             // std::cout << "resi=" << resi << " for Tm/TN=" << TmTN_vals[i] << "\n";
         } catch (std::exception& e) {
-            // std::cout << "failed for Tm/TN=" << TmTN_vals[i] << "\n";
-            std::cout << e.what() << " for Tm/TN=" << TmTN_vals[i] << "\n";
-            const auto vm = (mode_ == 0) ? vw_ : std::sqrt(veff_params_->csq_b(TmTN_vals[i]));
+            std::cout << "Failed for Tm/TN=" << TmTN_vals[i] << ":" << e.what() << "\n";
         }
 
         resi_vals[i] = resi;
@@ -888,6 +910,7 @@ double FluidProfile::T2TN_residual_veff(const deriv_func& dydv, double TmTN, con
 
     // calculate fluid profile from wall to shock
     const auto [v_sol, y_sol] = deflagration_profile_veff(dydv, vm, wmwN, TmTN, false, n);
+    std::cout << "pass\n";
 
     // fluid behind shock
     const auto xi_sh = y_sol.back()[0];
@@ -913,17 +936,41 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
     const auto TpTN_min = veff_params_->TTN_min();
     const auto TpTN_max = veff_params_->TTN_max();
 
-    auto matching_helper = [this, vm, TmTN](const std::array<double, 2>& yp_guess) {
-        return matching_eqs_wall(yp_guess[0], yp_guess[1], vm, TmTN); // yp = {vp, TpTN}
-    };
-
-    // solve matching eqs
-    // const std::array<double, 2> yp_guess = {0.9*vw_, TmTN + 1e-4}; // {vp, Tp}
-    const std::array<double, 2> yp_guess = {0.9*vm, TmTN}; // {vp, Tp}
     const std::array<double, 2> bounds_min = {vp_min, TpTN_min};
     const std::array<double, 2> bounds_max = {vp_max, TpTN_max};
-    const auto sol = newton_solve_2d_bounded(matching_helper, yp_guess, bounds_min, bounds_max);
-    // const auto sol = newton_solve_2d(matching_helper, yp_guess);
+
+    auto matching_helper = [this, vm, TmTN](const std::array<double, 2>& vp_TpTN) {
+        return matching_eqs_wall(vp_TpTN[0], vp_TpTN[1], vm, TmTN);
+    };
+    
+    // rough grid search to find initial guess for {vp, TpTN}
+    const auto vp_TpTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max);
+    // const auto vp_TpTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max, 50, 50, true, "grid_search.csv");
+    
+    // solve matching eqs
+    std::array<double, 2> sol;
+    try { // solve using bounded newton's method
+        sol = newton_solve_2d_bounded(matching_helper, vp_TpTN_guess, bounds_min, bounds_max);
+    } catch (std::exception& e) { // nelder-mead minimisation method fallback (needed for noisy EoS)  
+        if (test_resi) {
+            std::cout << "WARNING: " << e.what()
+                      << " Solving matching eqs by minimising residuals instead!\n";
+        }     
+
+        auto matching_helper2 = [this, vm, TmTN](const std::array<double, 2>& vp_TpTN) {
+            const auto resi = matching_eqs_wall(vp_TpTN[0], vp_TpTN[1], vm, TmTN);
+            return std::array<double, 2>{resi[0] * resi[0], resi[1] * resi[1]};
+        };
+
+        sol = nelder_mead_minimise_2d(matching_helper2, vp_TpTN_guess[0], vp_TpTN_guess[1]);
+
+        const auto resi = matching_helper({sol[0], sol[1]});
+        if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
+            throw std::runtime_error("Solving matching equations failed in get_IC_detonation_veff (residual too large)! Input EoS may have too much noise!");
+        }
+    }
+
+    // std::cout << "vm=" << vm << ", vp=" << sol[0] << ", TmTN=" << TmTN << ", TpTN=" << sol[1] << ", r1=" << matching_helper(sol)[0] << ", r2=" << matching_helper(sol)[1] << "\n";
 
     // fluid in front of wall
     const auto vp = sol[0];
@@ -953,7 +1000,7 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
     return {v_sol, y_sol};
 }
 
-size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi, const double tol) const {
+size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi) const {
     const auto pN = veff_params_->pN();
     const auto eN = veff_params_->eN();
 
@@ -993,8 +1040,8 @@ size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
 
-    if (test_resi && resi_vals[idx] > tol) {
-        std::cout << "Warning: Shock residual above tolerance (" << tol << "). Residual=" << resi_vals[idx] << "\n";
+    if (test_resi && resi_vals[idx] > minimiser_tol) {
+        std::cout << "Warning: Shock residual above tolerance (" << minimiser_tol << "). Residual=" << resi_vals[idx] << "\n";
     }
 
     return idx;
@@ -1010,21 +1057,44 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff() const {
     const auto TpTN = 1.0;
     const auto wpwN = 1.0;
 
-    std::function<std::array<double, 2>(std::array<double, 2>)> matching_helper = [this, vp, TpTN] (std::array<double, 2> ym_guess) {
-        return matching_eqs_wall(vp, TpTN, ym_guess[0], ym_guess[1]); // ym_guess = {vm_guess, TmTN_guess}
-    };
-
-    // solve matching eqs
     const auto vm_min = 0.0;
-    const auto vm_max = 1.0;
-    const auto TmTN_min = veff_params_->TTN_min();
+    const auto vm_max = vp;
+    // const auto vm_max = 1.0;
+    const auto TmTN_min = TpTN;
+    // const auto TmTN_min = veff_params_->TTN_min();
     const auto TmTN_max = veff_params_->TTN_max();
 
     const std::array<double, 2> bounds_min = {vm_min, TmTN_min};
     const std::array<double, 2> bounds_max = {vm_max, TmTN_max};
 
-    const std::array<double, 2> vm_TmTN_guess = {0.9*vp, TpTN + 1e-3}; // {vm, TmTN}
-    const auto sol = newton_solve_2d_bounded(matching_helper, vm_TmTN_guess, bounds_min, bounds_max);
+    auto matching_helper = [this, vp, TpTN] (std::array<double, 2> vm_TmTN) {
+        return matching_eqs_wall(vp, TpTN, vm_TmTN[0], vm_TmTN[1]); // ym_guess = {vm_guess, TmTN_guess}
+    };
+
+    // rough grid search to find initial guess for {vm, TmTN}
+    const auto vm_TmTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max, 50, 50, true, "grid_search.csv");
+
+    // solve matching eqs
+    std::array<double, 2> sol;
+    try { // solve using bounded newton's method
+        sol = newton_solve_2d_bounded(matching_helper, vm_TmTN_guess, bounds_min, bounds_max);
+    } catch (std::exception& e) { // nelder-mead minimisation method fallback (needed for noisy EoS)
+        std::cout << "WARNING: " << e.what()
+                  << " Solving matching eqs by minimising residuals instead!\n";
+        
+        auto matching_helper2 = [this, vp, TpTN] (std::array<double, 2> vm_TmTN) {
+            const auto resi = matching_eqs_wall(vp, TpTN, vm_TmTN[0], vm_TmTN[1]);
+            return std::array<double, 2>{resi[0] * resi[0], resi[1] * resi[1]};
+        };
+
+        sol = nelder_mead_minimise_2d(matching_helper2, vm_TmTN_guess[0], vm_TmTN_guess[1]);
+        std::cout << "vm=" << sol[0] << ", vp=" << vp << ", TmTN=" << sol[1] << ", r1=" << matching_helper(sol)[0] << ", r2=" << matching_helper(sol)[1] << "\n";
+
+        const auto resi = matching_helper({sol[0], sol[1]});
+        if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
+            throw std::runtime_error("Solving matching equations failed in get_IC_detonation_veff (residual too large)! Input EoS may have too much noise!");
+        }
+    }
 
     // fluid behind wall
     const auto vm = sol[0];
