@@ -321,24 +321,28 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   }
 
   // Construct interpolating functions p(T/TN), e(T/TN) in s/b phases
+  // Smooth spline needed here to remove numerical noise in eos
   alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_ws_array, veff_pb_array, veff_eb_array, veff_wb_array;
+  alglib::spline1dfitreport rep;
+  // const double smooth_fac = 1e-2;
+  const double smooth_fac = 1e-2;
+  const int basis_size = 50;
 
   veff_TTN_array.setcontent(n, veff_TTN_vals_.data());
   
   veff_ps_array.setcontent(n, veff_ps_vals_.data());
   veff_es_array.setcontent(n, veff_es_vals_.data());
   veff_ws_array.setcontent(n, veff_ws_vals_.data());
-  alglib::spline1dbuildcubic(veff_TTN_array, veff_ps_array, veff_ps_interp_);
-  alglib::spline1dbuildcubic(veff_TTN_array, veff_es_array, veff_es_interp_);
-  alglib::spline1dbuildcubic(veff_TTN_array, veff_ws_array, veff_ws_interp_);
-  // alglib::spline1dfit(veff_TTN_array, veff_ps_array, basis_size, smooth_fac, veff_ps_interp_, rep);
+  alglib::spline1dfit(veff_TTN_array, veff_ps_array, basis_size, smooth_fac, veff_ps_interp_, rep);
+  alglib::spline1dfit(veff_TTN_array, veff_es_array, basis_size, smooth_fac, veff_es_interp_, rep);
+  alglib::spline1dfit(veff_TTN_array, veff_ws_array, basis_size, smooth_fac, veff_ws_interp_, rep);
 
   veff_pb_array.setcontent(n, veff_pb_vals_.data());
   veff_eb_array.setcontent(n, veff_eb_vals_.data());
   veff_wb_array.setcontent(n, veff_wb_vals_.data());
-  alglib::spline1dbuildcubic(veff_TTN_array, veff_pb_array, veff_pb_interp_);
-  alglib::spline1dbuildcubic(veff_TTN_array, veff_eb_array, veff_eb_interp_);
-  alglib::spline1dbuildcubic(veff_TTN_array, veff_wb_array, veff_wb_interp_);
+  alglib::spline1dfit(veff_TTN_array, veff_pb_array, basis_size, smooth_fac, veff_pb_interp_, rep);
+  alglib::spline1dfit(veff_TTN_array, veff_eb_array, basis_size, smooth_fac, veff_eb_interp_, rep);
+  alglib::spline1dfit(veff_TTN_array, veff_wb_array, basis_size, smooth_fac, veff_wb_interp_, rep);
 
   // Calculate thermodynamic quantities at nucleation (T/TN = 1)
   pN_ = alglib::spline1dcalc(veff_ps_interp_, 1.0);
@@ -359,7 +363,6 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   wNeN_rat_ = wN_ / eN_;
 
   // Calculate sound speeds
-  // Using smooth spline here needed to remove numerical instabilities in thermo splines
   double s_unused, dps, des, dpb, deb, dps2_unused, des2_unused, dpb2_unused, deb2_unused;
   cpsq_vals_.reserve(n);
   cmsq_vals_.reserve(n);
@@ -378,15 +381,14 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
 
   // Fit sound speed splines
   alglib::real_1d_array cpsq_array, cmsq_array;
-  alglib::spline1dfitreport rep;
-  const double smooth_fac = 0.01;
-  const int basis_size = 100;
 
   cpsq_array.setcontent(n, cpsq_vals_.data());
-  alglib::spline1dfit(veff_TTN_array, cpsq_array, basis_size, smooth_fac, cpsq_fit_, rep);
+  // alglib::spline1dfit(veff_TTN_array, cpsq_array, basis_size, smooth_fac, cpsq_fit_, rep);
+  alglib::spline1dbuildcubic(veff_TTN_array, cpsq_array, cpsq_fit_);
 
   cmsq_array.setcontent(n, cmsq_vals_.data());
-  alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
+  // alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
+  alglib::spline1dbuildcubic(veff_TTN_array, cmsq_array, cmsq_fit_);
 
   // calculate alN_bag and alN_munu
   // const auto theta_s_bag = es_val(1.0) - 3.0 * ps_val(1.0);
