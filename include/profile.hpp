@@ -130,8 +130,7 @@ class FluidProfile {
 
     // matching eqs
     std::array<double, 2> matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const;
-    std::array<double, 2> matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const;
-    std::array<double, 2> matching_eqs_shock2(double v1, double T1TN, double v2, double T2TN) const;
+    std::array<double, 2> matching_eqs_shock(double v1, double T1TN, double v2, double T2TN) const;
     
     // deflagrations
     double find_TmTN_veff(const deriv_func& dydv) const;

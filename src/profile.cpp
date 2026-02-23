@@ -743,28 +743,7 @@ double FluidProfile::lambda_b_veff(double ToTN, const double eN, const double wN
     return (eb_T - eN) * wN_inv;
 }
 
-std::array<double, 2> FluidProfile::matching_eqs_shock(double pN, double eN, double v2, double v1, double T1TN) const {    
-    if (T1TN < veff_params_->TTN_min() || T1TN > veff_params_->TTN_max()) {
-        throw std::runtime_error("T1/TN is called out of bounds for spline!");
-    }
-
-    // const auto p2 = veff_params_->ps_val(T2TN); // p_2, e_2
-    // const auto e2 = veff_params_->es_val(T2TN);
-    const auto p2 = pN;
-    const auto e2 = eN;
-
-    const auto p1 = veff_params_->ps_val(T1TN); // p_1, e_1
-    const auto e1 = veff_params_->es_val(T1TN);
-
-    // const auto eq1 = v2 * v1 * (e1 - e2) - (p1 - p2);
-    // const auto eq2 = v1 * (e1 + p2) - v2 * (e2 + p1);
-    const auto eq1 = v1 * v2 - (p1 - p2) / (e1 - e2);
-    const auto eq2 = v1 / v2 - (e2 + p1) / (e1 + p2);
-
-    return {eq1, eq2};
-}
-
-std::array<double, 2> FluidProfile::matching_eqs_shock2(double v1, double T1TN, double v2, double T2TN) const {    
+std::array<double, 2> FluidProfile::matching_eqs_shock(double v1, double T1TN, double v2, double T2TN) const {    
     if (T1TN < veff_params_->TTN_min() || T1TN > veff_params_->TTN_max()) {
         throw std::runtime_error("T1/TN is called out of bounds for spline!");
     }
@@ -857,7 +836,8 @@ void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::
 
         // shock condition mu(xi_sh, v(xi_sh)) xi_sh = (p1-pN)/(e1-eN)
         xi_vals.push_back(xi_sh);
-        resi_vals.push_back(abs(matching_eqs_shock(pN, eN, v2, v1, T1TN)[1]));
+        resi_vals.push_back(abs(matching_eqs_shock(v1, T1TN, v2, 1.0)[1])); // T2TN=1
+        // resi_vals.push_back(abs(matching_eqs_shock(pN, eN, v2, v1, T1TN)[1]));
         // const auto resi = matching_eqs_shock(pN, eN, v2, v1, T1TN);
         // resi_vals.push_back(resi[0] * resi[0] + resi[1] * resi[1]);
     }
@@ -887,7 +867,7 @@ double FluidProfile::find_TmTN_veff(const deriv_func& dydv) const {
     };
 
     // testing residual
-    // test_residual_veff(dydv, 500);
+    test_residual_veff(dydv, 500);
 
     // find bracket where residual is defined and minimum lies
     const auto TmTN_min = veff_params_->TTN_min();
@@ -919,7 +899,7 @@ double FluidProfile::T2TN_residual_veff(const deriv_func& dydv, double TmTN, con
 
     // matching at shock to get T2/TN
     auto shock_matching_helper = [this, v1, T1TN, xi_sh] (double T2TN_guess) {
-        return matching_eqs_shock2(v1, T1TN, xi_sh, T2TN_guess)[1]; // v2 = xi_sh
+        return matching_eqs_shock(v1, T1TN, xi_sh, T2TN_guess)[1]; // v2 = xi_sh
     };
     const auto T2TN = newton_solve_1d_bounded(shock_matching_helper, 1.0, veff_params_->TTN_min(), veff_params_->TTN_max());
     // const auto T2TN = newton_solve_1d(shock_matching_helper, 1.0);
@@ -964,7 +944,7 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 
         const auto resi = matching_helper({sol[0], sol[1]});
         if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
-            throw std::runtime_error("Solving matching equations failed in get_IC_detonation_veff (residual too large)! Input EoS may have too much noise!");
+            throw std::runtime_error("Solving matching equations failed in get_IC_detonation_veff (residual too large)!");
         }
     }
 
@@ -1025,7 +1005,8 @@ size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const
         const auto v2 = xi_sh; // v2=xi_sh
 
         // shock condition mu(xi_sh, v(xi_sh)) xi_sh = (p1-pN)/(e1-eN)
-        resi_vals[i] = abs(matching_eqs_shock(pN, eN, v2, v1, T1TN)[0]);
+        resi_vals[i] = abs(matching_eqs_shock(v1, T1TN, v2, 1.0)[0]); // T2/TN=1
+        // resi_vals[i] = abs(matching_eqs_shock(pN, eN, v2, v1, T1TN)[0]);
         pass_count++;
     }
 
