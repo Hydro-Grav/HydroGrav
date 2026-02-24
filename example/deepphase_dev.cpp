@@ -156,9 +156,9 @@ void example_FluidProfile(const benchmark_point& bp) {
 // Gravitational wave power spectrum
 void example_GW_Spec(const benchmark_point& bp) {
     const auto dir = bp.dir();
-    const auto veff_file = dir + "eos.csv";
+    // const auto veff_file = dir + "eos.csv";
     // const std::string dir = "parameter_scan/eos_scan/";
-    // const auto veff_file = bp.dir();
+    const auto veff_file = bp.dir();
 
     const auto vw = bp.vw();
     const auto Ts = bp.Ts();
@@ -194,8 +194,10 @@ void example_GW_Spec(const benchmark_point& bp) {
         // OmegaGW_veff.profile().write(dir + "profile_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    const std::string filename_fp = dir + "fp_" + OmegaGW_veff.profile().mode_str() + ".png";
-    const std::string filename_gw = dir + "gw_" + OmegaGW_veff.profile().mode_str() + ".png";
+    // const std::string filename_fp = dir + "fp_" + OmegaGW_veff.profile().mode_str() + ".png";
+    // const std::string filename_gw = dir + "gw_" + OmegaGW_veff.profile().mode_str() + ".png";
+    const std::string filename_fp = "fp_" + bp.name() + ".png";
+    const std::string filename_gw = "gw_" + bp.name() + ".png";
     Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
     Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, filename_gw);
     #endif
@@ -493,7 +495,7 @@ int main() {
         gs,
         nuc_type,
         "BP0_def",
-        "benchmark_pts/SS/BP0/"
+        "benchmark_pts/SS/BP0/eos.csv"
     );
 
     benchmark_point BP0_hyb(
@@ -508,7 +510,7 @@ int main() {
         gs,
         nuc_type,
         "BP0_hyb",
-        "benchmark_pts/SS/BP0/"
+        "benchmark_pts/SS/BP0/eos.csv"
     );
 
     benchmark_point BP0_det(
@@ -523,7 +525,7 @@ int main() {
         gs,
         nuc_type,
         "BP0_det",
-        "benchmark_pts/SS/BP0/"
+        "benchmark_pts/SS/BP0/eos.csv"
     );
 
     benchmark_point BP1_hyb(
@@ -540,7 +542,7 @@ int main() {
         gs,
         nuc_type,
         "BP1_hyb",
-        "benchmark_pts/SS/BP1/3deft/"
+        "benchmark_pts/SS/BP1/3deft/eos.csv"
     );
 
     benchmark_point BP1_det(
@@ -557,7 +559,7 @@ int main() {
         gs,
         nuc_type,
         "BP1_det",
-        "benchmark_pts/SS/BP1/3deft/"
+        "benchmark_pts/SS/BP1/3deft/eos.csv"
     );
 
     benchmark_point BP2_hyb(
@@ -574,7 +576,7 @@ int main() {
         gs,
         nuc_type,
         "BP2_hyb",
-        "benchmark_pts/SS/BP2/3deft/"
+        "benchmark_pts/SS/BP2/3deft/eos.csv"
     );
 
     benchmark_point BP2_det(
@@ -591,7 +593,24 @@ int main() {
         gs,
         nuc_type,
         "BP2_det",
-        "benchmark_pts/SS/BP2/3deft/"
+        "benchmark_pts/SS/BP2/3deft/eos.csv"
+    );
+
+    benchmark_point BP2_det_new(
+        0.754187, // vw (detonation)
+        114.579,  // Ts
+        // 0.00386107, // alN_bag (Will)
+        // 0.00386107, // alN_munu (Will)
+        0.00386064, // alN_bag
+        0.00387911, // alN_munu
+        1445.85, // betaHs
+        1.86566e-14, // Hs
+        0.575068 * 0.575068, // cpsq
+        0.570803 * 0.570803, // cmsq
+        gs,
+        nuc_type,
+        "BP2_det_new",
+        "benchmark_pts/SS/BP2_new/eos.csv"
     );
 
     benchmark_point BP3(
@@ -608,7 +627,7 @@ int main() {
         gs,
         nuc_type,
         "BP3",
-        "benchmark_pts/SS/BP3/"
+        "benchmark_pts/SS/BP3/eos.csv"
     );
 
     // NOTE: TmTN < 1 for veff
@@ -626,7 +645,7 @@ int main() {
         gs,
         nuc_type,
         "BP4",
-        "benchmark_pts/SS/BP4/"
+        "benchmark_pts/SS/BP4/eos.csv"
     );
 
     // NOTE: TmTN < 1 for veff
@@ -644,7 +663,7 @@ int main() {
         gs,
         nuc_type,
         "BP5",
-        "benchmark_pts/SS/BP5/"
+        "benchmark_pts/SS/BP5/eos.csv"
     );
 
     benchmark_point BP6(
@@ -661,7 +680,7 @@ int main() {
         gs,
         nuc_type,
         "BP6",
-        "benchmark_pts/SS/BP6/3deft/"
+        "benchmark_pts/SS/BP6/3deft/eos.csv"
     );
 
     // bag gets mode wrong
@@ -677,7 +696,7 @@ int main() {
         gs,
         nuc_type,
         "BP7",
-        "benchmark_pts/SS/BP7/"
+        "benchmark_pts/SS/BP7/eos.csv"
     );
 
     /*
@@ -829,16 +848,17 @@ int main() {
     );
 
     // NOTE: Old BPs will be broken since order of 's' and 'b' in veff eos switched when reading it in -> update veff eos files
-    std::vector<benchmark_point> bp_list = {BP0_def, BP0_hyb, BP0_det, BP1_hyb, BP1_det, BP2_hyb, BP2_det, BP3, BP4, BP5, BP6, BP7};
+    std::vector<benchmark_point> bp_list = {BP0_def, BP0_hyb, BP0_det, BP1_hyb, BP1_det, BP2_hyb, BP2_det, BP2_det_new, BP3, BP4, BP5, BP6, BP7};
     std::vector<benchmark_point> scan_bp_list = {scan_BP0, scan_BP1, scan_BP2, scan_BP3, scan_BP4, scan_BP5, scan_BP6, scan_BP7, scan_BP8};
     // gw_param_scan(bp_list, "gw_param_scan.csv");
 
     // std::vector<std::pair<std::string, std::string>> fail_cases;
-    // for (int i = 0; i < bp_list.size(); i++) {
-    //     const auto bp = bp_list[i];
+    // for (int i = 0; i < scan_bp_list.size(); i++) {
+    //     const auto bp = scan_bp_list[i];
     //     try {
     //         example_GW_Spec(bp);
     //     } catch (std::exception& e) {
+    //         std::cout << "Failed on " << bp.name() << "!\n";
     //         fail_cases.push_back({bp.name(), e.what()});
     //     }
     // }
@@ -848,13 +868,11 @@ int main() {
     //     std::cout << fail_cases[i].first << ": " << fail_cases[i].second << "\n";
     // }
 
-    const auto bp = bp_list[6];
+    const auto bp = bp_list[5];
     const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
 
-    const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir() + "eos.csv");
-    // params_veff.plot_thermo("thermo.png");
-    // params_veff.plot_csq("csq.png");
+    const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
     const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
 
     // const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
@@ -864,8 +882,8 @@ int main() {
     // const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
 
     #ifdef ENABLE_MATPLOTLIB
-    const std::string filename_fp = bp.name() + ".png";
-    // Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
+    // const std::string filename_fp = "fp_" + bp.name() + ".png";
+    // Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp, 0.55, 0.6);
     // params_veff.plot_thermo2("thermo.png");
     // params_veff.plot_csq("csq.png");
     #endif
