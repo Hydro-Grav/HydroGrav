@@ -13,9 +13,8 @@
 #include <memory>
 
 // modify include list when testing of program finished - currently includes everything
-#include "hydrodynamics.hpp"
 #include "phasetransition.hpp"
-#include "spectrum.hpp"
+#include "ssm.hpp"
 #include "profile.hpp"
 #include "physics.hpp"
 #include "maths_ops.hpp"
@@ -744,8 +743,8 @@ int main() {
         0.573406, // vw_def
         // 0.73521, // vw_det
         118.632, // Ts
-        0.00295754, // alN_bag
-        0.002968, // alN_munu
+        0.00295754, // alN_bag (will)
+        0.002968, // alN_munu (will)
         2350.7934124242875, // beta/Hs
         1.9977e-14, // Hs
         0.575253 * 0.575253, // cpsq
@@ -868,7 +867,7 @@ int main() {
     //     std::cout << fail_cases[i].first << ": " << fail_cases[i].second << "\n";
     // }
 
-    const auto bp = bp_list[5];
+    const auto bp = scan_bp_list[2];
     const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
 
@@ -884,6 +883,7 @@ int main() {
     #ifdef ENABLE_MATPLOTLIB
     // const std::string filename_fp = "fp_" + bp.name() + ".png";
     // Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp, 0.55, 0.6);
+    // Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
     // params_veff.plot_thermo2("thermo.png");
     // params_veff.plot_csq("csq.png");
     #endif

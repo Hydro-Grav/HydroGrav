@@ -71,12 +71,11 @@ set(HEADERS
   include/constants.hpp
   include/CubicSpline.tpp
   include/deepphase.hpp
-  include/hydrodynamics.hpp
   include/maths_ops.hpp
   include/phasetransition.hpp
   include/physics.hpp
   include/profile.hpp
-  include/spectrum.hpp
+  include/ssm.hpp
   include/sici.hpp
   include/sici_arrays.hpp
   include/solvers.tpp

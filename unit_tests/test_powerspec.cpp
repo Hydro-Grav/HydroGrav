@@ -1,5 +1,6 @@
 #include "catch/catch.hpp"
-#include "spectrum.hpp"
+#include "ssm.hpp"
+#include "profile.hpp"
 #include "phasetransition.hpp"
 
 TEST_CASE("Tests functionality of the PowerSpec class.", "[powerSpec]") {

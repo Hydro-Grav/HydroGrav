@@ -1,6 +1,7 @@
 #include "catch/catch.hpp"
 #include <cmath>
-#include "hydrodynamics.hpp"
+
+#include "profile.hpp"
 #include "phasetransition.hpp"
 
 TEST_CASE("Tests the FluidProfile class for correct behavior and integration.", "[fluidProfile]") {

@@ -155,7 +155,7 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
       cpsq_(cpsq),
       cmsq_(cmsq) {
 
-      std::cout << "Note: PTParams_Bag must be given alN defined for Bag model!" << std::endl;
+      std::cout << "Storing phase transition parameters. Note that alN definition differs between bag and mu-nu models!\n\n";
 
       // check valid speed of sound
       if (!is_valid_csq(cpsq_)) {
@@ -285,7 +285,7 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfS
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
     : PTParams(vw, alN, TN, beta, Rs, nuc_type, un) {
     
-    std::cout << "Note: PTParams_Veff must be given alN defined for mu nu model!" << std::endl;
+    std::cout << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model!\n\n";
     initialize_from_eos_data(eos_data);
 }
 
@@ -395,12 +395,10 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   // const auto theta_b_bag = eb_val(1.0) - 3.0 * pb_val(1.0);
   // const auto alN_bag = (theta_s_bag - theta_b_bag) / (3.0 * ws_val(1.0));
 
-  // const auto theta_s = es_val(1.0) - ps_val(1.0) / cmsq_;
-  // const auto theta_b = eb_val(1.0) - pb_val(1.0) / cmsq_;
+  // const auto theta_s = es_val(1.0) - ps_val(1.0) / csq_b(1.0);
+  // const auto theta_b = eb_val(1.0) - pb_val(1.0) / csq_b(1.0);
   // const auto alN_munu = (theta_s - theta_b) / (3.0 * ws_val(1.0));
   // std::cout << "alN_bag=" << alN_bag << ", alN_munu=" << alN_munu << "\n";
-
-  std::cout << "Equation of state read successfully!\n";
 }
 
 // Public:
