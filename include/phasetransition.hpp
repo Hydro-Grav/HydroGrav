@@ -1,3 +1,13 @@
+/**
+ * @file phasetransition.hpp
+ * @brief Classes and helpers describing phase transition parameters,
+ *        equations of state, and universe properties.
+ *
+ * This header provides `Universe` and `PTParams` classes alongside
+ * default-parameter structs and EOS data structures used throughout the
+ * gravitational-wave calculations.
+ */
+
 // PhaseTransition.hpp
 #ifndef INCLUDE_PHASETRANSITION_HPP_H
 #define INCLUDE_PHASETRANSITION_HPP_H
@@ -20,6 +30,9 @@ TO DO:
 namespace PhaseTransition {
 
 // DO NOT CHANGE DEFAULT VALS
+/**
+ * @brief Default numerical values for the universe parameters in natural units (\f$\hbar=c=k_B=1\f$).
+ */
 struct dflt_universe { // in units hbar = c = kB = 1
   // values today
   static constexpr double T0 = 2.34914e-13; // 2.725 K / (1.16e+13 K/GeV) = 2.349e-13 GeV
@@ -65,11 +78,28 @@ class Universe {
     const double T0_, Ts_, g0_, gs_, H0_, Hs_;
 };
 
+/**
+ * @brief Retrieve a reference to default universe object.
+ */
 const Universe& default_universe();
 
+/**
+ * @brief Approximate mean bubble separation \f$R_*\f$ from wall velocity and
+ *        transition rate parameter.
+ *
+ * @param vw   Wall velocity.
+ * @param beta Inverse duration parameter of the phase transition.
+ * @return Approximate value of \f$R_*\f$.
+ */
 constexpr double Rs_approx(double vw, double beta) { return std::pow(8 * M_PI, 1. / 3.) * vw / beta; };
 
 // DO NOT CHANGE DEFAULT VALS
+/**
+ * @brief Default values for the phase transition parameters.
+ *
+ * These values are used when the user does not supply explicit PT
+ * parameters. They correspond to a benchmark point for xSM.
+ */
 struct dflt_PTParams {
   static constexpr double vw = 0.675122; // Wall velocity
   static constexpr double alN_bag = 0.0972393; // PT strength 
@@ -146,10 +176,25 @@ class PTParams {
     bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
 };
 
+/**
+ * @class PTParams_Bag
+ * @brief Phase transition parameters for the bag and mu-nu equations of state.
+ */
 class PTParams_Bag : public PTParams {
   public:
     // ctors
+    /**
+     * @brief Construct bag-model parameters with default sound speed.
+     *
+     * `cpsq` and `cmsq` default to 1/3 when not provided.
+     */
     PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un);
+    /**
+     * @brief Full constructor specifying speeds of sound squared.
+     *
+     * @param cpsq Sound speed squared in symmetric phase.
+     * @param cmsq Sound speed squared in broken phase.
+     */
     PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
 
     ModelType eos() const override { return ModelType::Bag; }
@@ -164,6 +209,14 @@ class PTParams_Bag : public PTParams {
     bool is_valid_csq(double csq) const;
 };
 
+/**
+ * @class EquationOfState
+ * @brief Container for thermodynamic data used by the Veff model.
+ *
+ * Holds temperature and pressure/energy density arrays along with
+ * factory methods for reading from a file. The data are used to build
+ * spline interpolants for various thermodynamic quantities.
+ */
 struct EquationOfState 
 {
   std::vector<double> T_vals;
@@ -172,6 +225,15 @@ struct EquationOfState
   std::vector<double> es_vals;
   std::vector<double> eb_vals;
 
+  /**
+   * @brief Construct an EquationOfState from tabulated data.
+   *
+   * @param T  Temperatures.
+   * @param ps Pressures in symmetric phase.
+   * @param pb Pressures in broken phase.
+   * @param es Energy densities in symmetric phase.
+   * @param eb Energy densities in broken phase.
+   */
   EquationOfState(
     const std::vector<double>& T,
     const std::vector<double>& ps,
@@ -179,8 +241,22 @@ struct EquationOfState
     const std::vector<double>& es,
     const std::vector<double>& eb);
 
+  /**
+   * @brief Load EOS data from a file and construct an EquationOfState.
+   *
+   * The file format must match that produced by the EOS preprocessing
+   * utilities.
+   *
+   * @param filename Path to data file.
+   * @return Constructed EquationOfState object.
+   */
   static EquationOfState from_file(const std::string& filename);
 
+  /**
+   * @brief Check whether the EOS data vectors are non-empty and consistent.
+   *
+   * @return `true` if the object contains valid data.
+   */
   bool is_valid() const;
   size_t size() const { return T_vals.size(); }
 
@@ -188,10 +264,23 @@ private:
   void validate() const;
 };
 
+/**
+ * @class PTParams_Veff
+ * @brief Phase transition parameters using a generic effective potential
+ *        equation of state.
+ */
 class PTParams_Veff : public PTParams {
 public:
   // These use the new eos_data
+  /**
+   * @brief Construct Veff-model parameters using EOS data.
+   *
+   * Beta and Rs are computed internally from the EOS.
+   */
   PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data);
+  /**
+   * @brief Full constructor feeding all GW parameters explicitly.
+   */
   PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
 
   // Backward compatibile
@@ -206,11 +295,17 @@ public:
   std::vector<double> veff_es_vals() const { return veff_es_vals_; }
   std::vector<double> veff_eb_vals() const { return veff_eb_vals_; }
 
+  /** @brief Pressure in symmetric phase at given T/TN. */
   double ps_val(double TTN) const { return alglib::spline1dcalc(veff_ps_interp_, TTN); }
+  /** @brief Pressure in broken phase at given T/TN. */
   double pb_val(double TTN) const { return alglib::spline1dcalc(veff_pb_interp_, TTN); }
+  /** @brief Energy density in symmetric phase at given T/TN. */
   double es_val(double TTN) const { return alglib::spline1dcalc(veff_es_interp_, TTN); }
+  /** @brief Energy density in broken phase at given T/TN. */
   double eb_val(double TTN) const { return alglib::spline1dcalc(veff_eb_interp_, TTN); }
+  /** @brief Enthalpy density in symmetric phase. */
   double ws_val(double TTN) const { return alglib::spline1dcalc(veff_ws_interp_, TTN); }
+  /** @brief Enthalpy density in broken phase. */
   double wb_val(double TTN) const { return alglib::spline1dcalc(veff_wb_interp_, TTN); }
 
   double TTN_min() const { return veff_TTN_vals_.front(); }

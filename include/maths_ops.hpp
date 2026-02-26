@@ -147,6 +147,17 @@ private:
  */
 std::vector<double> linspace(double start, double end, std::size_t num=100);
 
+/**
+ * @brief Generate a vector of logarithmically spaced values.
+ *
+ * Similar to Python's `numpy.logspace`, this function returns `num`
+ * points spaced evenly on a log scale between `start` and `stop`.
+ *
+ * @param start Starting exponent value (base e).
+ * @param stop  Ending exponent value (base e).
+ * @param num   Number of points to generate.
+ * @return Vector of length `num`.
+ */
 std::vector<double> logspace(double start, double stop, std::size_t num=100);
 
 /**
@@ -160,12 +171,50 @@ std::vector<double> logspace(double start, double stop, std::size_t num=100);
  */
 double power(double x, int exp);
 
+/**
+ * @brief Convert a floating-point value to string with fixed precision.
+ *
+ * @param value     Value to convert.
+ * @param precision Number of decimal places.
+ * @return Formatted string.
+ */
 std::string to_string_with_precision(double value, int precision = 2);
 
+/**
+ * @brief Integrate y(x) using Simpson's rule on a non-uniform grid.
+ *
+ * @param x Independent variable samples.
+ * @param y Function values corresponding to `x`.
+ * @return Approximate integral \f$\int y\,dx\f$.
+ */
 double simpson_integrate(const std::vector<double>& x, const std::vector<double>& y);
+/**
+ * @brief Two–dimensional Simpson integration over a mesh defined by `x` and `y`.
+ *
+ * @param x Vector of x coordinates.
+ * @param y Vector of y coordinates.
+ * @param f Matrix of function values of size `x.size()` × `y.size()`.
+ * @return Double integral estimate.
+ */
 double simpson_2d_integrate(const std::vector<double>& x, const std::vector<double>& y, const std::vector<std::vector<double>>& f);
+/**
+ * @brief Simpson integration for 2D data supplied as a flattened array.
+ *
+ * @param x Vector of x coordinates.
+ * @param y Vector of y coordinates.
+ * @param f_flat Flattened function values (row-major order).
+ * @return Estimated integral.
+ */
 double simpson_2d_integrate_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat);
 
+/**
+ * @struct SimpsonWeights2D
+ * @brief Precomputed weight matrices used by weighted 2D Simpson integrator.
+ *
+ * `Ax_weights` and `Ay_weights` store coefficient triples for each
+ * interval in the x- and y-directions respectively.  `dx` and `dy`
+ * hold the corresponding interval sizes.
+ */
 struct SimpsonWeights2D {
     std::vector<std::vector<double>> Ax_weights; // size: (nx-2) x 3
     std::vector<std::vector<double>> Ay_weights; // size: (ny-2) x 3
@@ -173,15 +222,36 @@ struct SimpsonWeights2D {
     std::vector<double> dy;  // size: ny-2
 };
 
+/**
+ * @brief Compute 1D Simpson weight coefficients for a non-uniform grid.
+ *
+ * @param coords    Coordinate values.
+ * @param weights   Output weight matrix (Nx3).
+ * @param intervals Output vector of interval widths.
+ */
 void precompute_1d_weights(
     const std::vector<double>& coords,
     std::vector<std::vector<double>>& weights,
     std::vector<double>& intervals);
 
+/**
+ * @brief Generate 2D Simpson weights for use with weighted integration.
+ *
+ * @param x Vector of x coordinates.
+ * @param y Vector of y coordinates.
+ * @return Struct containing precomputed weights and intervals.
+ */
 SimpsonWeights2D precompute_simpson_weights_2d(
     const std::vector<double>& x,
     const std::vector<double>& y);
 
+/**
+ * @brief Weighted Simpson integration for flattened 2D data on a
+ *        non-uniform grid.
+ *
+ * Uses precomputed weight matrices produced by
+ * `precompute_simpson_weights_2d`.
+ */
 double simpson_2d_nonuniform_flat_weighted(
     const std::vector<double>& x,                        // full x vector, size nx
     const std::vector<double>& y,                        // full y vector, size ny
@@ -192,11 +262,47 @@ double simpson_2d_nonuniform_flat_weighted(
     const std::vector<double>& dy                        // size (ny-2)/2
 );
 
+/**
+ * @brief Compute the sine integral Si(x) using cached routines.
+ *
+ * @param x Argument value.
+ * @return Si(x).
+ */
 double Si(double x);
+/**
+ * @brief Compute the cosine integral Ci(x) using cached routines.
+ *
+ * @param x Argument value.
+ * @return Ci(x).
+ */
 double Ci(double x);
+/**
+ * @brief Return both Si(x) and Ci(x) as a pair.
+ *
+ * Optionally specify number of integration points used in fallback
+ * algorithms.
+ */
 std::pair<double, double> SiCi(double x, const size_t n=1000);
+/**
+ * @brief Compute derivatives of Si and Ci with respect to their inputs.
+ *
+ * @param x First argument.
+ * @param y Second argument.
+ * @param n Number of points for numeric differentiation.
+ * @return A vector containing the derivatives.
+ */
 std::vector<double> dSiCi(double x, double y, const size_t n);
 
+/**
+ * @brief Simple bisection root finder for a continuous function.
+ *
+ * @param f        Function for which the root is sought.
+ * @param a        Lower bracket.
+ * @param b        Upper bracket.
+ * @param tol      Tolerance for convergence.
+ * @param max_iter Maximum number of iterations.
+ * @return Approximate root value.
+ */
 double root_finder(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 double root_finder_new(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 
