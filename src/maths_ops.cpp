@@ -895,7 +895,8 @@ std::array<double, 2> find_bracket(const std::function<double(double)>& residual
     
     // Alternative check: scan for any interior local minimum in the segment
     if (!has_turning_point) {
-        for (int j = S.i0 + 1; j < S.i1; ++j) {
+        // for (int j = S.i0 + 1; j < S.i1; ++j) {
+        for (int j = S.i0; j < S.i1; ++j) {
             if (ys[j] < ys[j - 1] && ys[j] < ys[j + 1]) {
                 has_turning_point = true;
                 break;
