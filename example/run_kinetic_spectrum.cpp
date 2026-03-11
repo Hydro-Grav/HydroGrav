@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
     const Hydrodynamics::FluidProfile profile(params);
 
     // Momentum values
-    const auto kRs_vals = logspace(1e-1, 1e+3, 100);
+    const auto kRs_vals = logspace(-1.0, 3.0, 100);
 
     // Kinetic power spectrum
     Spectrum::PowerSpec Ek = Spectrum::Ekin(kRs_vals, profile);

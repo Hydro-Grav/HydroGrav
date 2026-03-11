@@ -158,7 +158,7 @@ std::vector<double> linspace(double start, double end, std::size_t num=100);
  * @param num   Number of points to generate.
  * @return Vector of length `num`.
  */
-std::vector<double> logspace(double start, double stop, std::size_t num=100);
+std::vector<double> logspace(double log_start, double log_end, std::size_t num=100);
 
 /**
  * @brief Computes x raised to an integer exponent.

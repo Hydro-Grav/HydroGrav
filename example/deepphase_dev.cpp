@@ -97,7 +97,7 @@ class benchmark_point {
 // Fluid profile
 void example_FluidProfile(const benchmark_point& bp) {
     const auto dir = bp.dir();
-    const auto veff_file = dir + "eos.csv";
+    const auto veff_file = dir;
 
     const auto vw = bp.vw();
     const auto Ts = bp.Ts();
@@ -127,7 +127,7 @@ void example_FluidProfile(const benchmark_point& bp) {
     // profile_bag.write("prof_bag.csv");
 
     const Hydrodynamics::FluidProfile profile_munu(params_munu);
-    // profile_munu.plot("profile_munu.png");
+    // profile_munu.plot("fp_" + bp.name() + "_new.png");
     // profile_munu.write("prof_munu.csv");
 
     const Hydrodynamics::FluidProfile profile_veff(params_veff); // veff
@@ -146,8 +146,8 @@ void example_FluidProfile(const benchmark_point& bp) {
               << "cpsq (veff) = " << params_veff.csq_s(1.06728) << ", cmsq (veff) = " << params_veff.csq_b(1.0164) << "\n";
 
     #ifdef ENABLE_MATPLOTLIB
-    // const auto filename = bp.dir() + "profile_" + profile_bag.mode_str() + ".png";
-    const auto filename = "fp.png";
+    const auto filename = bp.dir() + "profile_" + profile_bag.mode_str() + ".png";
+    // const auto filename = "fp.png";
     Hydrodynamics::plot_profiles(profile_bag, profile_munu, profile_veff, filename, 0.585, 0.605);
     #endif
 }
@@ -175,7 +175,7 @@ void example_GW_Spec(const benchmark_point& bp) {
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
     // Define GW spectrum
-    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
         const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
         const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
@@ -196,7 +196,7 @@ void example_GW_Spec(const benchmark_point& bp) {
     // const std::string filename_fp = dir + "fp_" + OmegaGW_veff.profile().mode_str() + ".png";
     // const std::string filename_gw = dir + "gw_" + OmegaGW_veff.profile().mode_str() + ".png";
     const std::string filename_fp = "fp_" + bp.name() + ".png";
-    const std::string filename_gw = "gw_" + bp.name() + ".png";
+    const std::string filename_gw = "gw_" + bp.name() + "_new.png";
     Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
     Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, filename_gw);
     #endif
@@ -284,7 +284,7 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
     const auto TN = Ts;
 
-    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
     // parameter range
     std::uniform_real_distribution<double> vw_distr(0.001, 0.999);
@@ -352,7 +352,7 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
 
 void compare_dtau_calc(const benchmark_point& bp) {
 
-    const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
     // bag
     auto params_bag_ptr = bp.get_PTParams_Bag();
@@ -389,7 +389,7 @@ void gw_param_scan(const std::vector<benchmark_point>& bp_list, const std::strin
          << "snr_bag,snr_munu,snr_veff,df_peak_bag,df_peak_munu,dOmega_peak_bag,dOmega_peak_munu,"
          << "L1_bag,L1_munu,L2_bag,L2_munu,W1_bag,W1_munu\n";
 
-    const auto kRs_vals = logspace(1e-3, 1e+3, 200);
+    const auto kRs_vals = logspace(-3.0, 3.0, 200);
 
     for (const auto& bp : bp_list) {
         // define PT parameters
@@ -1071,48 +1071,402 @@ int main() {
         "parameter_scan/eos_scan2/eos_111.856000_0.920614.csv"
     );
 
+    benchmark_point scan3_BP0(
+        0.424034227585217,
+        42.4833159363108,
+        0.0524864082888102,
+        0.0521341022362761,
+        3425.71897510552,
+        2.65136823153231e-15,
+        0.569099271949071 * 0.569099271949071,
+        0.580678905077911 * 0.580678905077911,
+        gs,
+        nuc_type,
+        "scan3_BP0",
+        "parameter_scan/eos_scan3/bad_eos/eos_86.463300_0.815641.csv"
+    );
+
+    benchmark_point scan3_BP1(
+        0.591215456228598,
+        43.6364350814534,
+        0.0697386824723006,
+        0.0695952535344496,
+        1861.81925679229,
+        2.82256805440367e-15,
+        0.569405413616819 * 0.569405413616819,
+        0.578317311888028 * 0.578317311888028,
+        gs,
+        nuc_type,
+        "scan3_BP1",
+        "parameter_scan/eos_scan3/bad_eos/eos_90.300400_0.828345.csv"
+    );
+
+    benchmark_point scan3_BP2(
+        0.653061873774833,
+        45.4737384453901,
+        0.0782957447474071,
+        0.0786390701387317,
+        1109.54482304556,
+        3.081674246438e-15,
+        0.569819674068506 * 0.569819674068506,
+        0.575315998510338 * 0.575315998510338,
+        gs,
+        nuc_type,
+        "scan3_BP2",
+        "parameter_scan/eos_scan3/bad_eos/eos_93.951300_0.840716.csv"
+    );
+
+    benchmark_point scan3_BP3(
+        0.714907232835199,
+        43.5017326427126,
+        0.104168292454918,
+        0.103874305817539,
+        762.744208436858,
+        2.84678740435448e-15,
+        0.569430234580891 * 0.569430234580891,
+        0.578590568293944 * 0.578590568293944,
+        gs,
+        nuc_type,
+        "scan3_BP3",
+        "parameter_scan/eos_scan3/bad_eos/eos_97.126100_0.855474.csv"
+    );
+
+    benchmark_point scan3_BP4(
+        0.714180830765479,
+        50.5562498790412,
+        0.0779077030974728,
+        0.079080634417694,
+        484.185141122048,
+        3.81570945891244e-15,
+        0.570759266512843 * 0.570759266512843,
+        0.570324267725689 * 0.570324267725689,
+        gs,
+        nuc_type,
+        "scan3_BP4",
+        "parameter_scan/eos_scan3/bad_eos/eos_102.185000_0.871710.csv"
+    );
+
+    benchmark_point scan3_BP5(
+        0.744648046347456,
+        47.9752859785928,
+        0.0956335088045258,
+        0.0966920287228332,
+        435.363580582639,
+        3.46056323174485e-15,
+        0.570333816555551 * 0.570333816555551,
+        0.572383002196562 * 0.572383002196562,
+        gs,
+        nuc_type,
+        "scan3_BP5",
+        "parameter_scan/eos_scan3/bad_eos/eos_103.074000_0.878137.csv"
+    );
+
+    benchmark_point scan3_BP6(
+        0.781296132210045,
+        47.1428455093062,
+        0.114530743197856,
+        0.11560465816251,
+        311.885297906255,
+        3.36745875576192e-15,
+        0.570199039380077 * 0.570199039380077,
+        0.573257328971889 * 0.573257328971889,
+        gs,
+        nuc_type,
+        "scan3_BP6",
+        "parameter_scan/eos_scan3/bad_eos/eos_107.153000_0.898598.csv"
+    );
+
+    benchmark_point scan3_BP7(
+        0.548765588044471,
+        126.788721271538,
+        0.00175159918753548,
+        0.00175511448748998,
+        3090.90060092291,
+        2.2778244074639e-14,
+        0.575472173939423 * 0.575472173939423,
+        0.571614141750257 * 0.571614141750257,
+        gs,
+        nuc_type,
+        "scan3_BP7",
+        "parameter_scan/eos_scan3/bad_eos/eos_119.501000_0.839315.csv"
+    );
+
+    benchmark_point scan3_BP8(
+        0.55313749583814,
+        126.088263677203,
+        0.00184340073145435,
+        0.0018473660292793,
+        2753.10679150686,
+        2.25304234185504e-14,
+        0.57544931477567 * 0.57544931477567,
+        0.571566514056531 * 0.571566514056531,
+        gs,
+        nuc_type,
+        "scan3_BP8",
+        "parameter_scan/eos_scan3/bad_eos/eos_121.234000_0.854576.csv"
+    );
+
+    benchmark_point scan3_BP9(
+        0.562182571359414,
+        140.27297767704,
+        0.000451703770559099,
+        0.000451954212443167,
+        7368.52225877582,
+        2.78178073618762e-14,
+        0.576638720544239 * 0.576638720544239,
+        0.572988161588945 * 0.572988161588945,
+        gs,
+        nuc_type,
+        "scan3_BP9",
+        "parameter_scan/eos_scan3/bad_eos/eos_122.655000_0.829474.csv"
+    );
+
+    benchmark_point scan3_BP10(
+        0.55819859823755,
+        124.763794685288,
+        0.00202014236318521,
+        0.00202498946643498,
+        2474.71702877477,
+        2.20655262818198e-14,
+        0.575412049657847 * 0.575412049657847,
+        0.571487608970243 * 0.571487608970243,
+        gs,
+        nuc_type,
+        "scan3_BP10",
+        "parameter_scan/eos_scan3/bad_eos/eos_123.398000_0.874963.csv"
+    );
+
+    benchmark_point scan3_BP11(
+        0.560331326707943,
+        137.464810537926,
+        0.000695102425340838,
+        0.000695751416132317,
+        5347.25238020574,
+        2.67271576109664e-14,
+        0.575712912419011 * 0.575712912419011,
+        0.57200777409572 * 0.57200777409572,
+        gs,
+        nuc_type,
+        "scan3_BP11",
+        "parameter_scan/eos_scan3/bad_eos/eos_125.536000_0.860363.csv"
+    );
+
+    benchmark_point scan3_BP12(
+        0.561820624700799,
+        136.831749909775,
+        0.000741970429636302,
+        0.00074270989804963,
+        4780.98298208269,
+        2.64837260343305e-14,
+        0.575774595343358 * 0.575774595343358,
+        0.572115479512002 * 0.572115479512002,
+        gs,
+        nuc_type,
+        "scan3_BP12",
+        "parameter_scan/eos_scan3/bad_eos/eos_128.661000_0.888760.csv"
+    );
+
+    benchmark_point scan3_BP13(
+        0.580906244923419,
+        126.980003343966,
+        0.00180937492276206,
+        0.00181429273706598,
+        1519.48449769515,
+        2.28472229809105e-14,
+        0.575195639726464 * 0.575195639726464,
+        0.571228965647879 * 0.571228965647879,
+        gs,
+        nuc_type,
+        "scan3_BP13",
+        "parameter_scan/eos_scan3/bad_eos/eos_148.818000_1.097190.csv"
+    );
+
+    benchmark_point scan3_BP14(
+        0.57051788160334,
+        134.667059569115,
+        0.000894747706780823,
+        0.000896056374203199,
+        2542.90395058529,
+        2.5658996207417e-14,
+        0.575424298550776 * 0.575424298550776,
+        0.571522408659435 * 0.571522408659435,
+        gs,
+        nuc_type,
+        "scan3_BP14",
+        "parameter_scan/eos_scan3/bad_eos/eos_150.239000_1.098110.csv"
+    );
+
+    benchmark_point scan3_BP15(
+        0.581028335518798,
+        127.375343815094,
+        0.00175790967388128,
+        0.00176267755098547,
+        1516.28234562835,
+        2.29878378934788e-14,
+        0.575079946151881 * 0.575079946151881,
+        0.571138872336147 * 0.571138872336147,
+        gs,
+        nuc_type,
+        "scan3_BP15",
+        "parameter_scan/eos_scan3/bad_eos/eos_150.371000_1.112020.csv"
+    );
+
+    benchmark_point scan3_BP16(
+        0.612834790344668,
+        114.101357387217,
+        0.00412426377578814,
+        0.00414644653653141,
+        683.044309458343,
+        1.85061458035062e-14,
+        0.574927503070381 * 0.574927503070381,
+        0.570620944017831 * 0.570620944017831,
+        gs,
+        nuc_type,
+        "scan3_BP16",
+        "parameter_scan/eos_scan3/bad_eos/eos_153.187000_1.162030.csv"
+    );
+
+    benchmark_point scan3_BP17(
+        0.597688035913066,
+        122.938148687558,
+        0.0024206435070742,
+        0.00242940543861108,
+        1011.36088079302,
+        2.14349027429355e-14,
+        0.575041461142732 * 0.575041461142732,
+        0.570966485627116 * 0.570966485627116,
+        gs,
+        nuc_type,
+        "scan3_BP17",
+        "parameter_scan/eos_scan3/bad_eos/eos_156.730000_1.184500.csv"
+    );
+
+    benchmark_point scan3_BP18(
+        0.608827583430373,
+        118.736820123508,
+        0.00317023280309733,
+        0.00318444281719968,
+        782.197819931002,
+        2.00154715709996e-14,
+        0.574978517919574 * 0.574978517919574,
+        0.570800995194272 * 0.570800995194272,
+        gs,
+        nuc_type,
+        "scan3_BP18",
+        "parameter_scan/eos_scan3/bad_eos/eos_157.389000_1.197710.csv"
+    );
+
+    benchmark_point scan3_BP19(
+        0.60011975917346,
+        122.386620581492,
+        0.00251460809469135,
+        0.00252405564959401,
+        947.197574440905,
+        2.12457707364485e-14,
+        0.575013475943456 * 0.575013475943456,
+        0.570928750245745 * 0.570928750245745,
+        gs,
+        nuc_type,
+        "scan3_BP19",
+        "parameter_scan/eos_scan3/bad_eos/eos_158.006000_1.198680.csv"
+    );
+
+    benchmark_point scan3_BP20(
+        0.58372944603808,
+        128.730217899208,
+        0.00157068882982505,
+        0.00157433556736908,
+        1355.65779801245,
+        2.34723770061459e-14,
+        0.575677851051611 * 0.575677851051611,
+        0.571704643833846 * 0.571704643833846,
+        gs,
+        nuc_type,
+        "scan3_BP20",
+        "parameter_scan/eos_scan3/bad_eos/eos_158.669000_1.196200.csv"
+    );
+
+    benchmark_point scan3_BP21(
+        0.603831570353577,
+        123.809888969341,
+        0.00228385253364145,
+        0.0022926182995402,
+        693.423786205566,
+        2.17350728349524e-14,
+        0.574736536836366 * 0.574736536836366,
+        0.570581563613331 * 0.570581563613331,
+        gs,
+        nuc_type,
+        "scan3_BP21",
+        "parameter_scan/eos_scan3/bad_eos/eos_172.086000_1.352690.csv"
+    );
+
+    benchmark_point scan3_BP22(
+        0.610153896286683,
+        123.066624923648,
+        0.00240983782442729,
+        0.00241926505671368,
+        663.093233187663,
+        2.14787125307176e-14,
+        0.574724624669337 * 0.574724624669337,
+        0.570713419564649 * 0.570713419564649,
+        gs,
+        nuc_type,
+        "scan3_BP22",
+        "parameter_scan/eos_scan3/bad_eos/eos_172.123000_1.353910.csv"
+    );
+
     // NOTE: Old BPs will be broken since order of 's' and 'b' in veff eos switched when reading it in -> update veff eos files
     std::vector<benchmark_point> bp_list = {BP0_def, BP0_hyb, BP0_det, BP1_hyb, BP1_det, BP2_hyb, BP2_det, BP2_det_new, BP3, BP4, BP5, BP6, BP7};
     std::vector<benchmark_point> scan_bp_list = {scan_BP0, scan_BP1, scan_BP2, scan_BP3, scan_BP4, scan_BP5, scan_BP6, scan_BP7, scan_BP8};
     std::vector<benchmark_point> scan2_bp_list = {scan2_BP0, scan2_BP1, scan2_BP2, scan2_BP3, scan2_BP4, scan2_BP5, scan2_BP6, scan2_BP7, 
                                                   scan2_BP8, scan2_BP9, scan2_BP10, scan2_BP11, scan2_BP12, scan2_BP13, scan2_BP14};
-    // gw_param_scan(bp_list, "gw_param_scan.csv");
+    std::vector<benchmark_point> scan3_bp_list = {scan3_BP0, scan3_BP1, scan3_BP2, scan3_BP3, scan3_BP4, scan3_BP5, scan3_BP6, scan3_BP7, 
+                                                  scan3_BP8, scan3_BP9, scan3_BP10, scan3_BP11, scan3_BP12, scan3_BP13, scan3_BP14, 
+                                                  scan3_BP15, scan3_BP16, scan3_BP17, scan3_BP18, scan3_BP19, scan3_BP20, 
+                                                  scan3_BP21, scan3_BP22};
 
-    std::vector<std::pair<std::string, std::string>> fail_cases;
-    for (int i = 0; i < scan2_bp_list.size(); i++) {
-        const auto bp = scan2_bp_list[i];
-        try {
-            example_GW_Spec(bp);
-        } catch (std::exception& e) {
-            std::cout << "Failed on " << bp.name() << "!\n";
-            fail_cases.push_back({bp.name(), e.what()});
-        }
-    }
+    // std::vector<std::pair<std::string, std::string>> fail_cases;
+    // for (int i = 0; i < scan3_bp_list.size(); i++) {
+    //     const auto bp = scan3_bp_list[i];
+    //     try {
+    //         example_GW_Spec(bp);
+    //         // example_FluidProfile(bp);
+    //     } catch (std::exception& e) {
+    //         std::cout << "Failed on " << bp.name() << "!\n";
+    //         fail_cases.push_back({bp.name(), e.what()});
+    //     }
+    // }
 
-    std::cout << "Fail Cases:\n";
-    for (int i = 0; i < fail_cases.size(); i++) {
-        std::cout << fail_cases[i].first << ": " << fail_cases[i].second << "\n";
-    }
+    // std::cout << "Fail Cases:\n";
+    // for (int i = 0; i < fail_cases.size(); i++) {
+    //     std::cout << fail_cases[i].first << ": " << fail_cases[i].second << "\n";
+    // }
 
-    // const auto bp = scan2_bp_list[7];
-    // const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
-    // const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    const auto bp = scan3_bp_list[0];
+    const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
+    const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
-    // const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
-    // const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
+    const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
+    const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
+    // const auto OmegaGW_veff = Spectrum::Ekin(kRs_vals, params_veff);
+    OmegaGW_veff.profile().write("fp_" + bp.name() + "_veff.csv");
 
-    // const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
-    // const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
+    const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
+    const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
+    // const auto OmegaGW_bag = Spectrum::Ekin(kRs_vals, params_bag);
 
-    // const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.cpsq(), bp.cmsq());
-    // const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
+    const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.cpsq(), bp.cmsq());
+    const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
+    // const auto OmegaGW_munu = Spectrum::Ekin(kRs_vals, params_munu);
+    OmegaGW_munu.profile().write("fp_" + bp.name() + "_munu.csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    // const std::string filename_fp = "fp_" + bp.name() + ".png";
-    // Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp, 0.829, 0.83);
-    // Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
-    // params_veff.plot_thermo2("thermo.png");
-    // params_veff.plot_csq("csq.png");
+    const std::string filename_fp = "fp_" + bp.name() + ".png";
+    Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp, 0.4, 0.6);
+    Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
+    params_veff.plot_thermo2("thermo.png");
+    params_veff.plot_csq("csq.png");
     #endif
     
 
@@ -1122,7 +1476,7 @@ int main() {
     //     const auto bp = scan_bp_list[i];
 
     //     const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
-    //     const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+    //     const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
     //     const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
     //     const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);

@@ -20,7 +20,7 @@ int main() {
         PhaseTransition::PTParams_Bag params_exp(vw, alN, TN, beta, Rs, "exp", un, 1./3., 1./3.);
         PhaseTransition::PTParams_Bag params_sim(vw, alN, TN, beta, Rs, "sim", un, 1./3., 1./3.);
 
-        const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+        const auto kRs_vals = logspace(-3.0, 3.0, 100);
         Spectrum::PowerSpec OmegaGW_exp = Spectrum::zetaKin(kRs_vals, params_exp);
         Spectrum::PowerSpec OmegaGW_sim = Spectrum::zetaKin(kRs_vals, params_sim);
 
@@ -42,7 +42,7 @@ int main() {
 
             const PhaseTransition::Universe un;
 
-            const auto kRs_vals = logspace(1e-3, 1e+3, 100);
+            const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
             try {
             PhaseTransition::PTParams_Bag params_01(vw, 0.1, TN, beta, Rs, "exp", un, 1./3., 1./3.);

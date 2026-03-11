@@ -483,12 +483,12 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto nk = kRs_vals.size();
 
-    const auto pRs_vals = logspace(config::pRs_minimum, config::pRs_maximum, config::n_pRs); // P = p*Rs
+    const auto pRs_vals = logspace(log10(config::pRs_minimum), log10(config::pRs_maximum), config::n_pRs); // P = p*Rs
 
     const auto kinetic_spectrum_spline_lower_bound = (1.0 - config::kinetic_spectrum_spline_factor) * find_min_pt(kRs_vals, pRs_vals);
     const auto kinetic_spectrum_spline_upper_bound = (1.0 + config::kinetic_spectrum_spline_factor) * ptilde(kRs_vals.back(), pRs_vals.back(), -1.0);
 
-    const auto kinetic_spectrum_K_values = logspace(kinetic_spectrum_spline_lower_bound, kinetic_spectrum_spline_upper_bound, config::kinetic_spectrum_spline_points);
+    const auto kinetic_spectrum_K_values = logspace(log10(kinetic_spectrum_spline_lower_bound), log10(kinetic_spectrum_spline_upper_bound), config::kinetic_spectrum_spline_points);
 
     alglib::spline1dinterpolant log_zk_spline;
     build_kinetic_spectrum_spline(kinetic_spectrum_K_values, profile, log_zk_spline);
@@ -496,6 +496,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
     const auto prefac = gw_prefac(kRs_vals, profile);
+    std::cout << "prefac=" << prefac << "\n";
 
     std::vector<double> GW_P_vals(nk);
     
@@ -609,7 +610,7 @@ std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vecto
 
     // integrand becomes very large for small tau -> use logspace for accuracy of integration
     // const auto nt = 50;
-    const auto tau_vals = logspace(tau_s, tau_fin, nt);
+    const auto tau_vals = logspace(log10(tau_s), log10(tau_fin), nt);
     const auto ntsq = nt * nt;
 
     const auto nk = k_vals.size();
@@ -727,7 +728,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
 
-    const auto chi_vals = logspace(config::chi_min, config::chi_max, config::chi_points);
+    const auto chi_vals = logspace(log10(config::chi_min), log10(config::chi_max), config::chi_points);
     const auto n = chi_vals.size();
 
     const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
@@ -800,7 +801,7 @@ double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
     // tau_nl ~ Rs / sqrt(Omega_K)
     // Omega_K = avg kinetic energy of sound waves
     const auto Rs = prof.params()->Rs();
-    const auto kRs_vals = logspace(config::kRs_minimum, config::kRs_maximum, config::n_kRs);
+    const auto kRs_vals = logspace(log10(config::kRs_minimum), log10(config::kRs_maximum), config::n_kRs);
 
     const auto Ek = Ekin(kRs_vals, prof);
     const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());    
@@ -822,6 +823,8 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
     // Normalised kinetic energy density OmegaK / KK (eq 42 arXiv:2308.12943)
     // OmegaK = total kinetic energy density, KK = critical energy density
     const auto OmegaK_KK = Ekin_max / Rs;
+
+    std::cout << "Ekin_max=" << Ekin_max << ", wNeN_rat=" << wNeN_rat << "\n";
     
     return 3.0 * wNeN_rat * wNeN_rat * TGW * OmegaK_KK * OmegaK_KK;
 }

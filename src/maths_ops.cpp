@@ -58,12 +58,12 @@ std::vector<double> linspace(double start, double end, std::size_t num) {
     return result;
 }
 
-std::vector<double> logspace(double start, double stop, std::size_t num) {
+std::vector<double> logspace(double log_start, double log_end, std::size_t num) {
     std::vector<double> result;
-    double log_start = std::log10(start);  // Log of the start value
-    double log_stop = std::log10(stop);    // Log of the stop value
+    // double log_start = std::log10(start);  // Log of the start value
+    // double log_stop = std::log10(stop);    // Log of the stop value
 
-    double step = (log_stop - log_start) / (num - 1);  // Step size in log space
+    double step = (log_end - log_start) / (num - 1);  // Step size in log space
 
     for (size_t i = 0; i < num; ++i) {
         double log_val = log_start + i * step;     // Calculate log value at step i
