@@ -520,9 +520,9 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 }
 
 size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi, const double tol) const {
-    if (test_resi) {
-        test_shock_bag(v_sol, y_sol);
-    }
+    // if (test_resi) {
+    //     test_shock_bag(v_sol, y_sol);
+    // }
 
     std::vector<double> resi_vals(v_sol.size());
     int pass_count = 0;
@@ -1355,16 +1355,21 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 
     // update final point manually where dxidv is singular
     if (mode_ != 0) {
-        
         w_end_val = w_sol_tmp.back() - dwdv(std::sqrt(cmsq_), 0.0, w_end_val, cmsq_) * v_sol_tmp.back();
         T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(cmsq_), 0.0, T_end_val, cmsq_) * v_sol_tmp.back();
         la_end_val = lambda_b(w_end_val);
 
-        v_sol_tmp.push_back(0.0);
-        xi_sol_tmp.push_back(std::sqrt(cmsq_));
-        w_sol_tmp.push_back(w_end_val);
-        T_sol_tmp.push_back(T_end_val);
-        la_sol_tmp.push_back(la_end_val);
+        // v_sol_tmp.push_back(0.0);
+        // xi_sol_tmp.push_back(std::sqrt(cmsq_));
+        // w_sol_tmp.push_back(w_end_val);
+        // T_sol_tmp.push_back(T_end_val);
+        // la_sol_tmp.push_back(la_end_val);
+        const size_t idx = v_sol_tmp.size() - 1; // index of last point
+        v_sol_tmp[idx] = 0.0;
+        xi_sol_tmp[idx] = std::sqrt(cmsq_);
+        w_sol_tmp[idx] = w_end_val;
+        T_sol_tmp[idx] = T_end_val;
+        la_sol_tmp[idx] = la_end_val;
 
         xif = xi_sol_tmp.back();
     }
@@ -1569,6 +1574,8 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         const auto ics = get_IC_detonation_veff();
         const auto vmUF = ics.first;
         const auto y0 = ics.second; // {xi_w, wmwN, TmTN}
+        // const auto vmUF = 0.0482328;
+        // const state_type y0 = {vw_, 1.11616, 1.02874};
 
         // solver
         const auto sol = rk4_solver(dydv, vmUF, 1e-10, y0, n);
@@ -1597,9 +1604,9 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
 
-        // std::cout << "Detonation profile:\n"
-        //           << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
-        //           << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n";
+        std::cout << "Detonation profile:\n"
+                  << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
+                  << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n";
     }
 
     if (mode_ != 0) {
@@ -1608,11 +1615,19 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(veff_params_->csq_b(T_end_val)), 0.0, T_end_val, veff_params_->csq_b(T_end_val)) * v_sol_tmp.back();
         la_end_val = lambda_b_veff(T_end_val, eN, wN_inv);
 
-        v_sol_tmp.push_back(0.0);
-        xi_sol_tmp.push_back(std::sqrt(veff_params_->csq_b(T_end_val)));
-        w_sol_tmp.push_back(w_end_val);
-        T_sol_tmp.push_back(T_end_val);
-        la_sol_tmp.push_back(la_end_val);
+        // std::cout << "w_end_val (corrected) = " << w_end_val << ", T_end_val (corrected) = " << T_end_val << "\n";
+
+        // v_sol_tmp.push_back(0.0);
+        // xi_sol_tmp.push_back(std::sqrt(veff_params_->csq_b(T_end_val)));
+        // w_sol_tmp.push_back(w_end_val);
+        // T_sol_tmp.push_back(T_end_val);
+        // la_sol_tmp.push_back(la_end_val);
+        const size_t idx = v_sol_tmp.size() - 1; // index of last point
+        v_sol_tmp[idx] = 0.0;
+        xi_sol_tmp[idx] = std::sqrt(veff_params_->csq_b(T_end_val));
+        w_sol_tmp[idx] = w_end_val;
+        T_sol_tmp[idx] = T_end_val;
+        la_sol_tmp[idx] = la_end_val;
 
         xif = xi_sol_tmp.back();
     }
