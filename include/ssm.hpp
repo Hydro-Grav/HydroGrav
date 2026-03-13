@@ -145,11 +145,6 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
  */
 double ff(double tau_m, double kcs);
 
-/**
- * @brief Compute the 3D delta function integrals used in SSM formulas.
- */
-std::vector<std::vector<std::vector<double>>> dlt(const int nt, const std::vector<double>& k_vals, const std::vector<double>& p_vals, const std::vector<double>& z_vals, const PhaseTransition::PTParams& params);
-
 double dlt_SSM(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin);
 
 /**
