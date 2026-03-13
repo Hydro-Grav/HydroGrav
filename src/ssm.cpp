@@ -87,6 +87,13 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     const auto &v_vals  = prof.v_vals();
     const auto &la_vals = prof.la_vals();
 
+    const double xi_min = prof.xi_min();
+    const double xi_max = prof.xi_max();
+    const double vw = prof.params()->vw();
+    const auto mode = prof.mode();
+
+    const double lambda_min = prof.la_vals().front();
+
     const size_t N = xi_vals.size();
     if (N == 0) return {{},{}};
 
@@ -110,11 +117,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
         double f_cos_int = 0.0;
         double l_sin_int = 0.0;
 
-        const double xi_min = prof.xi_min();
-        const double xi_max = prof.xi_max();
-        const double vw = prof.params()->vw();
-        const auto mode = prof.mode();
-
+        // evaluate fluid integrals over xi_min < xi < xi_max for given chi
         if ( chi < config::chi_threshold ) {
 
             auto integrand_f_sin = [&](double xi) -> double {
@@ -198,14 +201,30 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
         }
 
         double fd_j = fac * inv_chi * (f_cos_int + inv_chi * f_sin_int);
-        double l_j = fac * inv_chi * l_sin_int;
+        double l_j;
 
-        const double lambda_min = prof.la_vals().front();
-        if(lambda_min != 0) {
-            const double cos_term = - xi_min * std::cos(xi_min * chi);
-            const double sin_term = std::sin(xi_min * chi)*inv_chi;
-            const double analytic_l = cos_term + sin_term;
-            l_j += fac * inv_chi * inv_chi * lambda_min * analytic_l;
+        // analytic evaluation of l(chi) for 0 < xi < xi_min generates a lot of noise
+        // at small chi since the analytic result is proportional to 1/chi^3, so we do
+        // this part of the integration numerically
+        if (chi < 1.0) { // numeric evaluation for small chi
+            double l_spline_part = l_sin_int;
+            if (lambda_min != 0.0) {
+                auto const_integrand = [&](double xi) -> double {
+                    return lambda_min * xi * std::sin(chi * xi);
+                };
+
+                double l_extra = levin.integrate_sin(const_integrand, chi, 0.0, xi_min);
+                l_spline_part += l_extra;
+            }
+            l_j = fac * inv_chi * l_spline_part;
+        } else { // analytic evaluation for large chi
+            l_j = fac * inv_chi * l_sin_int;
+            if(lambda_min != 0) {
+                const double cos_term = - xi_min * std::cos(xi_min * chi);
+                const double sin_term = std::sin(xi_min * chi)*inv_chi;
+                const double analytic_l = cos_term + sin_term;
+                l_j += fac * inv_chi * inv_chi * lambda_min * analytic_l;
+            }
         }
 
         fd[j] = fd_j;
@@ -229,12 +248,12 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
         Apsq[j] = 0.25 * (f*f + csq * l*l);
     }
 
-    // std::ofstream ofs("Ap_sq_debug.csv");
-    // ofs << "chi,Apsq,fd,l\n";
-    // for (size_t j = 0; j < m; j++) {
-    //     ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
-    // }
-    // ofs.close();
+    std::ofstream ofs("Ap_sq_debug.csv");
+    ofs << "chi,Apsq,fd,l\n";
+    for (size_t j = 0; j < m; j++) {
+        ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
+    }
+    ofs.close();
 
     return Apsq;
 }
@@ -496,7 +515,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
     const auto prefac = gw_prefac(kRs_vals, profile);
-    std::cout << "prefac=" << prefac << "\n";
 
     std::vector<double> GW_P_vals(nk);
     
@@ -824,7 +842,8 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
     // OmegaK = total kinetic energy density, KK = critical energy density
     const auto OmegaK_KK = Ekin_max / Rs;
 
-    std::cout << "Ekin_max=" << Ekin_max << ", wNeN_rat=" << wNeN_rat << "\n";
+    // std::cout << "Ekin_max=" << Ekin_max << ", wNeN_rat=" << wNeN_rat << "\n";
+    // std::cout << "prefac=" << 3.0 * wNeN_rat * wNeN_rat * TGW * OmegaK_KK * OmegaK_KK << "\n";
     
     return 3.0 * wNeN_rat * wNeN_rat * TGW * OmegaK_KK * OmegaK_KK;
 }
