@@ -105,7 +105,7 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     alglib::spline1dinterpolant f_sin_spline, f_cos_spline, l_sin_spline;
     create_fluid_integrand_splines(prof, f_sin_spline, f_cos_spline, l_sin_spline);
 
-    FilonQuadrature levin(config::filon_polynomial_order);
+    FilonQuadrature levin(config::filon_polynomial_order); // for highly oscillatory part of integrals
     boost::math::quadrature::gauss<double, config::fd_l_gauss_legendre_samples> integrator;
 
     #pragma omp parallel for
@@ -170,6 +170,16 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
                 l_sin_int += integrator.integrate(integrand_l_sin, vw, xi_max);
             }
 
+            // 0 < xi < xi_min part of integral (only non-zero for l(chi))
+            // if (lambda_min != 0.0) {
+            //     auto const_integrand = [&](double xi) -> double {
+            //         return lambda_min * xi * std::sin(chi * xi);
+            //     };
+
+            //     double l_extra = integrator.integrate(const_integrand, 0.0, xi_min);
+            //     l_sin_int += l_extra;
+            // }
+
         } else {
             auto f_sin_func = [&](double xi) -> double {
                 return alglib::spline1dcalc(f_sin_spline, xi);
@@ -198,33 +208,27 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
                 f_sin_int += levin.integrate_sin(f_sin_func, chi, vw, xi_max);
                 l_sin_int += levin.integrate_sin(l_sin_func, chi, vw, xi_max);
             }
+
+            // 0 < xi < xi_min part of integral (only non-zero for l(chi))
+            // if (lambda_min != 0.0) {
+            //     auto const_integrand = [&](double xi) -> double {
+            //         return lambda_min * xi;
+            //     };
+
+            //     double l_extra = levin.integrate_sin(const_integrand, chi, 0.0, xi_min);
+            //     l_sin_int += l_extra;
+            // }
         }
 
         double fd_j = fac * inv_chi * (f_cos_int + inv_chi * f_sin_int);
-        double l_j;
+        double l_j = fac * inv_chi * l_sin_int;
 
-        // analytic evaluation of l(chi) for 0 < xi < xi_min generates a lot of noise
-        // at small chi since the analytic result is proportional to 1/chi^3, so we do
-        // this part of the integration numerically
-        if (chi < 1.0) { // numeric evaluation for small chi
-            double l_spline_part = l_sin_int;
-            if (lambda_min != 0.0) {
-                auto const_integrand = [&](double xi) -> double {
-                    return lambda_min * xi * std::sin(chi * xi);
-                };
-
-                double l_extra = levin.integrate_sin(const_integrand, chi, 0.0, xi_min);
-                l_spline_part += l_extra;
-            }
-            l_j = fac * inv_chi * l_spline_part;
-        } else { // analytic evaluation for large chi
-            l_j = fac * inv_chi * l_sin_int;
-            if(lambda_min != 0) {
-                const double cos_term = - xi_min * std::cos(xi_min * chi);
-                const double sin_term = std::sin(xi_min * chi)*inv_chi;
-                const double analytic_l = cos_term + sin_term;
-                l_j += fac * inv_chi * inv_chi * lambda_min * analytic_l;
-            }
+        // analytic evaluation of 0 < xi < xi_min (only non-zero for l(chi))
+        if(lambda_min != 0) {
+            const double cos_term = - xi_min * std::cos(xi_min * chi);
+            const double sin_term = std::sin(xi_min * chi)*inv_chi;
+            const double analytic_l = cos_term + sin_term;
+            l_j += fac * inv_chi * inv_chi * lambda_min * analytic_l;
         }
 
         fd[j] = fd_j;
@@ -248,12 +252,12 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
         Apsq[j] = 0.25 * (f*f + csq * l*l);
     }
 
-    std::ofstream ofs("Ap_sq_debug.csv");
-    ofs << "chi,Apsq,fd,l\n";
-    for (size_t j = 0; j < m; j++) {
-        ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
-    }
-    ofs.close();
+    // std::ofstream ofs("Ap_sq_debug_" + prof.params()->eos_to_string() + ".csv");
+    // ofs << "chi,Apsq,fd,l\n";
+    // for (size_t j = 0; j < m; j++) {
+    //     ofs << chi_vals[j] << "," << Apsq[j] << "," << fd_int[j] << "," << l_int[j] << "\n";
+    // }
+    // ofs.close();
 
     return Apsq;
 }
@@ -605,15 +609,12 @@ double dlt_SSM(double k, double p, double pt, const double cs, const double tau_
     return dlt;
 }
 
-/*** dlt spectrum ***/
-// inline this later?
 double ff(double tau_m, double kcs) {
     // kcs = k*cs -> ff called this way to make dlt faster
     return std::cos(kcs * tau_m); // for SSM -> NEED TO UPDATE THIS
 }
 
 /*** Kinetic spectrum ***/
-// avoids duplicating fluid profile in GWSpec
 PowerSpec Ekin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
     return Ekin(kRs_vals, Hydrodynamics::FluidProfile(params));
 }
@@ -723,9 +724,6 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
     // Normalised kinetic energy density OmegaK / KK (eq 42 arXiv:2308.12943)
     // OmegaK = total kinetic energy density, KK = critical energy density
     const auto OmegaK_KK = Ekin_max / Rs;
-
-    // std::cout << "Ekin_max=" << Ekin_max << ", wNeN_rat=" << wNeN_rat << "\n";
-    // std::cout << "prefac=" << 3.0 * wNeN_rat * wNeN_rat * TGW * OmegaK_KK * OmegaK_KK << "\n";
     
     return 3.0 * wNeN_rat * wNeN_rat * TGW * OmegaK_KK * OmegaK_KK;
 }

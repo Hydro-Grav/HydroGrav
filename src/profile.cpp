@@ -444,12 +444,35 @@ double FluidProfile::find_vpUF(const deriv_func& dydv, const size_t n) const {
         }
     };
 
-    // test_alN_residual(dydv, vm, 500);
+    test_alN_residual(dydv, vm, 500);
 
     // find bracket where residual is defined and minimum lies
-    const auto vpUF_min = 0.0;
-    const auto vpUF_max = 1.0;
-    const auto bracket = find_bracket(safe_residual, vpUF_min, vpUF_max);
+    // const auto vpUF_min = 0.0;
+    // const auto vpUF_max = 1.0;
+    // auto bracket = find_bracket(safe_residual, vpUF_min, vpUF_max);
+
+    // // fallback if find_bracket fails
+    // if (!std::isfinite(bracket[0]) || !std::isfinite(bracket[1])) {
+    //     bracket = find_bracket(safe_residual, 1e-4, 0.999);
+    // }
+
+    // if (!std::isfinite(bracket[0]) || !std::isfinite(bracket[1])) {
+    //     throw std::runtime_error("find_vpUF failed: bracket not found!");
+    // }
+
+    // find bracket where residual is defined and minimum lies
+    const std::array<std::pair<double,double>, 2> vpUF_ranges = {{
+        {0.0,  1.0},
+        {1e-4, 0.999} // fallback if find_bracket fails across vpUF in [0,1]
+    }};
+
+    std::array<double, 2> bracket = {std::numeric_limits<double>::quiet_NaN(),
+                                    std::numeric_limits<double>::quiet_NaN()};
+
+    for (const auto& [vpUF_min, vpUF_max] : vpUF_ranges) {
+        bracket = find_bracket(safe_residual, vpUF_min, vpUF_max);
+        if (std::isfinite(bracket[0]) && std::isfinite(bracket[1])) break;
+    }
 
     if (!std::isfinite(bracket[0]) || !std::isfinite(bracket[1])) {
         throw std::runtime_error("find_vpUF failed: bracket not found!");
@@ -463,15 +486,16 @@ double FluidProfile::find_vpUF(const deriv_func& dydv, const size_t n) const {
     return vpUF;
 }
 
-std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi, const size_t n) const {
+std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi, const size_t n, const double tol) const {
     // construct profile using IC {vpUF,wpwN,TpTN}={vpUF,1,1}
-    auto [v_sol, y_sol] = deflagration_profile_internal(dydv, vpUF, 1.0, 1.0, test_resi, n);
+    auto [v_sol, y_sol, shock_flag] = deflagration_profile_internal(dydv, vpUF, 1.0, 1.0, test_resi, n);
     const auto w_end_val = y_sol.back()[1];
     const auto T_end_val = y_sol.back()[2];
 
     // read off shock and calculate fluid behind shock
-    const auto xi_sh = std::max(y_sol.back()[0], std::sqrt(cpsq_));
-    // std::cout << "xi_sh=" << xi_sh << ", y_sol.back()[0]=" << y_sol.back()[0] << ", cp=" << std::sqrt(cpsq_) << "\n";
+    // const auto xi_sh = std::max(y_sol.back()[0], std::sqrt(cpsq_));
+    const auto xi_sh = (shock_flag) ? std::sqrt(cpsq_) : std::max(y_sol.back()[0], std::sqrt(cpsq_));
+
     const auto [w1wN, T1TN] = wT_from_shock(xi_sh);
 
     const auto w_fac = w1wN / w_end_val;
@@ -483,43 +507,60 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
         y_sol[i][2] *= T_fac;
     }
 
-    return {v_sol, y_sol};
+    // check shock matching condition for final profile
+    if (test_resi) {
+        const auto r1 = abs(mu(xi_sh, v_sol.back()) * xi_sh - cpsq_);
+        const auto r2 = abs(xi_sh/mu(xi_sh, v_sol.back()) - (T1TN*T1TN*T1TN*T1TN + cpsq_) / (cpsq_ * T1TN*T1TN*T1TN*T1TN + 1.0));
+
+        if (r1 > tol || r2 > tol) {
+            std::cout << "Warning in deflagration_profile: Shock residual above tolerance (" << tol << "). R1=" << r1 << ", R2=" << r2 << "\n";
+        }
+    }
+
+    // return {v_sol, y_sol};
+    return std::make_tuple(v_sol, y_sol, shock_flag);
 }
 
 double FluidProfile::alN_residual(const deriv_func& dydv, double vpUF, double vm, const size_t n) const {
-    const auto y_prof = deflagration_profile(dydv, vpUF, false, n).second;
+    const auto y_prof = std::get<1>(deflagration_profile(dydv, vpUF, false, n));
     const auto wpwN = y_prof.front()[1];
-    
-    // const auto alN_calc = wpwN * get_alp_wall(vpUF, vw_);
-    // const auto alN_calc = wpwN * get_alp_wall(mu(vw_, vpUF), vw_); // alp(vp,vm)
-    const auto alN_calc = wpwN * get_alp_wall(mu(vw_, vpUF), vm);
+
+    const auto fac = (1.0 / cmsq_ - 1.0 / cpsq_) / (1.0 / cpsq_ + 1) / 3.0;
+    const auto alN_calc = wpwN * get_alp_wall(mu(vw_, vpUF), vm) + fac * (wpwN - 1.0);
+    // const auto alN_calc = wpwN * get_alp_wall(mu(vw_, vpUF), vm);
 
     return abs(alN_ - alN_calc);
 }
 
-std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_resi, const size_t n) const {
+std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_resi, const size_t n) const {
     // solve EoM - integrate from v(xi)=vpUF -> v(xi)=0
     const state_type yp = {vw_, wpwN, TpTN}; // {xi_w, wpwN, TpTN}
     const auto [v_sol_tmp, y_sol_tmp] = rk4_solver(dydv, vpUF, 1e-10, yp, n);
 
     // find shock & truncate solution
-    const auto sh_idx = std::min(find_shock_idx(v_sol_tmp, y_sol_tmp, test_resi), v_sol_tmp.size() - 1);
-    if (test_resi)
-        std::cout << "sh_idx=" << sh_idx << ", v_sol_tmp.size()-1=" << v_sol_tmp.size()-1 << "\n";
+    // const auto sh_idx = std::min(find_shock_idx(v_sol_tmp, y_sol_tmp, test_resi), v_sol_tmp.size() - 1);
+    const auto find_sh_idx = find_shock_idx(v_sol_tmp, y_sol_tmp, test_resi);
+    const auto sh_idx = std::min(find_sh_idx, v_sol_tmp.size()-1);
+
+    // handles edge case where xi_sh = cp (i.e. shock discontinuity dissappears)
+    // uses flag to handle shock value rather than integrating from vpUF -> 0.0 since eom diverges at v=0
+    const bool shock_flag = (find_sh_idx == v_sol_tmp.size() - 1) ? true : false;
 
     // re-integrate for final profile
     // avoids insufficient no. points for integrating profile when shock is close to vpUF
     if (test_resi) {
-        return rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
+        const auto [v_sol, y_sol] = rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
+        return std::make_tuple(v_sol, y_sol, shock_flag);
     }
 
     const std::vector<double> v_sol(v_sol_tmp.begin(), v_sol_tmp.begin() + sh_idx + 1);
     const std::vector<state_type> y_sol(y_sol_tmp.begin(), y_sol_tmp.begin() + sh_idx + 1);
 
-    return {v_sol, y_sol};
+    // return {v_sol, y_sol};
+    return std::make_tuple(v_sol, y_sol, shock_flag);
 }
 
-size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi, const double tol) const {
+size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi) const {
     // if (test_resi) {
     //     test_shock_bag(v_sol, y_sol);
     // }
@@ -541,7 +582,6 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
         const auto v2 = xi_sh; // v2=xi_sh
 
         // shock condition mu(xi_sh, v(xi_sh)) xi_sh = cp^2
-        // resi_vals.push_back(abs(v1 * v2 - cpsq_));
         resi_vals[i] = abs(v1 * v2 - cpsq_);
         pass_count++;
     }
@@ -554,10 +594,6 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
 
-    if (test_resi && resi_vals[idx] > tol) {
-        std::cout << "Warning in find_shock_idx: Shock residual above tolerance (" << tol << "). Residual=" << resi_vals[idx] << "\n";
-    }
-
     return idx;
 }
 
@@ -565,23 +601,26 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
 void FluidProfile::test_alN_residual(const deriv_func& dydv, double vm, const size_t n) const {
     std::cout << "Running test for alN residual... ";
 
-    const auto vpUF_vals = linspace(0.0001, 0.9999, n);
-    // const auto vpUF_vals = linspace(0.6, 0.7, n);
+    const auto vpUF_vals = linspace(1e-4, 0.2, n);
     std::vector<double> resi_vals(n);
 
     for (int i = 0; i < n; i++) {
         double resi = std::numeric_limits<double>::quiet_NaN();
         try {
             resi = alN_residual(dydv, vpUF_vals[i], vm);
-            if (resi < 0.01) {
-                // std::cout << "resi=" << resi << " for vpUF=" << vpUF_vals[i] << "\n";
-            }
+            // if (resi < 0.001) {
+            //     std::cout << "resi=" << resi << " for vpUF=" << vpUF_vals[i] << "\n";
+            // }
         } catch (std::exception& e) {
-            std::cout << "Failed for vpUF=" << vpUF_vals[i] << ":" << e.what() << "\n";
+            // std::cout << "Failed for vpUF=" << vpUF_vals[i] << ":" << e.what() << "\n";
         }
 
         resi_vals[i] = resi;
     }
+
+    const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
+    const auto idx = std::distance(resi_vals.begin(), it);
+    std::cout << "test_alN_residual: vpUF=" << vpUF_vals[idx] << ", min_resi=" << resi_vals[idx] << "\n";
     
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(800, 800);
@@ -616,13 +655,16 @@ void FluidProfile::test_shock_bag(const std::vector<double>& v_sol, const std::v
         const auto r2 = abs(v2/v1 - (T1TN*T1TN*T1TN*T1TN + cpsq_) / (cpsq_ * T1TN*T1TN*T1TN*T1TN + 1.0));
         r1_vals.push_back(r1);
         r2_vals.push_back(r2);
-        // resi_vals.push_back(abs(v1 * v2 - cpsq_));
-        resi_vals.push_back(std::sqrt(r1 * r1 + r2 * r2));
+
+        // resi_vals.push_back(std::sqrt(r1 * r1 + r2 * r2));
+        resi_vals.push_back(r1);
+        // std::cout << "vUF=" << v_sol[i] << ", xi=" << y_sol[i][0]
+        //           << ", r1=" << r1 << ", r2=" << r2 << "\n";
     }
 
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
-    std::cout << "test_shock: xi_sh=" << xi_vals[idx] << ", r1=" << r1_vals[idx] << ", r2=" << r2_vals[idx] << ", min_resi=" << resi_vals[idx] << "\n";
+    // std::cout << "\n test_shock: xi_sh=" << xi_vals[idx] << ", r1=" << r1_vals[idx] << ", r2=" << r2_vals[idx] << ", min_resi=" << resi_vals[idx] << "\n";
 
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(800, 800);
@@ -631,7 +673,7 @@ void FluidProfile::test_shock_bag(const std::vector<double>& v_sol, const std::v
     plt::ylabel("residual");
     // plt::xlim(1.0, 1.1);
     plt::grid(true);
-    plt::save("shock_resi.png");
+    plt::save("shock_resi_bag.png");
     #endif
 
     std::cout << "Test complete. Shock residual saved to 'shock_resi.png'\n";
@@ -769,7 +811,8 @@ std::array<double, 2> FluidProfile::matching_eqs_shock(double v1, double T1TN, d
     // const auto eq1 = v1 * v2 - (p1 - p2) / (e1 - e2);
     // const auto eq2 = v1 / v2 - (e2 + p1) / (e1 + p2);
 
-    // scale residuals to O(1)
+    // scale residuals to O(1) (prevents issues with newton solver)
+    // NOTE: p(T), e(T) ~ 1e+8 so residual must converge to at least 1e-10!!
     const auto scale = std::max({std::abs(p1), std::abs(p2), std::abs(e1), std::abs(e2)});
     const auto eq1 = (v2 * v1 * (e1 - e2) - (p1 - p2)) / scale;
     const auto eq2 = (v1 * (e1 + p2) - v2 * (e2 + p1)) / scale;
@@ -793,9 +836,9 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
     const auto pm = veff_params_->pb_val(TmTN); // p_-, e_-
     const auto em = veff_params_->eb_val(TmTN);
 
-    // scale residuals to O(1)
+    // scale residuals to O(1) (prevents issues with newton solver)
+    // NOTE: p(T), e(T) ~ 1e+8 so residual must converge to at least 1e-10!!
     const auto scale = std::max({std::abs(pp), std::abs(pm), std::abs(ep), std::abs(em)});
-
     const auto eq1 = (vp * vm * (em - ep) - (pm - pp)) / scale;
     const auto eq2 = (vm * (em + pp) - vp * (ep + pm)) / scale;
 
@@ -806,31 +849,34 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
 void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) const {
     std::cout << "Running test for T2/TN residual...\n";
 
-    const auto TmTN_vals = linspace(veff_params_->TTN_min(), veff_params_->TTN_max(), n);
-    // const auto TmTN_vals = linspace(0.999, 1.0005, n);
-    // const std::vector<double> TmTN_vals = {0.999712};
+    // const auto TmTN_vals = linspace(veff_params_->TTN_min(), veff_params_->TTN_max(), n);
+    const auto TmTN_vals = linspace(veff_params_->TTN_min(), 1.0, n);
 
-    std::vector<double> resi_vals(n);
+    std::vector<double> resi_vals, TmTN_vals_pass;
     for (int i = 0; i < n; i++) {  
         double resi = std::numeric_limits<double>::quiet_NaN();
         try {
             resi = T2TN_residual_veff(dydv, TmTN_vals[i]);
-        } catch (std::exception& e) {
-            std::cout << "Failed for Tm/TN=" << TmTN_vals[i] << ":" << e.what() << "\n";
-        }
 
-        resi_vals[i] = resi;
-        // std::cout << "TmTN=" << TmTN_vals[i] << ", resi=" << resi << "\n";
+            resi_vals.push_back(resi);
+            TmTN_vals_pass.push_back(TmTN_vals[i]);
+        } catch (std::exception& e) {
+            // std::cout << "Failed for Tm/TN=" << TmTN_vals[i] << ":" << e.what() << "\n";
+        }
+        
+        // if (resi < 0.001) {
+        //     std::cout << "TmTN=" << TmTN_vals[i] << ", resi=" << resi << "\n";
+        // }
     }
 
     // index where residual is minimised
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
-    std::cout << "test_residual_veff: TmTN=" << TmTN_vals[idx] << ", min_resi=" << resi_vals[idx] << "\n";
+    std::cout << "test_residual_veff: TmTN=" << TmTN_vals_pass[idx] << ", min_resi=" << resi_vals[idx] << "\n";
     
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(800, 800);
-    plt::plot(TmTN_vals, resi_vals);
+    plt::plot(TmTN_vals_pass, resi_vals);
     plt::xlabel("TmTN");
     plt::ylabel("residual");
     // plt::xlim(TmTN_vals.front(), TmTN_vals.back());
@@ -858,8 +904,9 @@ void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::
         const auto v2 = xi_sh; // v2=xi_sh
 
         // shock condition mu(xi_sh, v(xi_sh)) xi_sh = (p1-pN)/(e1-eN)
+        const auto resi = matching_eqs_shock(v1, T1TN, v2, 1.0); // T2TN=1
         xi_vals.push_back(xi_sh);
-        resi_vals.push_back(abs(matching_eqs_shock(v1, T1TN, v2, 1.0)[0])); // T2TN=1
+        resi_vals.push_back(abs(resi[0])); 
         // const auto resi = matching_eqs_shock(v1, T1TN, v2, 1.0);
         // resi_vals.push_back(std::sqrt(resi[0] * resi[0] + resi[1] * resi[1]));
     }
@@ -874,8 +921,6 @@ void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::
     plt::plot(xi_vals, resi_vals);
     plt::xlabel("xi_sh");
     plt::ylabel("residual");
-    // plt::xlim();
-    // plt::ylim(0.0, 0.00001);
     plt::grid(true);
     plt::save("shock_resi_veff.png");
     #endif
@@ -908,6 +953,8 @@ double FluidProfile::find_TmTN_veff(const deriv_func& dydv) const {
     const auto TmTN = golden_section_minimize(safe_residual, bracket[0], bracket[1]);
     if (TmTN < 0.0) throw std::runtime_error("find_TmTN_veff failed (TmTN < 0)!");
 
+    // std::cout << "find_TmTN_veff: TmTN=" << TmTN << ", resi=" << safe_residual(TmTN) << "\n";
+
     return TmTN;
 }
 
@@ -923,7 +970,9 @@ double FluidProfile::T2TN_residual_veff(const deriv_func& dydv, double TmTN, con
     const auto v1UF = v_sol.back();
     const auto v1 = mu(xi_sh, abs(v1UF));
     // const auto w1wN = y_sol.back()[1];
-    const auto T1TN = y_sol.back()[2];   
+    const auto T1TN = y_sol.back()[2]; 
+    
+    // std::cout << "TmTN=" << TmTN << ", xish=" << xi_sh << ", v1UF=" << v1UF << ", T1TN=" << T1TN << "\n";
 
     // matching at shock to get T2/TN
     // system is overdetermined (Tm, T1, v1, v2 are all known, just need T2) -> one matching eq sufficent
@@ -931,13 +980,16 @@ double FluidProfile::T2TN_residual_veff(const deriv_func& dydv, double TmTN, con
     //     return matching_eqs_shock(v1, T1TN, xi_sh, T2TN_guess)[0]; // v2 = xi_sh
     // };
     // const auto T2TN = newton_solve_1d_bounded(shock_matching_helper, 1.0, veff_params_->TTN_min(), veff_params_->TTN_max());
-    auto shock_matching_helper = [this, v1, T1TN, xi_sh] (double T2TN_guess) {
-        const auto resi = matching_eqs_shock(v1, T1TN, xi_sh, T2TN_guess);
+    auto shock_matching_helper = [this, v1, T1TN, xi_sh] (double T2TN) {
+        const auto resi = matching_eqs_shock(v1, T1TN, xi_sh, T2TN);
         return std::sqrt(resi[0] * resi[0] + resi[1] * resi[1]);
+        // return abs(resi[0]);
     };
     const auto T2TN = golden_section_minimize(shock_matching_helper, veff_params_->TTN_min(), veff_params_->TTN_max());
 
-    // std::cout << "TmTN=" << TmTN << ", T1TN=" << T1TN << ", T2TN-1=" << T2TN-1.0 << "\n";
+    const auto resi = matching_eqs_shock(v1, T1TN, xi_sh, T2TN);
+    // std::cout << "TmTN=" << TmTN << ", resi[0]=" << resi[0] << ", resi[1]=" << resi[1] << ", |resi|=" << std::sqrt(resi[0] * resi[0] + resi[1] * resi[1]) << "\n";
+            //   << ", T2TN-1=" << T2TN-1.0 << "\n";
 
     return abs(T2TN - 1.0);
 }
@@ -1015,12 +1067,18 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
     const auto find_sh = find_shock_idx_veff(v_sol_tmp, y_sol_tmp, test_resi);
     const auto sh_idx = std::min(find_sh, v_sol_tmp.size() - 1);
 
-    // std::cout << "xi_sh=" << y_sol_tmp[sh_idx][0] << ", sh_resi=" << resi_vals[sh_idx] << ", ";
-
     // re-integrate for final profile
     // avoids insufficient no. points for integrating profile when shock is close to vpUF
     if (test_resi) {
-        return rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
+        const auto [v_sol, y_sol] = rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
+        const auto resi = matching_eqs_shock(mu(y_sol.back()[0], v_sol.back()), y_sol.back()[2], y_sol.back()[0], 1.0);
+
+        // check shock matching condition for final profile
+        if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
+            std::cout << "Warning in deflagration_profile_veff: Shock residual above tolerance (" << minimiser_tol << "). R1=" << resi[0] << ", R2=" << resi[1] << "\n";
+        }
+
+        return {v_sol, y_sol};
     }
 
     const std::vector<double> v_sol(v_sol_tmp.begin(), v_sol_tmp.begin() + sh_idx + 1);
@@ -1034,9 +1092,9 @@ size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const
     const auto eN = veff_params_->eN();
 
     // testing purposes
-    // if (test_resi) {
-    //     test_shock_veff(v_sol, y_sol);
-    // }
+    if (test_resi) {
+        test_shock_veff(v_sol, y_sol);
+    }
 
     std::vector<double> resi_vals(v_sol.size()), resi_vals2(v_sol.size());
     int pass_count = 0;
@@ -1044,6 +1102,8 @@ size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const
     for (int i = 0; i < v_sol.size(); i++) {
         const auto xi_sh = y_sol[i][0];
 
+        // ensures shock is supersonic and >vw
+        // if (xi_sh <= std::max(vw_, cp) || xi_sh > 1.0) {
         if (xi_sh <= vw_ || xi_sh > 1.0) {
             resi_vals[i] = 1.0;
             continue;
@@ -1057,10 +1117,8 @@ size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const
 
         // shock condition mu(xi_sh, v(xi_sh)) xi_sh = (p1-pN)/(e1-eN)
         const auto resi = matching_eqs_shock(v1, T1TN, v2, 1.0); // T2/TN=1
-        resi_vals[i] = std::sqrt(resi[0] * resi[0] + resi[1] * resi[1]);
-        // if (test_resi) {
-        //     std::cout << "xi_sh=" << xi_sh << ", r1=" << resi[0] << ", r2=" << resi[1] << ", combined_resi=" << resi_vals[i] << "\n";
-        // }
+        // resi_vals[i] = std::sqrt(resi[0] * resi[0] + resi[1] * resi[1]);
+        resi_vals[i] = abs(resi[0]);
         pass_count++;
     }
 
@@ -1078,7 +1136,7 @@ size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const
     return idx;
 }
 
-std::pair<double, state_type> FluidProfile::get_IC_detonation_veff() const {
+std::pair<double, state_type> FluidProfile::get_IC_detonation_veff(const double vm_min, const double vm_max) const {
     // uses matching conditions to get vm, Tm/TN from vp, Tp/TN
     const auto xi0 = vw_;
     const auto vp = vw_;
@@ -1088,8 +1146,8 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff() const {
     // newton solver seems to fail sometimes when tighter bounds on vm and Tm are used
     // i.e. 0 < vm < vp and TpTN < TmTN < TTN_max
     // leave as is and have consistency check to test vm < vp and Tm > Tp after solver
-    const auto vm_min = 0.0;
-    const auto vm_max = 1.0;
+    // const auto vm_min = 0.0;
+    // const auto vm_max = 1.0;
     const auto TmTN_min = veff_params_->TTN_min();
     const auto TmTN_max = veff_params_->TTN_max();
 
@@ -1194,8 +1252,10 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         const auto vp = mu(vw_, vpUF);
 
         const auto prof_tmp = deflagration_profile(dydv, vpUF, true, n);
-        v_sol_tmp = prof_tmp.first;
-        y_sol_tmp = prof_tmp.second;
+        v_sol_tmp = std::get<0>(prof_tmp);
+        y_sol_tmp = std::get<1>(prof_tmp);
+        const bool shock_flag = std::get<2>(prof_tmp);
+
 
         std::reverse(v_sol_tmp.begin(), v_sol_tmp.end());
         std::reverse(y_sol_tmp.begin(), y_sol_tmp.end());
@@ -1213,7 +1273,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         // ensures difference isn't too large!
         const auto cp = std::sqrt(cpsq_);
 
-        const auto xi_sh = std::max(xi_sol_tmp.front(), cp);
+        const auto xi_sh = (shock_flag) ? cp : std::max(xi_sol_tmp.front(), cp);
         if (xi_sh > 1.0) {
             throw std::runtime_error("Shock must be less than speed of light (cp <= xi_sh < 1)");
         }
@@ -1359,11 +1419,6 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(cmsq_), 0.0, T_end_val, cmsq_) * v_sol_tmp.back();
         la_end_val = lambda_b(w_end_val);
 
-        // v_sol_tmp.push_back(0.0);
-        // xi_sol_tmp.push_back(std::sqrt(cmsq_));
-        // w_sol_tmp.push_back(w_end_val);
-        // T_sol_tmp.push_back(T_end_val);
-        // la_sol_tmp.push_back(la_end_val);
         const size_t idx = v_sol_tmp.size() - 1; // index of last point
         v_sol_tmp[idx] = 0.0;
         xi_sol_tmp[idx] = std::sqrt(cmsq_);
@@ -1571,11 +1626,16 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         // w0 = w(xi_w) = wm/wN
         // T0 = T(xi_w) = Tm/TN
 
-        const auto ics = get_IC_detonation_veff();
-        const auto vmUF = ics.first;
-        const auto y0 = ics.second; // {xi_w, wmwN, TmTN}
-        // const auto vmUF = 0.0482328;
-        // const state_type y0 = {vw_, 1.11616, 1.02874};
+        auto ics = get_IC_detonation_veff();
+        auto vmUF = ics.first;
+        auto y0 = ics.second; // {xi_w, wmwN, TmTN}
+
+        // failsafe for if vmUF < cm
+        if (vmUF < std::sqrt(veff_params_->csq_b(y0[2]))) {
+            ics = get_IC_detonation_veff(std::sqrt(veff_params_->csq_b(y0[2])), 1.0);
+            vmUF = ics.first;
+            y0 = ics.second;
+        }
 
         // solver
         const auto sol = rk4_solver(dydv, vmUF, 1e-10, y0, n);
@@ -1609,19 +1669,12 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
                   << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n";
     }
 
+    // update final point manually where dxidv is singular
     if (mode_ != 0) {
-        // update final point manually where dxidv is singular
         w_end_val = w_sol_tmp.back() - dwdv(std::sqrt(veff_params_->csq_b(T_end_val)), 0.0, w_end_val, veff_params_->csq_b(T_end_val)) * v_sol_tmp.back();
         T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(veff_params_->csq_b(T_end_val)), 0.0, T_end_val, veff_params_->csq_b(T_end_val)) * v_sol_tmp.back();
         la_end_val = lambda_b_veff(T_end_val, eN, wN_inv);
 
-        // std::cout << "w_end_val (corrected) = " << w_end_val << ", T_end_val (corrected) = " << T_end_val << "\n";
-
-        // v_sol_tmp.push_back(0.0);
-        // xi_sol_tmp.push_back(std::sqrt(veff_params_->csq_b(T_end_val)));
-        // w_sol_tmp.push_back(w_end_val);
-        // T_sol_tmp.push_back(T_end_val);
-        // la_sol_tmp.push_back(la_end_val);
         const size_t idx = v_sol_tmp.size() - 1; // index of last point
         v_sol_tmp[idx] = 0.0;
         xi_sol_tmp[idx] = std::sqrt(veff_params_->csq_b(T_end_val));

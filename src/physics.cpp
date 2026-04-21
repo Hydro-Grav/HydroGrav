@@ -28,7 +28,7 @@ double P_acc(double f) {
 double get_LISA_omegahsq(double f) {
     double Poms = P_oms(f);
     double Pacc = P_acc(f);
-    double L = 2.5e9;  // LISA arm length in meters
+    double L = 2.5e9;  // LISA arm length in meters (2.5 million km)
     double fs = 2.998e8 / (2.0 * M_PI * L);  // Transfer frequency
     
     // Strain noise spectral density

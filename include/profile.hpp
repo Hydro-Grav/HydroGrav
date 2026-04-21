@@ -109,10 +109,12 @@ class FluidProfile {
 
     // deflagrations
     double find_vpUF(const deriv_func& dydv, const size_t n=1000) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi=false, const size_t n=1000) const;
+    std::tuple<std::vector<double>, std::vector<state_type>, bool> deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi=false, const size_t n=1000, const double tol=1e-5) const;
     double alN_residual(const deriv_func& dydv, double vpUF, double vm, const size_t n=1000) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_resi=false, const size_t n=1000) const;
-    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false, const double tol=1e-5) const;
+    // std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_resi=false, const size_t n=1000) const;
+    std::tuple<std::vector<double>, std::vector<state_type>, bool> deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_resi=false, const size_t n=1000) const;
+
+    size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false) const;
 
     // dev
     void test_alN_residual(const deriv_func& dydv, double vm, const size_t n) const;
@@ -143,7 +145,7 @@ class FluidProfile {
     void test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
     
     // detonations
-    std::pair<double, state_type> get_IC_detonation_veff() const;
+    std::pair<double, state_type> get_IC_detonation_veff(const double vm_min=0.0, const double vm_max=1.0) const;
 
     // lambda profiles
     double lambda_s_veff(double ToTN, const double eN, const double wN_inv) const;
