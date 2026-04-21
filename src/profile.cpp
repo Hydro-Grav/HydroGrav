@@ -444,7 +444,7 @@ double FluidProfile::find_vpUF(const deriv_func& dydv, const size_t n) const {
         }
     };
 
-    test_alN_residual(dydv, vm, 500);
+    // test_alN_residual(dydv, vm, 500);
 
     // find bracket where residual is defined and minimum lies
     // const auto vpUF_min = 0.0;
@@ -1092,9 +1092,9 @@ size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const
     const auto eN = veff_params_->eN();
 
     // testing purposes
-    if (test_resi) {
-        test_shock_veff(v_sol, y_sol);
-    }
+    // if (test_resi) {
+    //     test_shock_veff(v_sol, y_sol);
+    // }
 
     std::vector<double> resi_vals(v_sol.size()), resi_vals2(v_sol.size());
     int pass_count = 0;
