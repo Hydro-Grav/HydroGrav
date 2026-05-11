@@ -34,8 +34,8 @@
 
 #include "ap.h"
 
-// for EoS with p(T), e(T) ~ O(1e+9), need residuals to converge to at least O(1e+10)
-const static double minimiser_tol = 1e-10;
+// for EoS with p(T), e(T) ~ O(1e+8), need residuals to converge to at least O(1e+10)
+const static double minimiser_tol = 1e-9;
 
 /**
  * @brief Cubic spline interpolation class.

@@ -73,6 +73,8 @@ class FluidProfile {
     std::string mode_str() const;
 
     void write(const std::string& filename = "fp.csv") const; // write bubble profile to disk
+
+    bool shock_flag() const { return shock_flag_; }
     
     #ifdef ENABLE_MATPLOTLIB
     void plot(const std::string& filename = "fp.png", double xi_min = 0.0, double xi_max = 1.0) const; // Plots bubble profiles
@@ -90,6 +92,8 @@ class FluidProfile {
     int mode_; // hydrodynamic mode (deflagration=0, hybrid=1, detonation=2)
     prof_type xi_vals_, v_vals_, w_vals_, T_vals_, la_vals_; // xi, v(xi), w(xi), la(x)
     double xi_min_integrate_, xi_max_integrate_; // start/endpoints of profile for integration
+
+    bool shock_flag_; // flag for checking shock convergence using Veff in parameter scan
 
     /************************** Bag EoS **************************/
     int get_mode_bag(double vw, double cmsq, double alN) const;
@@ -135,14 +139,15 @@ class FluidProfile {
     std::array<double, 2> matching_eqs_shock(double v1, double T1TN, double v2, double T2TN) const;
     
     // deflagrations
-    double find_TmTN_veff(const deriv_func& dydv) const;
-    double T2TN_residual_veff(const deriv_func& dydv, double TmTN, const size_t n=1000) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_resi=false, const size_t n=1000) const;
-    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false) const;
-    
+    double find_TmTN_veff(const deriv_func& dydv);
+    double v1_residual_veff(const deriv_func& dydv, double TmTN, const size_t n=1000);
+    std::tuple<double, double, double> wall_matching_veff(const double vm, const double TmTN, const double wmwN) const;
+    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_resi=false, const size_t n=1000);
+
     // dev
-    void test_residual_veff(const deriv_func& dydv, const size_t n) const;
-    void test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
+    void test_residual_veff(const deriv_func& dydv, const size_t n);
+    void test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol);
     
     // detonations
     std::pair<double, state_type> get_IC_detonation_veff(const double vm_min=0.0, const double vm_max=1.0) const;
