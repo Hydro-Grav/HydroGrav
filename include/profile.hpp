@@ -139,15 +139,17 @@ class FluidProfile {
     std::array<double, 2> matching_eqs_shock(double v1, double T1TN, double v2, double T2TN) const;
     
     // deflagrations
-    double find_TmTN_veff(const deriv_func& dydv);
-    double v1_residual_veff(const deriv_func& dydv, double TmTN, const size_t n=1000);
+    double find_TmTN_veff(const deriv_func& dydv, const bool fallback=false) const;
+    double v1_residual_veff(const deriv_func& dydv, double TmTN, const bool fallback=false, const size_t n=1000) const;
     std::tuple<double, double, double> wall_matching_veff(const double vm, const double TmTN, const double wmwN) const;
-    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
-    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool test_resi=false, const size_t n=1000);
+    size_t find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool fallback=false) const;
+    std::pair<std::vector<double>, std::vector<state_type>> deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool fallback=false, const bool test_resi=false, const size_t n=1000) const;
+    bool check_shock_convergence(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol);
+    bool check_shock_convergence_fallback(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const double tol=1e-2) const;
 
     // dev
-    void test_residual_veff(const deriv_func& dydv, const size_t n);
-    void test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol);
+    void test_residual_veff(const deriv_func& dydv, const size_t n) const;
+    void test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
     
     // detonations
     std::pair<double, state_type> get_IC_detonation_veff(const double vm_min=0.0, const double vm_max=1.0) const;
