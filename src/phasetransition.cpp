@@ -67,7 +67,7 @@ const Universe& default_universe() {
 }
 
 /************************************ PTParams ************************************/
-PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un)
+PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un)
     : un_(un),
       vw_(vw),
       alN_(alN),
@@ -113,14 +113,10 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
       }
 
       // check valid bubble nucleation type
-      const char* allowed_nuc[] = {"exp", "sim"};
-      const auto m = sizeof(allowed_nuc) / sizeof(allowed_nuc[0]);
-
-      if (is_valid_model(nuc_type, allowed_nuc, m)) {
-        nuc_type_ = nuc_type;
-      } else {
-        std::cout << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
-        nuc_type_ = dflt_PTParams::nuc_type;
+      const std::vector<std::string> allowed_nuc = {"exp", "sim"};
+      if (!is_valid_model(nuc_type, allowed_nuc)) {
+          std::cout << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
+          nuc_type_ = dflt_PTParams::nuc_type;
       }
     }
 
@@ -137,20 +133,15 @@ void PTParams::print() const {
 }
 
 // Private:
-bool PTParams::is_valid_model(const char* model, const char* allowed_models[], const int n) const {
-  for (int i = 0; i < n; i++) {
-    if (std::strcmp(model, allowed_models[i]) == 0) {
-      return true;
-    }
-  }
-  return false;
+bool PTParams::is_valid_model(const std::string& model, const std::vector<std::string>& allowed_models) const {
+    return std::find(allowed_models.begin(), allowed_models.end(), model) != allowed_models.end();
 }
 
 /********************************** PTParams_Bag **********************************/
-PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un) // Bag model
+PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un) // Bag model
     : PTParams_Bag(vw, alN, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0) {}
 
-PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, double cpsq, double cmsq) // full ctor
+PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, double cpsq, double cmsq) // full ctor
     : PTParams(vw, alN, TN, beta, Rs, nuc_type, un),
       cpsq_(cpsq),
       cmsq_(cmsq) {
@@ -282,7 +273,7 @@ bool EquationOfState::is_valid() const
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfState& eos_data)
     : PTParams_Veff(vw, alN, TN, dflt_PTParams::beta, dflt_PTParams::Rs, dflt_PTParams::nuc_type, default_universe(), eos_data) {}
 
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const EquationOfState& eos_data)
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, const EquationOfState& eos_data)
     : PTParams(vw, alN, TN, beta, Rs, nuc_type, un) {
     
     std::cout << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model!\n\n";
@@ -293,7 +284,7 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, doub
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename)
     : PTParams_Veff(vw, alN, TN, EquationOfState::from_file(veff_eos_filename)) {}
 
-PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename)
+PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, const std::string& veff_eos_filename)
     : PTParams_Veff(vw, alN, TN, beta, Rs, nuc_type, un, EquationOfState::from_file(veff_eos_filename)) {}
 
 // Private initialization method

@@ -110,7 +110,7 @@ struct dflt_PTParams {
   static constexpr double TN = dflt_universe::Ts; // Nucleation temperature
   static constexpr double cpsq = 0.56705 * 0.56705; // speed of sound squared (symmetric phase)
   static constexpr double cmsq = 0.539046 * 0.539046; // speed of sound squared (broken phase)
-  static constexpr const char* nuc_type = "exp"; // bubble nucleation type
+  static inline const std::string nuc_type = "exp"; // bubble nucleation type
 };
 
 
@@ -131,7 +131,7 @@ units:
 class PTParams {
   public:
     // ctor
-    PTParams(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un);
 
     enum class ModelType { Bag, Veff }; // equation of state model
     virtual ModelType eos() const = 0;
@@ -157,7 +157,7 @@ class PTParams {
     double Rs() const { return Rs_; } // characteristic length scale R_*
     double tau_s() const { return tau_s_; } // start time of PT
     double tau_fin() const { return tau_fin_; } // end time of PT
-    const char* nuc_type() const { return nuc_type_; } // bubble nucleation type
+    const std::string nuc_type() const { return nuc_type_; } // bubble nucleation type
 
     // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
     // void print() const;
@@ -168,12 +168,12 @@ class PTParams {
   protected:
     const Universe un_;
     double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_;
-    const char *nuc_type_;
+    std::string nuc_type_;
 
     virtual void print() const;
   
   private:
-    bool is_valid_model(const char* model, const char* allowed_models[], const int n) const;
+    bool is_valid_model(const std::string& model, const std::vector<std::string>& allowed_models) const;
 };
 
 /**
@@ -188,14 +188,14 @@ class PTParams_Bag : public PTParams {
      *
      * `cpsq` and `cmsq` default to 1/3 when not provided.
      */
-    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un);
+    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un);
     /**
      * @brief Full constructor specifying speeds of sound squared.
      *
      * @param cpsq Sound speed squared in symmetric phase.
      * @param cmsq Sound speed squared in broken phase.
      */
-    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, double cpsq, double cmsq);
+    PTParams_Bag(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, double cpsq, double cmsq);
 
     ModelType eos() const override { return ModelType::Bag; }
 
@@ -281,11 +281,11 @@ public:
   /**
    * @brief Full constructor feeding all GW parameters explicitly.
    */
-  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const EquationOfState& eos_data);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, const EquationOfState& eos_data);
 
   // Backward compatibile
   PTParams_Veff(double vw, double alN, double TN, const std::string& veff_eos_filename);
-  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const char* nuc_type, const Universe& un, const std::string& veff_eos_filename);
+  PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, const std::string& veff_eos_filename);
 
   ModelType eos() const override { return ModelType::Veff; }
 
