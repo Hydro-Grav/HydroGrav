@@ -96,7 +96,7 @@ class PowerSpec {
      *
      * @param filename Path to output file (default "spectrum.csv").
      */
-    void write(const std::string& filename="spectrum.csv") const;
+    void write(const std::string& filename="spectrum.csv", const bool write_header=false) const;
 
     #ifdef ENABLE_MATPLOTLIB
     /**
