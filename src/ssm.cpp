@@ -626,7 +626,17 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto Rs = prof.params()->Rs();
     const auto nuc_type = prof.params()->nuc_type();
 
-    auto lt_dist = Hydrodynamics::lifetime_distribution_function(nuc_type);
+    // access custom lifetime distribution from prof.params.get_lifetime_distribution() if it
+    // exists, otherwise use default based on nuc_type. Convert to std::function for uniform use.
+    std::function<double(double)> lt_dist;
+    auto opt_lt = prof.params()->get_lifetime_distribution();
+    if (opt_lt.has_value()) {
+        // capture a copy of the LifetimeDistribution and call its operator()
+        auto lt_copy = *opt_lt;
+        lt_dist = [lt_copy](double Ttilde) mutable { return lt_copy(Ttilde); };
+    } else {
+        lt_dist = Hydrodynamics::lifetime_distribution_function(nuc_type);
+    }
 
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);

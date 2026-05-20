@@ -15,6 +15,8 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <algorithm>
+#include <optional>
 
 #include "ap.h"
 #include "interpolation.h"
@@ -113,6 +115,83 @@ struct dflt_PTParams {
   static inline const std::string nuc_type = "exp"; // bubble nucleation type
 };
 
+/**
+ * @brief Lifetime distribution function of bubbles.
+ *
+ * Encapsulates the lifetime distribution function nu(T_tilde), where T_tilde
+ * is a dimensionless time variable.
+ */
+struct LifetimeDistribution {
+
+  enum class ZeroHandling {
+    Throw, // throws an exception if nu <= 0
+    Clamp, // clamps nu to a small positive value
+  };
+
+  std::vector<double> Ttilde_values;
+  std::vector<double> nu_values;
+  std::vector<double> log_nu_values;
+
+  LifetimeDistribution(
+    const std::vector<double>& Ttilde_vals,
+    const std::vector<double>& nu_vals,
+    ZeroHandling zero_handling = ZeroHandling::Clamp)
+    : Ttilde_values(Ttilde_vals)
+    , nu_values(nu_vals)
+    , log_nu_values(nu_vals.size())
+  {
+
+    if (Ttilde_values.size() != nu_values.size()) {
+      throw std::invalid_argument(
+        "LifetimeDistribution: Ttilde and nu vectors must have the same size, got " + std::to_string(Ttilde_values.size()) + " vs "+ std::to_string(nu_values.size()));
+    }
+    if (Ttilde_values.size() < 2) {
+      throw std::invalid_argument(
+        "LifetimeDistribution: at least 2 data points are required for spline construction");
+    }
+
+    for (size_t i = 0; i < nu_values.size(); i++) {
+      if (nu_values[i] <= 0.0) {
+        if (zero_handling == ZeroHandling::Throw) {
+          throw std::invalid_argument(
+            "LifetimeDistribution: nu_values[" + std::to_string(i) + "] = "
+            + std::to_string(nu_values[i]) + " is <= 0. "
+            "Use ZeroHandling::Clamp if you want non-positive values replaced automatically.");
+        }
+        log_nu_values[i] = std::log(std::numeric_limits<double>::denorm_min());
+      } else {
+        log_nu_values[i] = std::log(nu_values[i]);
+      }
+    }
+
+    alglib::real_1d_array Ttilde_arr, log_nu_arr;
+    Ttilde_arr.setcontent(Ttilde_values.size(), Ttilde_values.data());
+    log_nu_arr.setcontent(log_nu_values.size(), log_nu_values.data());
+
+    try {
+      alglib::spline1dbuildcubic(Ttilde_arr, log_nu_arr, nu_spline_);
+    } catch (const alglib::ap_error& e) {
+      throw std::runtime_error(
+        std::string("LifetimeDistribution: error building spline: ") + e.msg);
+    } catch (...) {
+      throw std::runtime_error(
+        "LifetimeDistribution: unknown error building spline");
+    }
+  }
+
+  double operator()(double Ttilde) const {
+    double T_clamped = std::clamp(Ttilde, Ttilde_values.front(), Ttilde_values.back());
+    return std::exp(alglib::spline1dcalc(nu_spline_, T_clamped));
+  }
+
+  bool inDomain(double Ttilde) const {
+    return Ttilde >= Ttilde_values.front() && Ttilde <= Ttilde_values.back();
+  }
+
+private:
+  alglib::spline1dinterpolant nu_spline_;
+};
+
 
 /* 
 units:
@@ -165,10 +244,14 @@ class PTParams {
     virtual double cpsq() const = 0; // speed of sound squared (symmetric phase)
     virtual double cmsq() const = 0; // speed of sound squared (broken phase)
 
+    void set_lifetime_distribution(const LifetimeDistribution& lt_dist) { lt_dist_ = lt_dist; }
+    std::optional<LifetimeDistribution> get_lifetime_distribution() const { return lt_dist_; }
+
   protected:
     const Universe un_;
     double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_;
     std::string nuc_type_;
+    std::optional<LifetimeDistribution> lt_dist_;
 
     virtual void print() const;
   

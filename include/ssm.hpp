@@ -15,6 +15,8 @@
 
 namespace Hydrodynamics {
 
+  struct
+
 /**
  * @brief Lifetime distribution function of bubbles
  *
