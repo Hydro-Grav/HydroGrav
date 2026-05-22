@@ -5,25 +5,30 @@ int main(int argc, char* argv[]) {
     const PhaseTransition::Universe un;
 
     // define PT parameters
-    const auto vw = PhaseTransition::dflt_PTParams::vw;
-    const auto alN = PhaseTransition::dflt_PTParams::alN_bag;
-    const auto beta = PhaseTransition::dflt_PTParams::beta;
-    const auto Rs = PhaseTransition::dflt_PTParams::Rs;
-    const auto TN = PhaseTransition::dflt_PTParams::TN;
+    double alN, beta, vw;
+    if (argc == 4) {
+        alN = std::stod(argv[1]);
+        beta = std::stod(argv[2])*(1e-15);
+        vw = std::stod(argv[3]);
+    } else { // dlft values
+        alN = PhaseTransition::dflt_PTParams::alN_bag;
+        beta = PhaseTransition::dflt_PTParams::beta;
+        vw = PhaseTransition::dflt_PTParams::vw;
+    }
+
+    auto Rs = PhaseTransition::dflt_PTParams::Rs;
+    auto TN = PhaseTransition::dflt_PTParams::TN;
     auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
     auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
-    const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
+    auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
     const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-
-    // Create hydrodynamic profile of bubble
-    const Hydrodynamics::FluidProfile profile(params);
 
     // Momentum values
     const auto kRs_vals = logspace(-1.0, 3.0, 100);
 
     // Kinetic power spectrum
-    Spectrum::PowerSpec Ek = Spectrum::Ekin(kRs_vals, profile);
+    Spectrum::PowerSpec Ek = Spectrum::Ekin(kRs_vals, params);
     Spectrum::PowerSpec Eks = Spectrum::norm_spec(Ek); // Normalised spectrum
 
     Eks.write("kinetic_spectrum.csv");

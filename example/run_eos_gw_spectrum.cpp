@@ -3,10 +3,15 @@
 int main() {
 
     /*
-        This example script generalises the run_fluid_profile to work
+        This example script generalises the run_gw_spectrum to work
         for arbitrary equation of state. The generalised equation of state
         is stored in the EquationOfState object.
     */
+
+    /* 
+        Create default universe parameters (temperature, Hubble and DoF today and at PT)
+    */
+    const PhaseTransition::Universe un;
 
     const auto vw = PhaseTransition::dflt_PTParams::vw;
     const auto alN = PhaseTransition::dflt_PTParams::alN_bag;
@@ -15,7 +20,10 @@ int main() {
     const auto Rs = PhaseTransition::dflt_PTParams::Rs;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    const PhaseTransition::Universe un;
+    /*
+        Momentum values of GW spectrum:
+    */
+   const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
     /*
         Mock equation of state data based on Bag model 
@@ -43,6 +51,7 @@ int main() {
         Firstly, we create the EquationOfState object from the eos data
     */
     PhaseTransition::EquationOfState eos_data(T, ps, pb, es, eb);
+    eos_data.write("thermo_example.csv");
 
     /* 
         Secondly, we construct the PTParams object
@@ -50,21 +59,33 @@ int main() {
     PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, Rs, nuc_type, un, eos_data);
 
     /*
-        Lastly, we use this to compute the fluid profile
-        Note as we use mock data above, this results in an error.
+        Lastly, we use this to compute the gravitational wave spectrum.
     */
-    const Hydrodynamics::FluidProfile profile_from_eos(params);
+    Spectrum::PowerSpec OmegaGW_from_eos = Spectrum::GWSpec(kRs_vals, params);
 
+    /*
+        The fluid profile is constructed internally within Spectrum::GWSpec and can be
+        accessed using:
+    */
+    const auto profile_from_eos = OmegaGW_from_eos.profile();
+
+    /*
+        Or, to construct the fluid profile directly:
+    */
+    // const Hydrodynamics::FluidProfile profile_from_eos(params);
+
+    OmegaGW_from_eos.write("gw_spectrum_eos_from_vectors.csv"); 
     profile_from_eos.write("fluid_profile_eos_from_vectors.csv");
 
     #ifdef ENABLE_MATPLOTLIB
+    OmegaGW_from_eos.plot("gw_spectrum_eos_from_vectors.png");
     profile_from_eos.plot("fluid_profile_eos_from_vectors.png");
     #endif
 
 
     /*
         Alternatively, the EoS can be loaded from a precomputed file. The format should be:
-        T,pb,ps,eb,es
+        T,ps,pb,es,eb
         10.0,0.8,1.0,2.4,3.0
         20.0,3.2,4.0,9.6,12.0
         30.0,7.2,9.0,21.6,27.0
@@ -72,21 +93,25 @@ int main() {
         We do this using the from_file function in EquationOfState.
     */
 
-    const std::string eos_path = "thermo.csv";
+    const std::string eos_path = "thermo_example.csv";
 
     PhaseTransition::EquationOfState eos_data_from_path = PhaseTransition::EquationOfState::from_file(eos_path);
 
     /*
         This can then be passed to PTParams_Veff. Additionally, PTParams_Veff itself can be 
-        initialised from the file path (for backwards compatibility, might not make it to release)
+        initialised from the file path
     */
     PhaseTransition::PTParams_Veff params_from_path(vw, alN, TN, beta, Rs, nuc_type, un, eos_path);
 
-    const Hydrodynamics::FluidProfile profile_from_path(params_from_path);
+    Spectrum::PowerSpec OmegaGW_from_path = Spectrum::GWSpec(kRs_vals, params_from_path);
 
+    const auto profile_from_path = OmegaGW_from_path.profile();
+
+    OmegaGW_from_path.write("gw_spectrum_eos_from_file.csv");
     profile_from_path.write("fluid_profile_eos_from_file.csv");
 
     #ifdef ENABLE_MATPLOTLIB
+    OmegaGW_from_path.plot("gw_spectrum_eos_from_file.png");
     profile_from_path.plot("fluid_profile_eos_from_file.png");
     #endif
 
