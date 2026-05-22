@@ -260,6 +260,8 @@ struct EquationOfState
   bool is_valid() const;
   size_t size() const { return T_vals.size(); }
 
+  void write(const std::string& filename="thermo.csv") const;
+
 private:
   void validate() const;
 };

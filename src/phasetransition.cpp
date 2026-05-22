@@ -266,6 +266,22 @@ bool EquationOfState::is_valid() const
   }
 }
 
+void EquationOfState::write(const std::string& filename) const {
+    std::cout << "Writing equation of state to disk... ";
+
+    std::ofstream file(filename);
+    file << "T,ps,pb,es,eb\n";
+
+    for (size_t i = 0; i < T_vals.size(); ++i) {
+        file << T_vals[i] << "," << ps_vals[i] << "," << pb_vals[i] << "," << es_vals[i] << "," << eb_vals[i] << "\n";
+    }
+    file.close();
+
+    std::cout << "Saved to " << filename << "!\n";
+
+    return;
+}
+
 /********************************** PTParams_Veff *********************************/
 // NOTE: PTParams_Veff only uses alN to check if hydrodynamic mode agrees with Bag model!
 
@@ -351,8 +367,6 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
     throw std::invalid_argument("Unphysical nucleation enthalpy. Must have wN > 0.");
   }
 
-  wNeN_rat_ = wN_ / eN_;
-
   // Calculate sound speeds
   double s_unused, dps, des, dpb, deb, dps2_unused, des2_unused, dpb2_unused, deb2_unused;
   cpsq_vals_.reserve(n);
@@ -380,6 +394,16 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   cmsq_array.setcontent(n, cmsq_vals_.data());
   // alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
   alglib::spline1dbuildcubic(veff_TTN_array, cmsq_array, cmsq_fit_);
+
+  wNeN_rat_ = wN_ / eN_;
+
+  // check for normalisation issue in eos (adjust tolerance as needed)
+  // impacts prefactor for gw spectrum - only changes max amplitude of spectrum
+  if (wNeN_rat_ > 2.0) {
+    std::cout << "Warning: Equation of state normalisation issue. wN/eN=" << wNeN_rat_ << " is abnormally large! "
+              << "Using wN/eN = 1 + cpsq approximation instead!\n";
+    wNeN_rat_ = 1.0 + alglib::spline1dcalc(cpsq_fit_, 1.0); // munu approx
+  }
 
   // calculate alN_bag and alN_munu
   // const auto theta_s_bag = es_val(1.0) - 3.0 * ps_val(1.0);
