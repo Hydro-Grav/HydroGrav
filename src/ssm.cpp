@@ -357,6 +357,8 @@ void PowerSpec::write(const std::string& filename, const bool write_header) cons
 
 #ifdef ENABLE_MATPLOTLIB
 void PowerSpec::plot(const std::string& filename) const {
+    std::cout << "Generating power spectrum plot... ";
+
     plt::figure_size(800, 600);
     plt::loglog(K(), P(), "k-");
     plt::suptitle("vw = " + to_string_with_precision(params_->vw()) + ", alN = " + to_string_with_precision(params_->alN()));
@@ -491,7 +493,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto ti = std::chrono::high_resolution_clock::now();
 
-    // std::cout << "[DEBUG] Config values: "
+    // std::clog << "[DEBUG] Config values: "
     //           << "pRs_samples=" << config::pRs_samples 
     //           << ", z_samples=" << config::z_samples 
     //           << ", pRs_tolerance=" << config::pRs_tolerance 
@@ -499,11 +501,21 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const Hydrodynamics::FluidProfile profile(params);
 
+    std::cout << "Calculating gravitational wave power spectrum...\n";
+
     const auto cs = std::sqrt(params.cpsq());
     const auto Rs_inv = 1.0 / params.Rs();
     
+    double dtau;
+    if (calc_dtau) {
+        std::cout << "Using non-linear timescale to calculate dtau\n";
+        dtau = get_nl_timescale(profile);
+    } else {
+        std::cout << "Using dtau=10*Rs\n";
+        dtau = dtau_approx(params);
+    }
+
     const auto tau_s = params.tau_s();
-    const auto dtau = (calc_dtau) ? get_nl_timescale(profile) : dtau_approx(params);
     const auto tau_fin = tau_s + dtau;
 
     const auto nk = kRs_vals.size();
@@ -517,8 +529,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     alglib::spline1dinterpolant log_zk_spline;
     build_kinetic_spectrum_spline(kinetic_spectrum_K_values, profile, log_zk_spline);
-
-    std::cout << "Calculating gravitational wave power spectrum...\n";
 
     const auto prefac = gw_prefac(kRs_vals, profile);
 
@@ -741,6 +751,8 @@ double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::Fluid
 
 #ifdef ENABLE_MATPLOTLIB
 void plot_spectra(const PowerSpec& gw_spec_bag, const PowerSpec& gw_spec_munu, const PowerSpec& gw_spec_veff, const std::string& filename, const double f_min, const double f_max) {
+    std::cout << "Generating power spectra plot for bag, mu-nu and Veff EoS... ";
+
     const auto freq_bag = gw_spec_bag.freq();
     const auto P_bag = gw_spec_bag.P();
 
@@ -755,7 +767,7 @@ void plot_spectra(const PowerSpec& gw_spec_bag, const PowerSpec& gw_spec_munu, c
     opts_bag["color"] = "red";
     opts_bag["linestyle"] = "--";
 
-    opts_munu["label"] = "mu nu";
+    opts_munu["label"] = "mu-nu";
     opts_munu["color"] = "black";
     opts_munu["linestyle"] = "-.";
 

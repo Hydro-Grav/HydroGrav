@@ -669,8 +669,6 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
     double fa = f(a);
     double fb = f(b);
 
-    // std::cout << "f(a=" << a <<")=" << fa << ", f(b=" << b << ")=" << fb << std::endl;
-
     if (fa * fb > 0.0) {
         throw std::runtime_error("Bisection method interval not bracketed!");
     }
@@ -681,7 +679,6 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
 
     for (int i = 0; i < max_iter; ++i) {
         double c = 0.5 * (a + b);
-        // std::cout << "c=" << c << "\n";
         double fc = f(c);
 
         if (!std::isfinite(fc)) {
@@ -706,8 +703,6 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
         }
     }
 
-    // std::cout << "Bisection method failed, using smallest root algorithm.\n";
-    // return find_smallest_root(f, a, b);
     throw std::runtime_error("Bisection method did not converge.");
 }
 
@@ -1112,7 +1107,7 @@ std::array<double, 2> bisection_2d(
         double res_norm = std::sqrt(res_mid[0]*res_mid[0] + res_mid[1]*res_mid[1]);
         
         if (dev) {
-            std::cout << "Bisection iter " << iter << ": mid=(" << mid[0] << ", " << mid[1] 
+            std::clog << "Bisection iter " << iter << ": mid=(" << mid[0] << ", " << mid[1] 
                     << "), r1=" << res_mid[0] << ", r2=" << res_mid[1] << ", residual=" << res_norm << "\n";
         }
         

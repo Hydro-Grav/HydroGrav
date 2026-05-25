@@ -46,11 +46,11 @@ Universe::Universe(double T0, double Ts, double g0, double gs, double H0, double
 std::ostream& operator<<(std::ostream& os, const Universe& un) {
     os << "************** Universe parameters **************\n"
        << std::left
-       << std::setw(20) << " " << std::setw(13) << "Today" << "Start of PT\n"
-       << std::setw(20) << " " << std::setw(13) << "-----" << "-----------\n"
-       << std::setw(20) << "Temperature:" << "T0=" << std::setw(10) << un.T0() << "Ts=" << un.Ts() << "\n"
-       << std::setw(20) << "Hubble constant:" << "H0=" << std::setw(10) << un.H0() << "Hs=" << un.Hs() << "\n"
-       << std::setw(20) << "Number of DoF:" << "g0=" << std::setw(10) << un.g0() << "gs=" << un.gs() << "\n"
+       << std::setw(20) << " " << std::setw(15) << "Today" << "Start of PT\n"
+       << std::setw(20) << " " << std::setw(15) << "-----" << "-----------\n"
+       << std::setw(20) << "Temperature:" << "T0=" << std::setw(12) << un.T0() << "Ts=" << un.Ts() << "\n"
+       << std::setw(20) << "Hubble constant:" << "H0=" << std::setw(12) << un.H0() << "Hs=" << un.Hs() << "\n"
+       << std::setw(20) << "Number of DoF:" << "g0=" << std::setw(12) << un.g0() << "gs=" << un.gs() << "\n"
        << "*************************************************\n";
        
     return os;
@@ -91,7 +91,7 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
 
       // check valid vw
       if (vw_ < 0.0 ) {
-        std::cout << "Warning: vw < 0. Taking |vw| as input instead.";
+        std::cerr << "Warning: vw < 0. Taking |vw| as input instead.";
         vw_ = std::abs(vw);
       } else if (vw == 0.0 || vw >= 1.0) {
         throw std::invalid_argument("Unphysical wall velocity passed into PTParams. Must have 0 < vw < 1.");
@@ -115,7 +115,7 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
       // check valid bubble nucleation type
       const std::vector<std::string> allowed_nuc = {"exp", "sim"};
       if (!is_valid_model(nuc_type, allowed_nuc)) {
-          std::cout << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
+          std::cerr << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
           nuc_type_ = dflt_PTParams::nuc_type;
       }
     }
@@ -146,7 +146,7 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
       cpsq_(cpsq),
       cmsq_(cmsq) {
 
-      std::cout << "Storing phase transition parameters. Note that alN definition differs between bag and mu-nu models!\n\n";
+      std::cout << "Storing phase transition parameters. Note that alN definition differs between bag and mu-nu models!\n";
 
       // check valid speed of sound
       if (!is_valid_csq(cpsq_)) {
@@ -292,7 +292,7 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfS
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, const EquationOfState& eos_data)
     : PTParams(vw, alN, TN, beta, Rs, nuc_type, un) {
     
-    std::cout << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model!\n\n";
+    std::cout << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model to identify if hydrodynamic mode differs to simplified EoS!!\n";
     initialize_from_eos_data(eos_data);
 }
 
@@ -400,7 +400,7 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   // check for normalisation issue in eos (adjust tolerance as needed)
   // impacts prefactor for gw spectrum - only changes max amplitude of spectrum
   if (wNeN_rat_ > 2.0) {
-    std::cout << "Warning: Equation of state normalisation issue. wN/eN=" << wNeN_rat_ << " is abnormally large! "
+    std::cerr << "Warning: Equation of state normalisation issue. wN/eN=" << wNeN_rat_ << " is abnormally large! "
               << "Using wN/eN = 1 + cpsq approximation instead!\n";
     wNeN_rat_ = 1.0 + alglib::spline1dcalc(cpsq_fit_, 1.0); // munu approx
   }

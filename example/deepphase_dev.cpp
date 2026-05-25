@@ -114,25 +114,25 @@ void example_FluidProfile(const benchmark_point& bp) {
 
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
-    const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-    const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+    // const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    // const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
     const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, nuc_type, un, veff_file);
 
-    un.print();
-    params_munu.print();
+    // un.print();
+    // params_veff.print();
 
     // Write fluid profiles to disk
-    const Hydrodynamics::FluidProfile profile_bag(params_bag);
+    // const Hydrodynamics::FluidProfile profile_bag(params_bag);
     // profile_bag.plot("profile_bag.png");
     // profile_bag.write("prof_bag.csv");
 
-    const Hydrodynamics::FluidProfile profile_munu(params_munu);
+    // const Hydrodynamics::FluidProfile profile_munu(params_munu);
     // profile_munu.plot("fp_" + bp.name() + "_new.png");
     // profile_munu.write("prof_munu.csv");
 
     const Hydrodynamics::FluidProfile profile_veff(params_veff); // veff
-    // profile_veff.plot("profile_veff.png");
-    // profile_veff.write("prof_veff.csv");
+    profile_veff.plot("profile_veff.png");
+    profile_veff.write("prof_veff.csv");
 
     // std::cout << "Bag: cpsq=" << params_bag.cpsq() << ", cmsq=" << params_bag.cmsq() << "\n"
     //           << "mu nu: cpsq=" << params_munu.cpsq() << ", cmsq=" << params_munu.cmsq() << "\n"
@@ -141,14 +141,10 @@ void example_FluidProfile(const benchmark_point& bp) {
     // params_veff.plot_thermo();
     // params_veff.plot_csq();
 
-    std::cout << "cpsq (bag) = " << params_bag.cpsq() << ", cmsq (bag) = " << params_bag.cmsq() << "\n"
-              << "cpsq (mu nu) = " << params_munu.cpsq() << ", cmsq (mu nu) = " << params_munu.cmsq() << "\n"
-              << "cpsq (veff) = " << params_veff.csq_s(1.06728) << ", cmsq (veff) = " << params_veff.csq_b(1.0164) << "\n";
-
     #ifdef ENABLE_MATPLOTLIB
-    const auto filename = bp.dir() + "profile_" + profile_bag.mode_str() + ".png";
+    // const auto filename = bp.dir() + "profile_" + profile_bag.mode_str() + ".png";
     // const auto filename = "fp.png";
-    Hydrodynamics::plot_profiles(profile_bag, profile_munu, profile_veff, filename, 0.585, 0.605);
+    // Hydrodynamics::plot_profiles(profile_bag, profile_munu, profile_veff, filename, 0.585, 0.605);
     #endif
 }
 
@@ -517,7 +513,7 @@ int main() {
     const auto gs = 106.75;
     const auto nuc_type = "exp";
 
-        benchmark_point BP0_def(
+    benchmark_point BP0_def(
         0.4, // vw (def)
         53.370765185008004,  // Ts
         0.11384915003991744, // alN_bag
@@ -1615,6 +1611,9 @@ int main() {
                                                   scan3_BP21, scan3_BP22};
     std::vector<benchmark_point> scan4_bp_list = {scan4_BP0, scan4_BP1, scan4_BP2, scan4_BP3, scan4_BP4, scan4_BP5, scan4_BP6, scan4_BP7, scan4_BP8, scan4_BP9};
 
+    const auto bp = scan4_bp_list[2];
+    example_FluidProfile(bp);
+
     // std::vector<std::pair<std::string, std::string>> fail_cases;
     // for (int i = 0; i < bp_list.size(); i++) {
     //     const auto bp = bp_list[i];
@@ -1633,13 +1632,13 @@ int main() {
     // }
 
     // for (int i = 0; i < scan2_bp_list.size(); i++) {
-        const int i = 9;
-        const auto bp = scan4_bp_list[i];
-        const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
-        const auto kRs_vals = logspace(-3.0, 3.0, 100);
+        // const int i = 9;
+        // const auto bp = scan4_bp_list[i];
+        // const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
+        // const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
-        const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
-        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
+        // const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
+        // const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
         
         // std::cout << "wNeN_rat=" << params_veff.wNeN_rat() << "\n";
         // OmegaGW_veff.profile().write("fp_" + bp.name() + "_veff.csv");
@@ -1647,8 +1646,8 @@ int main() {
 
         // std::cout << "shock_flag=" << OmegaGW_veff.profile().shock_flag() << "\n";
 
-        const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_bag(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
-        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
+        // const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_bag(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
+        // const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
         
         // OmegaGW_bag.profile().write("fp_" + bp.name() + "_bag.csv");
         // OmegaGW_bag.write("gw_" + bp.name() + "_bag.csv");
@@ -1657,8 +1656,8 @@ int main() {
         // const auto cmsq = params_veff.csq_b(OmegaGW_veff.profile().TmTN());
         // const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, cpsq, cmsq);
             
-        const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.cpsq(), bp.cmsq());
-        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
+        // const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.cpsq(), bp.cmsq());
+        // const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
         
         // OmegaGW_munu.profile().write("fp_" + bp.name() + "_munu.csv");
         // OmegaGW_munu.write("gw_" + bp.name() + "_munu.csv");
@@ -1676,14 +1675,14 @@ int main() {
         // std::cout << "snr_bag=" << snr_bag << ", snr_munu=" << snr_munu << ", snr_veff=" << snr_veff << "\n";
         
 
-        #ifdef ENABLE_MATPLOTLIB
-        const std::string filename_fp = "fp_" + bp.name() + ".png";
-        Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
-        Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
+        // #ifdef ENABLE_MATPLOTLIB
+        // const std::string filename_fp = "fp_" + bp.name() + ".png";
+        // Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
+        // Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
         // Spectrum::plot_spectra(Ekin_bag, Ekin_munu, Ekin_veff, "ekin_" + bp.name() + ".png");
         // params_veff.plot_thermo("thermo.png");
         // params_veff.plot_csq("csq_" + bp.name() + ".png");
-        #endif
+        // #endif
     // }
 
     // veff solution space stuff

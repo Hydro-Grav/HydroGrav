@@ -52,7 +52,7 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params);
  */
 class FluidProfile {
   public:
-    FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000);
+    FluidProfile(const PhaseTransition::PTParams& params, const size_t n=5000, const bool dev_log=false);
 
     // return pointer to base class
     const PhaseTransition::PTParams* params() const { return params_; }; // PT parameters
@@ -94,6 +94,7 @@ class FluidProfile {
     double xi_min_integrate_, xi_max_integrate_; // start/endpoints of profile for integration
 
     bool shock_flag_; // flag for checking shock convergence using Veff in parameter scan
+    const bool dev_log_;
 
     /************************** Bag EoS **************************/
     int get_mode_bag(double vw, double cmsq, double alN) const;
