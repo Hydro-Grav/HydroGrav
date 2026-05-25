@@ -130,8 +130,8 @@ units:
  */
 class PTParams {
   public:
-    // ctor
-    PTParams(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un); // ctor
+    virtual ~PTParams() = default; // dtor
 
     enum class ModelType { Bag, Veff }; // equation of state model
     virtual ModelType eos() const = 0;

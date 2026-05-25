@@ -468,7 +468,7 @@ void PTParams_Veff::plot_thermo2(const std::string& filename) const {
     const auto ps_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
     const auto pb_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
       const auto TTN = veff_TTN_vals_[i];
 
       es_spline_vals[i] = alglib::spline1dcalc(veff_es_interp_, TTN) / es_TN;
@@ -559,7 +559,7 @@ void PTParams_Veff::plot_thermo2(const std::string& filename) const {
 void PTParams_Veff::plot_csq(const std::string& filename) const {
   const auto n = veff_TTN_vals_.size();
   std::vector<double> cpsq_spline_vals(n), cmsq_spline_vals(n);
-  for (int i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     const auto TTN = veff_TTN_vals_[i];
     cpsq_spline_vals[i] = alglib::spline1dcalc(cpsq_fit_, TTN);
     cmsq_spline_vals[i] = alglib::spline1dcalc(cmsq_fit_, TTN);

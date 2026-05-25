@@ -1114,16 +1114,8 @@ std::array<double, 2> bisection_2d(
         if (res_norm < tol) {
             return mid;
         }
-        
-        // Evaluate at corners to decide which quadrant to keep
-        auto res_lower = F(lower);
-        auto res_upper = F(upper);
-        auto res_mixed1 = F({lower[0], upper[1]});
-        auto res_mixed2 = F({upper[0], lower[1]});
-        
-        // Find quadrant with best sign change properties
-        // Strategy: keep the quadrant where residuals have opposite signs
-        
+                
+        // Find quadrant with best sign change properties       
         struct Quadrant {
             std::array<double, 2> corner1;
             std::array<double, 2> corner2;
@@ -1227,7 +1219,7 @@ std::array<double, 2> grid_search_2d(std::function<std::array<double, 2>(std::ar
 }
 
 // nelder-mead 2d minimiser
-static double nelder_mead_2d_objective(const gsl_vector* x, void* params) {
+double nelder_mead_2d_objective(const gsl_vector* x, void* params) {
     auto* p = static_cast<NelderMead2DParams*>(params);
 
     const std::array<double, 2> args = {

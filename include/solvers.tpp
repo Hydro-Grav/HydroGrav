@@ -308,9 +308,7 @@ std::array<T,2> newton_solve_2d_bounded(
         // Step limiting: ensure we don't go out of bounds
         T alpha = 1.0;  // Step size multiplier
         
-        for (int j = 0; j < 2; ++j) {
-            T x_new = x0[j] + dx[j];
-            
+        for (int j = 0; j < 2; ++j) {            
             // Calculate maximum allowed step to stay within bounds
             if (dx[j] > 0) {
                 // Moving toward upper bound

@@ -58,7 +58,7 @@ double dwdv(double xi, double v, double w, const double csq) {
     return w * gammaSq(v) * mu(xi, v) * (1.0 + 1.0 / csq);
 }
 
-double dTdv(double xi, double v, double T, const double csq) {
+double dTdv(double xi, double v, double T) {
     return T * gammaSq(v) * mu(xi, v);
 }
 
@@ -68,7 +68,7 @@ state_type dydv_vec(double v, const state_type& y, double vw, double cmsq, doubl
     const auto T = y[2];
     const auto csq = (xi <= vw) ? cmsq : cpsq;
 
-    return { dxidv(xi, v, csq), dwdv(xi, v, w, csq), dTdv(xi, v, T, csq) };
+    return { dxidv(xi, v, csq), dwdv(xi, v, w, csq), dTdv(xi, v, T) };
 }
 /*************************************************************************************/
 
@@ -499,7 +499,7 @@ std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::def
     const auto T_fac = T1TN / T_end_val;
 
     // correctly normalise w/wN, T/TN profiles
-    for (int i = 0; i < v_sol.size(); i++) {
+    for (size_t i = 0; i < v_sol.size(); i++) {
         y_sol[i][1] *= w_fac; // normalize w profile so w1/wN=1 & scale to correct w1/wN
         y_sol[i][2] *= T_fac;
     }
@@ -565,7 +565,7 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
     std::vector<double> resi_vals(v_sol.size());
     int pass_count = 0;
 
-    for (int i = 0; i < v_sol.size(); i++) {
+    for (size_t i = 0; i < v_sol.size(); i++) {
         const auto xi_sh = y_sol[i][0];
         if (xi_sh <= vw_ || xi_sh > 1.0) {
             resi_vals[i] = 1.0;
@@ -574,8 +574,6 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
         
         const auto v1UF = v_sol[i];
         const auto v1 = mu(xi_sh, abs(v1UF)); // v1=mu(xi_sh, v1UF)
-        const auto T1TN = y_sol[i][2];
-
         const auto v2 = xi_sh; // v2=xi_sh
 
         // shock condition mu(xi_sh, v(xi_sh)) xi_sh = cp^2
@@ -601,7 +599,7 @@ void FluidProfile::test_alN_residual(const deriv_func& dydv, double vm, const si
     const auto vpUF_vals = linspace(1e-4, 0.2, n);
     std::vector<double> resi_vals(n);
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         double resi = std::numeric_limits<double>::quiet_NaN();
         try {
             resi = alN_residual(dydv, vpUF_vals[i], vm);
@@ -634,7 +632,7 @@ void FluidProfile::test_shock_bag(const std::vector<double>& v_sol, const std::v
     std::cout << "Running test for shock residual...\n";
 
     std::vector<double> xi_vals, resi_vals, r1_vals, r2_vals;
-    for (int i = 0; i < v_sol.size(); i++) {
+    for (size_t i = 0; i < v_sol.size(); i++) {
         const auto xi_sh = y_sol[i][0];
         if (xi_sh <= vw_ || xi_sh > 1.0) continue;
         
@@ -841,7 +839,7 @@ void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) co
     // const auto TmTN_vals = linspace(1.03597, 1.03615, n);
 
     std::vector<double> resi_vals, TmTN_vals_pass;
-    for (int i = 0; i < n; i++) {  
+    for (size_t i = 0; i < n; i++) {  
         double resi = std::numeric_limits<double>::quiet_NaN();
         try {
             resi = v1_residual_veff(dydv, TmTN_vals[i]);
@@ -876,11 +874,9 @@ void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) co
 
 void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const {
     std::cout << "Running test for shock residual...\n";
-    const auto pN = veff_params_->pN();
-    const auto eN = veff_params_->eN();
 
     std::vector<double> xi_vals, resi_vals;
-    for (int i = 0; i < v_sol.size(); i++) {
+    for (size_t i = 0; i < v_sol.size(); i++) {
         const auto xi_sh = y_sol[i][0];
         if (xi_sh <= vw_ || xi_sh > 1.0) continue;
         
@@ -1011,8 +1007,6 @@ std::tuple<double, double, double> FluidProfile::wall_matching_veff(const double
 
     // fluid in front of wall
     const auto vp = sol[0];
-    const auto vpUF = mu(vw_, abs(vp));
-
     const auto wpwN = w_from_matching(wmwN, vm, vp);
     const auto TpTN = sol[1];
 
@@ -1030,7 +1024,7 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 
     // truncate solution to where dxi/dv=0 (gives better behaved shock residual)
     std::vector<double> resi_vals(n);
-    for (int i = 0; i < v_sol_tmp.size(); i++) {
+    for (size_t i = 0; i < v_sol_tmp.size(); i++) {
         resi_vals[i] = abs(dxidv(y_sol_tmp[i][0], v_sol_tmp[i], veff_params_->csq_s(y_sol_tmp[i][2])));
     }
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
@@ -1089,16 +1083,13 @@ bool FluidProfile::check_shock_convergence_fallback(const std::vector<double>& v
 }
 
 size_t FluidProfile::find_shock_idx_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool fallback) const {
-    const auto pN = veff_params_->pN();
-    const auto eN = veff_params_->eN();
-
     const auto TpTN = y_sol[0][2];
     const auto cpsq = veff_params_->csq_s(TpTN);
 
     std::vector<double> resi_vals(v_sol.size());
     int pass_count = 0;
 
-    for (int i = 0; i < v_sol.size(); i++) {
+    for (size_t i = 0; i < v_sol.size(); i++) {
         const auto xi_sh = y_sol[i][0];
 
         if (xi_sh <= vw_ || xi_sh > 1.0) {
@@ -1312,6 +1303,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
                           << "  wmwN = " << w_end_val << ", TmTN = " << T_end_val << "\n"
                           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
                           << "  wpwN = " << wpwN << ", TpTN = " << T_sol_tmp.back() << "\n"
+                          << "  alp = " << alp << "\n"
                           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
                           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
                           << "  xi_sh = " << xi_sh << "\n";
@@ -1367,6 +1359,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
                           << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
                           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
                           << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+                          << "  alp = " << alp << "\n"
                           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
                           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
                           << "  xi_sh = " << xi_sh << "\n";
@@ -1418,7 +1411,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
     // update final point manually where dxidv is singular
     if (mode_ != 0) {
         w_end_val = w_sol_tmp.back() - dwdv(std::sqrt(cmsq_), 0.0, w_end_val, cmsq_) * v_sol_tmp.back();
-        T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(cmsq_), 0.0, T_end_val, cmsq_) * v_sol_tmp.back();
+        T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(cmsq_), 0.0, T_end_val) * v_sol_tmp.back();
         la_end_val = lambda_b(w_end_val);
 
         const size_t idx = v_sol_tmp.size() - 1; // index of last point
@@ -1693,7 +1686,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
     // update final point manually where dxidv is singular
     if (mode_ != 0) {
         w_end_val = w_sol_tmp.back() - dwdv(std::sqrt(veff_params_->csq_b(T_end_val)), 0.0, w_end_val, veff_params_->csq_b(T_end_val)) * v_sol_tmp.back();
-        T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(veff_params_->csq_b(T_end_val)), 0.0, T_end_val, veff_params_->csq_b(T_end_val)) * v_sol_tmp.back();
+        T_end_val = T_sol_tmp.back() - dTdv(std::sqrt(veff_params_->csq_b(T_end_val)), 0.0, T_end_val) * v_sol_tmp.back();
         la_end_val = lambda_b_veff(T_end_val, eN, wN_inv);
 
         const size_t idx = v_sol_tmp.size() - 1; // index of last point

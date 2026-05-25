@@ -82,7 +82,7 @@ class PowerSpec {
     const PhaseTransition::PTParams* params() const { return params_; };
 
     /// Sound‑wave duration parameter.
-    const double dtau() const { return dtau_; };
+    double dtau() const { return dtau_; };
 
     /**
      * @brief Return peak frequency and amplitude of the spectrum.

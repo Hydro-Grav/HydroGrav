@@ -383,7 +383,7 @@ struct NelderMead2DParams {
     const std::function<std::array<double, 2>(const std::array<double, 2>&)>& func;
 };
 
-static double nelder_mead_2d_objective(const gsl_vector* x, void* params);
+double nelder_mead_2d_objective(const gsl_vector* x, void* params);
 
 std::array<double, 2> nelder_mead_minimise_2d(
     const std::function<std::array<double, 2>(const std::array<double, 2>&)>& func,
