@@ -177,122 +177,6 @@ std::string to_string_with_precision(double value, int precision = 2);
  * @return Approximate integral \f$\int y\,dx\f$.
  */
 double simpson_integrate(const std::vector<double>& x, const std::vector<double>& y);
-/**
- * @brief Two–dimensional Simpson integration over a mesh defined by `x` and `y`.
- *
- * @param x Vector of x coordinates.
- * @param y Vector of y coordinates.
- * @param f Matrix of function values of size `x.size()` × `y.size()`.
- * @return Double integral estimate.
- */
-double simpson_2d_integrate(const std::vector<double>& x, const std::vector<double>& y, const std::vector<std::vector<double>>& f);
-/**
- * @brief Simpson integration for 2D data supplied as a flattened array.
- *
- * @param x Vector of x coordinates.
- * @param y Vector of y coordinates.
- * @param f_flat Flattened function values (row-major order).
- * @return Estimated integral.
- */
-double simpson_2d_integrate_flat(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& f_flat);
-
-/**
- * @struct SimpsonWeights2D
- * @brief Precomputed weight matrices used by weighted 2D Simpson integrator.
- *
- * `Ax_weights` and `Ay_weights` store coefficient triples for each
- * interval in the x- and y-directions respectively.  `dx` and `dy`
- * hold the corresponding interval sizes.
- */
-struct SimpsonWeights2D {
-    std::vector<std::vector<double>> Ax_weights; // size: (nx-2) x 3
-    std::vector<std::vector<double>> Ay_weights; // size: (ny-2) x 3
-    std::vector<double> dx;  // size: nx-2
-    std::vector<double> dy;  // size: ny-2
-};
-
-/**
- * @brief Compute 1D Simpson weight coefficients for a non-uniform grid.
- *
- * @param coords    Coordinate values.
- * @param weights   Output weight matrix (Nx3).
- * @param intervals Output vector of interval widths.
- */
-void precompute_1d_weights(
-    const std::vector<double>& coords,
-    std::vector<std::vector<double>>& weights,
-    std::vector<double>& intervals);
-
-/**
- * @brief Generate 2D Simpson weights for use with weighted integration.
- *
- * @param x Vector of x coordinates.
- * @param y Vector of y coordinates.
- * @return Struct containing precomputed weights and intervals.
- */
-SimpsonWeights2D precompute_simpson_weights_2d(
-    const std::vector<double>& x,
-    const std::vector<double>& y);
-
-/**
- * @brief Weighted Simpson integration for flattened 2D data on a
- *        non-uniform grid.
- *
- * Uses precomputed weight matrices produced by
- * `precompute_simpson_weights_2d`.
- */
-double simpson_2d_nonuniform_flat_weighted(
-    const std::vector<double>& x,                        // full x vector, size nx
-    const std::vector<double>& y,                        // full y vector, size ny
-    const std::vector<double>& f_flat,                   // flattened f array, size nx * ny
-    const std::vector<std::vector<double>>& Ax_weights,  // size (nx-2)/2 x 3
-    const std::vector<std::vector<double>>& Ay_weights,  // size (ny-2)/2 x 3
-    const std::vector<double>& dx,                       // size (nx-2)/2
-    const std::vector<double>& dy                        // size (ny-2)/2
-);
-
-/**
- * @brief Compute the sine integral Si(x) using cached routines.
- *
- * @param x Argument value.
- * @return Si(x).
- */
-double Si(double x);
-/**
- * @brief Compute the cosine integral Ci(x) using cached routines.
- *
- * @param x Argument value.
- * @return Ci(x).
- */
-double Ci(double x);
-/**
- * @brief Return both Si(x) and Ci(x) as a pair.
- *
- * Optionally specify number of integration points used in fallback
- * algorithms.
- */
-std::pair<double, double> SiCi(double x, const size_t n=1000);
-/**
- * @brief Compute derivatives of Si and Ci with respect to their inputs.
- *
- * @param x First argument.
- * @param y Second argument.
- * @param n Number of points for numeric differentiation.
- * @return A vector containing the derivatives.
- */
-std::vector<double> dSiCi(double x, double y, const size_t n);
-
-/**
- * @brief Simple bisection root finder for a continuous function.
- *
- * @param f        Function for which the root is sought.
- * @param a        Lower bracket.
- * @param b        Upper bracket.
- * @param tol      Tolerance for convergence.
- * @param max_iter Maximum number of iterations.
- * @return Approximate root value.
- */
-double root_finder(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
 
 /**
  * @brief Minimise a scalar function using the golden-section search method.
@@ -308,29 +192,6 @@ double root_finder(std::function<double(double)> f, double a, double b, double t
  * @return Approximate minimiser.
  */
 double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
-
-/**
- * @brief Minimise a scalar function using Brent's method.
- *
- * Combines golden-section search and parabolic interpolation for
- * superlinear convergence near smooth minima.
- *
- * @param f        Objective function.
- * @param a        Left bound of search interval.
- * @param b        Right bound of search interval.
- * @param tol      Convergence tolerance.
- * @param max_iter Maximum number of iterations.
- * @return Approximate minimiser.
- */
-double brent_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
-
-/**
- * @brief Convert a std::vector<double> to an ALGLIB real_1d_array.
- *
- * @param vec Input vector.
- * @return Equivalent ALGLIB array (data is copied).
- */
-alglib::real_1d_array vector_to_real_1d_array(const std::vector<double>& vec);
 
 /**
  * @brief Find a bracketing interval [a', b'] ⊆ [a, b] in which @p residual_func changes sign.
@@ -366,69 +227,6 @@ template <typename T, typename State, typename Func>
 std::pair<std::vector<T>, std::vector<State>> rk4_solver(const Func& dydx, T x0, T xf, const State& y0, size_t n=1000);
 
 /**
- * @brief One-dimensional Newton–Raphson root finder with numerical Jacobian.
- *
- * @tparam T    Floating-point type.
- * @tparam Func Callable with signature T(T).
- *
- * @param F        Function whose root is sought.
- * @param x0       Initial guess.
- * @param tol      Convergence tolerance (default: 1e-8).
- * @param max_iter Maximum iterations (default: 100).
- * @param h        Step size for finite-difference Jacobian (default: 1e-8).
- * @return Approximate root.
- */
-template <typename T, typename Func>
-T newton_solve_1d(const Func& F, T x0, T tol=1e-8, int max_iter=100, T h=1e-8);
-
-/**
- * @brief Bounded one-dimensional Newton–Raphson root finder.
- *
- * Like @c newton_solve_1d but clamps iterates to [x_min, x_max] to prevent
- * the solver from stepping outside a physically meaningful domain.
- *
- * @tparam T    Floating-point type.
- * @tparam Func Callable with signature T(T).
- *
- * @param f            Function whose root is sought.
- * @param x0           Initial guess (must satisfy x_min ≤ x0 ≤ x_max).
- * @param x_min        Lower bound.
- * @param x_max        Upper bound.
- * @param tol          Convergence tolerance.
- * @param max_iter     Maximum iterations.
- * @param h            Finite-difference step for Jacobian.
- * @param bound_margin Minimum distance kept from the domain boundaries.
- * @return Approximate root.
- */
-template <typename T, typename Func>
-T newton_solve_1d_bounded(
-    const Func& f,
-    T x0,
-    T x_min,
-    T x_max,
-    T tol = 1e-8,
-    int max_iter = 100,
-    T h = 1e-8,
-    T bound_margin = 1e-6
-);
-
-/**
- * @brief Two-dimensional Newton–Raphson root finder with numerical Jacobian.
- *
- * @tparam T    Floating-point type.
- * @tparam Func Callable with signature std::array<T,2>(std::array<T,2>).
- *
- * @param F        2D residual function.
- * @param x0       Initial guess.
- * @param tol      Convergence tolerance.
- * @param max_iter Maximum iterations.
- * @param h        Finite-difference step for Jacobian.
- * @return Approximate root as a 2-element array.
- */
-template <typename T, typename Func>
-std::array<T,2> newton_solve_2d(const Func& F, std::array<T,2> x0, T tol=1e-8, int max_iter=100, T h=1e-8);
-
-/**
  * @brief Bounded two-dimensional Newton–Raphson root finder.
  *
  * Extends @c newton_solve_2d by clamping iterates within [x_min, x_max]
@@ -460,28 +258,6 @@ std::array<T,2> newton_solve_2d_bounded(
     T bound_margin = 1e-6,  // Stay this far from boundaries
     bool dev = false
 );
-
-/**
- * @brief Two-dimensional bisection method for vector-valued residuals.
- *
- * Performs independent bisection along each coordinate direction to
- * find a point at which the 2D residual vector is near zero.
- *
- * @param F        2D residual function.
- * @param lower    Lower corner of the search domain.
- * @param upper    Upper corner of the search domain.
- * @param tol      Convergence tolerance.
- * @param max_iter Maximum iterations.
- * @param dev      Enable verbose diagnostic output.
- * @return Approximate solution as a 2-element array.
- */
-std::array<double, 2> bisection_2d(
-    std::function<std::array<double, 2>(std::array<double, 2>)> F,
-    std::array<double, 2> lower,
-    std::array<double, 2> upper,
-    double tol=1e-8,
-    int max_iter=50,
-    bool dev=false);
 
 #include "solvers.tpp"
 

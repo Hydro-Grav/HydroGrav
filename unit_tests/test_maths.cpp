@@ -116,38 +116,6 @@ TEST_CASE("Test cubic spline interpolation", "[cubicSpline]") {
     }
 }
 
-TEST_CASE("Test si(x) and ci(x)", "[trigInt]") {
-
-    struct TestContainer {
-        double x;
-        double expected_si;
-        double expected_ci;
-    };
-
-    TestContainer tests[] = {
-        {-5.0, -1.5499312449, -0.19003},
-        {-4.0, -1.7582031389, -0.140982},
-        {-3.0, -1.8486525274, 0.11963},
-        {-2.0, -1.6054129768, 0.422981},
-        {-1.0, -0.9460830704, 0.337404 },
-        {-0.5, -0.4931074180, -0.177784},
-        { 0.5,  0.4931074180, -0.177784},
-        { 1.0,  0.9460830704, 0.337404},
-        { 2.0,  1.6054129768,  0.422981},
-        { 3.0,  1.8486525274,  0.11963},
-        { 4.0,  1.7582031389,  -0.140982},
-        { 5.0,  1.5499312449,  -0.19003}
-    };
-
-    for (const auto& t : tests) {
-
-        const auto [si, ci] = SiCi(t.x);
-
-        CHECK(si == Approx(t.expected_si).epsilon(1e-5));
-        CHECK(ci == Approx(t.expected_ci).epsilon(1e-5));
-    }
-}
-
 TEST_CASE("ALGLIB function", "[alglib]") {
 
     auto f = [](double x) { return x*x*x - 2*x*x + x - 5; };

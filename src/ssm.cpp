@@ -621,10 +621,6 @@ double dlt_SSM(double k, double p, double pt, const double cs, const double tau_
     return dlt;
 }
 
-double ff(double tau_m, double kcs) {
-    return std::cos(kcs * tau_m);
-}
-
 /*** Kinetic spectrum ***/
 PowerSpec Ekin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params) {
     return Ekin(kRs_vals, Hydrodynamics::FluidProfile(params));

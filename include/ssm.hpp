@@ -141,18 +141,6 @@ inline double ptilde(double k, double p, double z) {
 double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>& p_vals);
 
 /**
- * @brief Auxiliary function used in analytic expressions.
- *
- * Computes the time-correlation kernel \f$f(\tilde\tau, kc_s)\f$
- * appearing in the analytic sound-shell model expressions.
- *
- * @param tau_m Duration parameter \f$\tilde\tau\f$.
- * @param kcs   Dimensionless wavenumber \f$k c_s\f$.
- * @return Value of \f$f\f$.
- */
-double ff(double tau_m, double kcs);
-
-/**
  * @brief Computes the sound-shell model time-correlation function \f$\Delta_{\rm SSM}\f$.
  *
  * Evaluates the double-time integral of the velocity–velocity correlator
