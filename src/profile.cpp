@@ -483,9 +483,9 @@ double FluidProfile::find_vpUF(const deriv_func& dydv, const size_t n) const {
     return vpUF;
 }
 
-std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi, const size_t n, const double tol) const {
+std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile(const deriv_func& dydv, double vpUF, const bool final_prof, const size_t n, const double tol) const {
     // construct profile using IC {vpUF,wpwN,TpTN}={vpUF,1,1}
-    auto [v_sol, y_sol, shock_flag] = deflagration_profile_internal(dydv, vpUF, 1.0, 1.0, test_resi, n);
+    auto [v_sol, y_sol, shock_flag] = deflagration_profile_internal(dydv, vpUF, 1.0, 1.0, final_prof, n);
     const auto w_end_val = y_sol.back()[1];
     const auto T_end_val = y_sol.back()[2];
 
@@ -505,7 +505,7 @@ std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::def
     }
 
     // check shock matching condition for final profile
-    if (test_resi) {
+    if (final_prof) {
         const auto r1 = abs(mu(xi_sh, v_sol.back()) * xi_sh - cpsq_);
         const auto r2 = abs(xi_sh/mu(xi_sh, v_sol.back()) - (T1TN*T1TN*T1TN*T1TN + cpsq_) / (cpsq_ * T1TN*T1TN*T1TN*T1TN + 1.0));
 
@@ -529,14 +529,13 @@ double FluidProfile::alN_residual(const deriv_func& dydv, double vpUF, double vm
     return abs(alN_ - alN_calc);
 }
 
-std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool test_resi, const size_t n) const {
+std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile_internal(const deriv_func& dydv, double vpUF, double wpwN, double TpTN, const bool final_prof, const size_t n) const {
     // solve EoM - integrate from v(xi)=vpUF -> v(xi)=0
     const state_type yp = {vw_, wpwN, TpTN}; // {xi_w, wpwN, TpTN}
     const auto [v_sol_tmp, y_sol_tmp] = rk4_solver(dydv, vpUF, 1e-10, yp, n);
 
     // find shock & truncate solution
-    // const auto sh_idx = std::min(find_shock_idx(v_sol_tmp, y_sol_tmp, test_resi), v_sol_tmp.size() - 1);
-    const auto find_sh_idx = find_shock_idx(v_sol_tmp, y_sol_tmp, test_resi);
+    const auto find_sh_idx = find_shock_idx(v_sol_tmp, y_sol_tmp, final_prof);
     const auto sh_idx = std::min(find_sh_idx, v_sol_tmp.size()-1);
 
     // handles edge case where xi_sh = cp (i.e. shock discontinuity dissappears)
@@ -545,7 +544,7 @@ std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::def
 
     // re-integrate for final profile
     // avoids insufficient no. points for integrating profile when shock is close to vpUF
-    if (test_resi) {
+    if (final_prof) {
         const auto [v_sol, y_sol] = rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
         return std::make_tuple(v_sol, y_sol, shock_flag);
     }
@@ -557,10 +556,10 @@ std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::def
     return std::make_tuple(v_sol, y_sol, shock_flag);
 }
 
-size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi) const {
-    // if (test_resi) {
-    //     test_shock_bag(v_sol, y_sol);
-    // }
+size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool final_prof) const {
+    if (final_prof) {
+        // test_shock_bag(v_sol, y_sol);
+    }
 
     std::vector<double> resi_vals(v_sol.size());
     int pass_count = 0;
@@ -1013,7 +1012,7 @@ std::tuple<double, double, double> FluidProfile::wall_matching_veff(const double
     return {vp, wpwN, TpTN};
 }
 
-std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool fallback, const bool test_resi, const size_t n) const {
+std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagration_profile_veff(const deriv_func& dydv, double vm, double wmwN, double TmTN, const bool fallback, const bool final_prof, const size_t n) const {
     const auto [vp, wpwN, TpTN] = wall_matching_veff(vm, wmwN, TmTN);
     const auto vpUF = mu(vw_, abs(vp));
 
@@ -1043,7 +1042,7 @@ std::pair<std::vector<double>, std::vector<state_type>> FluidProfile::deflagrati
 
     // re-integrate for final profile
     // avoids insufficient no. points for integrating profile when shock is close to vpUF
-    if (test_resi) {
+    if (final_prof) {
         const auto [v_sol, y_sol] = rk4_solver(dydv, vpUF, v_sol_tmp[sh_idx], yp, n); // integrates from vpUF->v1UF
         return {v_sol, y_sol};
     }
