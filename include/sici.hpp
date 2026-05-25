@@ -7,7 +7,9 @@
  * cosine integral functions efficiently.
  */
 
-#pragma once
+#ifndef INCLUDE_SICI_HPP_H
+#define INCLUDE_SICI_HPP_H
+
 #include <algorithm>
 #include <cmath>
 
@@ -128,3 +130,5 @@ inline void sici(double x, double& si, double& ci) {
     lookup_sici(x, si, ci);
     // alglib::sinecosineintegrals(x, si, ci);
 }
+
+#endif // INCLUDE_SICI_HPP_H

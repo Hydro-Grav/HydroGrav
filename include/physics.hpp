@@ -1,14 +1,12 @@
-// physics.hpp
+/**
+ * @file physics.hpp
+ * @brief Contains basic relativistic physics utility functions.
+ */
 #ifndef INCLUDE_PHYSICS_HPP_H
 #define INCLUDE_PHYSICS_HPP_H
 
 #include <vector>
 #include <string>
-
-/**
- * @file physics.hpp
- * @brief Contains basic relativistic physics utility functions.
- */
 
 static constexpr double kB = 8.61733326e-14; // Boltzmann constant (GeV/K)
 static constexpr double mP = 1.2209e19; // Planck mass (GeV)
@@ -23,22 +21,56 @@ static constexpr double h = 0.678;  // Reduced Hubble constant
  */
 double gammaSq(double v);
 
-// LISA SNR calculation
-
+/**
+ * @brief Optical Metrology System (OMS) noise power spectral density for LISA.
+ *
+ * @param f Frequency in Hz.
+ * @return OMS noise PSD in m²/Hz.
+ */
 double P_oms(double f);
 
-// Acceleration noise power spectral density
+/**
+ * @brief Acceleration noise power spectral density for LISA.
+ *
+ * @param f Frequency in Hz.
+ * @return Acceleration noise PSD in (m/s²)²/Hz.
+ */
 double P_acc(double f);
 
-// LISA sensitivity curve in Omega_GW h^2
+/**
+ * @brief LISA sensitivity curve expressed as an energy density fraction.
+ *
+ * Returns the effective noise level \f$\Omega_{\rm GW} h^2\f$ of the LISA
+ * detector at frequency @p f, combining OMS and acceleration noise contributions.
+ *
+ * @param f Frequency in Hz.
+ * @return \f$\Omega_{\rm GW} h^2\f$ sensitivity at @p f.
+ */
 double get_LISA_omegahsq(double f);
 
-// Galactic binary confusion noise in strain
+/**
+ * @brief Galactic binary confusion noise in gravitational-wave strain.
+ *
+ * @param f Frequency in Hz.
+ * @return Strain noise spectral density (Hz⁻¹).
+ */
 double gb_S(double f);
 
-// Galactic binary confusion noise in Omega_GW h^2
+/**
+ * @brief Galactic binary confusion noise as an energy density fraction.
+ *
+ * @param f Frequency in Hz.
+ * @return \f$\Omega_{\rm GW} h^2\f$ contribution from galactic binaries.
+ */
 double gb_omegahsq(double f);
 
+/**
+ * @brief Extragalactic binary confusion noise as an energy density fraction.
+ *
+ * @param f    Frequency in Hz.
+ * @param flag Amplitude variant: @c "central" (default), @c "upper", or @c "lower".
+ * @return \f$\Omega_{\rm GW} h^2\f$ contribution from extragalactic binaries.
+ */
 double eb_omegahsq(double f, const std::string& flag = "central");
 
 /**

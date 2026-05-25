@@ -622,8 +622,7 @@ double dlt_SSM(double k, double p, double pt, const double cs, const double tau_
 }
 
 double ff(double tau_m, double kcs) {
-    // kcs = k*cs -> ff called this way to make dlt faster
-    return std::cos(kcs * tau_m); // for SSM -> NEED TO UPDATE THIS
+    return std::cos(kcs * tau_m);
 }
 
 /*** Kinetic spectrum ***/

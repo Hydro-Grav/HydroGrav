@@ -7,8 +7,6 @@
  * default-parameter structs and EOS data structures used throughout the
  * gravitational-wave calculations.
  */
-
-// PhaseTransition.hpp
 #ifndef INCLUDE_PHASETRANSITION_HPP_H
 #define INCLUDE_PHASETRANSITION_HPP_H
 
@@ -20,12 +18,6 @@
 #include "interpolation.h"
 
 #include "physics.hpp"
-
-/*
-TO DO:
-- remove alN from PTParams base class and move to PTParams_Bag (need to change how get_mode() works in FluidProfile first)
-- TN only used for mu nu and Veff (not bag) - write ctor without TN for bag?
-*/
 
 namespace PhaseTransition {
 

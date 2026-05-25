@@ -1,8 +1,7 @@
 /**
  * @file constants.hpp
- * @brief Physical and mathematical constants used throughout DeepPhase.
+ * @brief Physical and mathematical constants used throughout HydroGrav.
  */
-// constants.hpp
 #ifndef INCLUDE_CONSTANTS_HPP_H
 #define INCLUDE_CONSTANTS_HPP_H
 

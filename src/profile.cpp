@@ -16,9 +16,9 @@
 
 #include "profile.hpp"
 #include "phasetransition.hpp"
-// #include "hydrodynamics.hpp"
 #include "physics.hpp"
 #include "maths_ops.hpp"
+#include "config.hpp"
 
 #ifdef ENABLE_MATPLOTLIB
 #include "matplotlibcpp.h"
@@ -418,9 +418,6 @@ std::pair<double, double> FluidProfile::wT_from_shock(double xi_sh) const { // w
     // w1*gammaSq(v1)*v1 = wN*gammaSq(v2)*v2, v2=xi_sh, v1*v2=cpsq
     const auto xi_sh_sq = xi_sh * xi_sh;
     const auto w1wN = (xi_sh_sq - cpsq_ * cpsq_) / (cpsq_ * (1.0 - xi_sh_sq));
-
-    // const auto mu = 1.0 + 1.0 / cpsq_;
-    // const auto T1TN = std::pow(w1wN, 1.0 / mu);
     const auto T1TN = std::pow(w1wN, 0.25);
 
     return {w1wN, T1TN};
@@ -755,7 +752,7 @@ int FluidProfile::get_mode_veff(double vw, double cmsq) const {
         sol = nelder_mead_minimise_2d(matching_helper2, vp_TmTN_guess[0], vp_TmTN_guess[1], 0.1, 0.01, 1e-12);
 
         const auto resi = matching_helper({sol[0], sol[1]});
-        if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
+        if (resi[0] > config::minimiser_tol || resi[1] > config::minimiser_tol) {
             throw std::runtime_error("Solving matching equations failed in get_mode_veff (residual too large)!");
         }
     }
@@ -999,7 +996,7 @@ std::tuple<double, double, double> FluidProfile::wall_matching_veff(const double
         sol = nelder_mead_minimise_2d(matching_helper2, vp_TpTN_guess[0], vp_TpTN_guess[1]);
 
         const auto resi = matching_helper({sol[0], sol[1]});
-        if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
+        if (resi[0] > config::minimiser_tol || resi[1] > config::minimiser_tol) {
             throw std::runtime_error("Solving matching equations failed in deflagration_profile_veff (residual too large)!");
         }
     }
@@ -1057,7 +1054,7 @@ bool FluidProfile::check_shock_convergence(const std::vector<double>& v_sol, con
     const auto resi = matching_eqs_shock(mu(y_sol.back()[0], v_sol.back()), y_sol.back()[2], y_sol.back()[0], 1.0); 
 
     // check shock matching condition for final profile
-    if (abs(resi[0]) > minimiser_tol || abs(resi[1]) > minimiser_tol) {
+    if (abs(resi[0]) > config::minimiser_tol || abs(resi[1]) > config::minimiser_tol) {
         shock_flag_ = false;
         return shock_flag_;
     }
@@ -1167,7 +1164,7 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff(const double 
         sol = nelder_mead_minimise_2d(matching_helper2, vm_TmTN_guess[0], vm_TmTN_guess[1], 0.1, 0.01, 1e-12);
 
         const auto resi = matching_helper({sol[0], sol[1]});
-        if (resi[0] > minimiser_tol || resi[1] > minimiser_tol) {
+        if (resi[0] > config::minimiser_tol || resi[1] > config::minimiser_tol) {
             throw std::runtime_error("Solving matching equations failed in get_IC_detonation_veff (residual too large)!");
         }
     }
