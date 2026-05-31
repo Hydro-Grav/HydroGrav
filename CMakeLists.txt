@@ -79,6 +79,7 @@ set(HEADERS
   include/sici.hpp
   include/sici_arrays.hpp
   include/solvers.tpp
+  include/snr.hpp
 )
 
 # --------------------------

@@ -19,6 +19,7 @@
 #include "physics.hpp"
 #include "maths_ops.hpp"
 #include "constants.hpp"
+#include "snr.hpp"
 
 #include "ap.h"
 #include "interpolation.h"
