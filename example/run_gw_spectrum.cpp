@@ -30,6 +30,11 @@ int main(int argc, char* argv[]) {
     // GW power spectrum
     Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params);
 
+    auto snr_list = get_SNR(OmegaGW.freq(), OmegaGW.P());
+    for (const auto& snr_result : snr_list) {
+        std::cout << snr_result.detector_name << " SNR: " << snr_result.snr << std::endl;
+    }
+
     OmegaGW.write("gw_spectrum.csv");
 
     #ifdef ENABLE_MATPLOTLIB
