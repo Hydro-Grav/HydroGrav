@@ -15,18 +15,19 @@ You need a C++17 compliant compiler, git, and the following dependencies:
 * OpenMP, version 3.0 or higher
 * GSL, version 2.0 or higher
 * ALGLIB, version 3.17 or higher
+* BOOST, version 1.83 or higher
 
 On *Ubuntu/Debian*-based distributions, `ALGLIB` and `GSL` can be installed by running:
 
-    sudo apt install libalglib-dev libgsl-dev
+    sudo apt install libalglib-dev libgsl-dev libboost-all-dev
 
 On *Fedora*-based distributions, instead use:
 
-    sudo dnf install alglib-devel gsl-devel
+    sudo dnf install alglib-devel gsl-devel boost-devel
 
 Finally on *Mac*:
 
-    brew install gsl alglib
+    brew install gsl alglib boost
 
 
 **Note:**
@@ -102,7 +103,3 @@ If the library and examples were successfully built, the examples and tests are 
     ./bin/run_kinetic_spectrum
     ./bin/run_gw_spectrum
     ./bin/unit_tests
-
-## Bugs
-* Bugs still present in GW calculation (not ready for use)
-* Fluid profile & kinetic power spectrum working well!
