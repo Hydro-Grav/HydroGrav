@@ -12,9 +12,9 @@ HydroGrav
 
 You need a C++17 compliant compiler, git, and the following dependencies:
 * CMake, version 3.11 or higher
-* OpenMP, version 3.0 or higher
-* GSL, version 2.0 or higher
-* ALGLIB, version 3.17 or higher
+* OpenMP, version 4.5 or higher
+* GSL, version 2.7.1 or higher
+* ALGLIB, version 4.0 or higher
 * BOOST, version 1.83 or higher
 
 On *Ubuntu/Debian*-based distributions, `ALGLIB` and `GSL` can be installed by running:
@@ -94,12 +94,15 @@ Or by using (recommended):
     source venv/bin/activate
     pip install 'numpy<2.0.0' matplotlib
 
+`HydroGrav` has been tested with `numpy` `1.26.4`.
+
 </details>
 
 ## Running
-If the library and examples were successfully built, the examples and tests are available to run using the following executables: ***subject to change***
+If the library and examples were successfully built, the examples and tests are available to run using the following executables:
 
     ./bin/run_fluid_profile
     ./bin/run_kinetic_spectrum
     ./bin/run_gw_spectrum
+    ./bin/run_eos_gw_spectrum
     ./bin/unit_tests
