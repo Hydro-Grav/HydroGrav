@@ -1633,8 +1633,8 @@ int main() {
         const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
         const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
-        const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
-        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
+        // const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
+        // const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
         
         // std::cout << "wNeN_rat=" << params_veff.wNeN_rat() << "\n";
         // OmegaGW_veff.profile().write("fp_" + bp.name() + "_veff.csv");
@@ -1642,8 +1642,8 @@ int main() {
 
         // std::cout << "shock_flag=" << OmegaGW_veff.profile().shock_flag() << "\n";
 
-        const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_bag(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
-        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
+        // const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_bag(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
+        // const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
         
         // OmegaGW_bag.profile().write("fp_" + bp.name() + "_bag.csv");
         // OmegaGW_bag.write("gw_" + bp.name() + "_bag.csv");
@@ -1668,9 +1668,9 @@ int main() {
         
 
         // #ifdef ENABLE_MATPLOTLIB
-        const std::string filename_fp = "fp_" + bp.name() + ".png";
-        Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
-        Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
+        // const std::string filename_fp = "fp_" + bp.name() + ".png";
+        // Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
+        // Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
         // Spectrum::plot_spectra(Ekin_bag, Ekin_munu, Ekin_veff, "ekin_" + bp.name() + ".png");
         // params_veff.plot_thermo("thermo.png");
         // params_veff.plot_csq("csq_" + bp.name() + ".png");

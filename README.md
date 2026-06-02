@@ -1,12 +1,12 @@
 <h1 align="center">
-DeepPhase
+HydroGrav
 </h1>
 
 <div align="center">
 <i>Precision gravitational waves from phase transitions.</i>
 </div>
 
-**DeepPhase** is a C++17 software package for calculating gravitational wave spectra from a first-order phase transition using either the Bag model or a via a direct calculation of thermodynamics from the effective potential.
+**HydroGrav** is a C++17 software package for calculating gravitational wave spectra from a first-order phase transition using either the Bag model or a via a direct calculation of thermodynamics from the effective potential.
 
 ## Dependencies
 
@@ -36,8 +36,8 @@ Finally on *Mac*:
 ## Building
 To build the shared library and examples, use: ***URL subject to change***
 
-    git clone https://github.com/William-Searle/DeepPhase
-    cd DeepPhase
+    git clone https://github.com/William-Searle/HydroGrav
+    cd HydroGrav
     mkdir build
     cd build
     cmake ..
@@ -63,13 +63,13 @@ To set an option, pass it to CMake with `-D`, for example:
 <details>
 <summary>Click me</summary>
 
-`DeepPhase` includes optional plotting functionality by utilizing the `matplotlib-cpp` library. To enable these features:
+`HydroGrav` includes optional plotting functionality by utilizing the `matplotlib-cpp` library. To enable these features:
 
 1. Download the [`matplotlibcpp.h`](https://github.com/lava/matplotlib-cpp/blob/master/matplotlibcpp.h) header file from the [matplotlib-cpp repository](https://github.com/lava/matplotlib-cpp).
-2. Place it in the `DeepPhase/include/` directory, so the file structure is:
+2. Place it in the `HydroGrav/include/` directory, so the file structure is:
 
    ```
-   DeepPhase/include/matplotlibcpp.h
+   HydroGrav/include/matplotlibcpp.h
    ```
 
 3. Run `cmake ..` in your `build` directory. During the build process, you should see the message:

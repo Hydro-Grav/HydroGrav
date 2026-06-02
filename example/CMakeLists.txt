@@ -1,5 +1,5 @@
 # --------------------------
-# CMakeLists.txt for DeepPhase/example
+# CMakeLists.txt for HydroGrav/example
 # --------------------------
 
 # -------------------------
@@ -11,7 +11,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 # Link libraries
 # --------------------------
 link_libraries(
-  DeepPhaseLib
+  HydroGravLib
 )
 
 # --------------------------
@@ -19,8 +19,8 @@ link_libraries(
 # --------------------------
 macro(add_example_executable name)
   add_executable(${name} ${ARGN})
-  if(_deepphase_warning_flags)
-    target_compile_options(${name} PRIVATE ${_deepphase_warning_flags})
+  if(_hydrograv_warning_flags)
+    target_compile_options(${name} PRIVATE ${_hydrograv_warning_flags})
   endif()
 endmacro()
 
@@ -31,5 +31,5 @@ add_example_executable(run_fluid_profile run_fluid_profile.cpp)
 add_example_executable(run_eos_gw_spectrum run_eos_gw_spectrum.cpp)
 add_example_executable(run_kinetic_spectrum run_kinetic_spectrum.cpp)
 add_example_executable(run_gw_spectrum run_gw_spectrum.cpp)
-add_example_executable(deepphase_dev deepphase_dev.cpp)
+add_example_executable(hydrograv_dev hydrograv_dev.cpp)
 add_example_executable(test_suite test_suite.cpp)
