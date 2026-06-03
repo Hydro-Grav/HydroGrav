@@ -180,7 +180,7 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 /**
  * @brief Calculates gravitational wave spectrum.
  */
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const bool calc_dtau=false);
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const double dtau);
 
 /**
  * @brief Builds spline interpolating functions for kinetic spectrum
@@ -193,7 +193,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
 
 /// Approximation used for dtau in arXiv:2308.12943.
-double dtau_approx(const PhaseTransition::PTParams& params);
+// double dtau_approx(const PhaseTransition::PTParams& params);
 
 /**
  * @brief Prefactor for gravitational-wave spectrum (Eq. 93 in arXiv:2308.12943).

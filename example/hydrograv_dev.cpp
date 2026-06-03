@@ -167,24 +167,26 @@ void example_GW_Spec(const benchmark_point& bp) {
     const auto gs = bp.gs();
     const auto nuc_type = bp.nuc_type();
 
+    const auto dtau = 10 * Rs;
+
     const PhaseTransition::Universe un(Ts, gs, Hs);
 
     // Define GW spectrum
     const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
         const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-        // const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
-        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
+        // const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, dtau);
+        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, dtau);
         OmegaGW_bag.write(dir + "GWSpec_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
         OmegaGW_bag.profile().write(dir + "profile_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
 
         const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
+        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu, dtau);
         OmegaGW_munu.write(dir + "GWSpec_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
         OmegaGW_munu.profile().write(dir + "profile_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
 
         const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, nuc_type, un, veff_file);
-        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
+        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff, dtau);
         OmegaGW_veff.write(dir + "GWSpec_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
         OmegaGW_veff.profile().write(dir + "profile_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
 
@@ -307,6 +309,7 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
         const auto alN = std::pow(10.0, log_alN_distr(gen));
         const auto beta = Hs * std::pow(10.0, log_betaH_distr(gen));
         const auto Rs = PhaseTransition::Rs_approx(vw, beta);
+        const auto dtau = 10*Rs;
         
         const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
         // const PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, Rs, nuc_type, un, "thermo.csv");
@@ -328,7 +331,7 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
 
         // attempt to construct GW spectrum
         try {         
-            const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params);
+            const auto OmegaGW = Spectrum::GWSpec(kRs_vals, params, dtau);
             pass_count++;
             file << OmegaGW.profile().mode_str() << "\n";
         } catch (const std::exception& e) {
@@ -342,37 +345,6 @@ void test_GWSpec(const std::string& filename = "GWSpec_test.csv") {
     file.close();
     std::cout << "Fluid profile test complete: " << pass_count << "/" << n << " cases passed (" << unphysical_count << " unphysical).\n";
     std::cout << "Results saved to '" << filename << "'.\n";
-
-    return;
-}
-
-void compare_dtau_calc(const benchmark_point& bp) {
-
-    const auto kRs_vals = logspace(-3.0, 3.0, 100);
-
-    // bag
-    auto params_bag_ptr = bp.get_PTParams_Bag();
-    const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, *params_bag_ptr); // dflt dtau
-    OmegaGW_bag.write(bp.dir() + "dtau_comparison/gw_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
-
-    const auto OmegaGW_bag_dtau = Spectrum::GWSpec(kRs_vals, *params_bag_ptr, true); // calc dtau
-    OmegaGW_bag_dtau.write(bp.dir() + "dtau_comparison/gw_bag_dtau_" + OmegaGW_bag_dtau.profile().mode_str() + ".csv");
-    
-    // munu
-    auto params_munu_ptr = bp.get_PTParams_munu();
-    const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, *params_munu_ptr);
-    OmegaGW_munu.write(bp.dir() + "dtau_comparison/gw_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
-
-    const auto OmegaGW_munu_dtau = Spectrum::GWSpec(kRs_vals, *params_munu_ptr, true);
-    OmegaGW_munu_dtau.write(bp.dir() + "dtau_comparison/gw_munu_dtau_" + OmegaGW_munu.profile().mode_str() + ".csv");
-
-    // veff
-    auto params_veff_ptr = bp.get_PTParams_Veff();
-    const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, *params_veff_ptr);
-    OmegaGW_veff.write(bp.dir() + "dtau_comparison/gw_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
-
-    const auto OmegaGW_veff_dtau = Spectrum::GWSpec(kRs_vals, *params_veff_ptr, true);
-    OmegaGW_veff_dtau.write(bp.dir() + "dtau_comparison/gw_veff_dtau_" + OmegaGW_veff_dtau.profile().mode_str() + ".csv");
 
     return;
 }
@@ -405,24 +377,26 @@ void gw_param_scan(const std::vector<benchmark_point>& bp_list, const std::strin
         const auto gs = bp.gs();
         const auto nuc_type = bp.nuc_type();
 
+        const auto dtau = 10*Rs;
+
         const PhaseTransition::Universe un(Ts, gs, Hs);
         const auto Tyears = 4.0; // No. of LISA observation years
 
         // bag spectrum
         const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
-        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, true);
+        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, dtau);
         OmegaGW_bag.write(dir + "GWSpec_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
         const auto snr_bag = LISA_snr(OmegaGW_bag.freq(), OmegaGW_bag.P(), Tyears);
 
         // mu nu spectrum
         const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu, true);
+        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu, dtau);
         OmegaGW_munu.write(dir + "GWSpec_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
         const auto snr_munu = LISA_snr(OmegaGW_munu.freq(), OmegaGW_munu.P(), Tyears);
 
         // veff spectrum
         const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, nuc_type, un, veff_file);
-        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff, true);
+        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff, dtau);
         OmegaGW_veff.write(dir + "GWSpec_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
         const auto snr_veff = LISA_snr(OmegaGW_veff.freq(), OmegaGW_veff.P(), Tyears);
 
@@ -1632,9 +1606,10 @@ int main() {
         const auto bp = scan4_bp_list[i];
         const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
         const auto kRs_vals = logspace(-3.0, 3.0, 100);
+        const auto dtau = 10*bp.Rs();
 
         // const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
-        // const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
+        // const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff, dtau);
         
         // std::cout << "wNeN_rat=" << params_veff.wNeN_rat() << "\n";
         // OmegaGW_veff.profile().write("fp_" + bp.name() + "_veff.csv");
@@ -1643,13 +1618,13 @@ int main() {
         // std::cout << "shock_flag=" << OmegaGW_veff.profile().shock_flag() << "\n";
 
         // const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_bag(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
-        // const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
+        // const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, dtau);
         
         // OmegaGW_bag.profile().write("fp_" + bp.name() + "_bag.csv");
         // OmegaGW_bag.write("gw_" + bp.name() + "_bag.csv");
 
         const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.cpsq(), bp.cmsq());
-        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
+        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu, dtau);
         
         // OmegaGW_munu.profile().write("fp_" + bp.name() + "_munu.csv");
         // OmegaGW_munu.write("gw_" + bp.name() + "_munu.csv");

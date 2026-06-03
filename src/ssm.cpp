@@ -489,7 +489,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 }
 
 /*** GW power spectrum ***/
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const bool calc_dtau) {
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const double dtau) {
 
     const auto ti = std::chrono::high_resolution_clock::now();
 
@@ -505,15 +505,6 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto cs = std::sqrt(params.cpsq());
     const auto Rs_inv = 1.0 / params.Rs();
-    
-    double dtau;
-    if (calc_dtau) {
-        std::cout << "Using non-linear timescale to calculate dtau\n";
-        dtau = get_nl_timescale(profile);
-    } else {
-        std::cout << "Using dtau=10*Rs\n";
-        dtau = dtau_approx(params);
-    }
 
     const auto tau_s = params.tau_s();
     const auto tau_fin = tau_s + dtau;
@@ -718,9 +709,9 @@ double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
 }
 
 // approximation used for dtau in arXiv:2308.12943
-double dtau_approx(const PhaseTransition::PTParams& params) {
-    return 10.0 * params.Rs();
-}
+// double dtau_approx(const PhaseTransition::PTParams& params) {
+//     return 10.0 * params.Rs();
+// }
 
 double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double Ts, double H0, double Hs, double g0, double gs) {
     // Transfer function (redshift of spectrum - eq 13 arXiv:2308.12943)

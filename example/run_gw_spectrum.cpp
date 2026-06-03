@@ -27,8 +27,15 @@ int main(int argc, char* argv[]) {
     // Momentum values
     const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
+    // Sound wave duration
+    const auto dtau = 10.0 * Rs;
+
+    // This can instead be estimated using the non-linear timescale of the fluid:
+    // const Hydrodynamics::FluidProfile profile(params);
+    // const auto dtau = Spectrum::get_nl_timescale(profile);
+
     // GW power spectrum
-    Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params);
+    Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params, dtau);
 
     OmegaGW.write("gw_spectrum.csv");
 

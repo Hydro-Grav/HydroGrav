@@ -25,6 +25,15 @@ int main() {
     */
    const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
+   /*
+        Sound wave duration:
+   */
+    const auto dtau = 10.0 * Rs;
+
+    /* This can instead be estimated using the non-linear timescale of the fluid: */
+    // const Hydrodynamics::FluidProfile profile(params);
+    // const auto dtau = Spectrum::get_nl_timescale(profile);
+
     /*
         Mock equation of state data based on Bag model 
         fit to above thermal params. In practice, this data
@@ -61,7 +70,7 @@ int main() {
     /*
         Lastly, we use this to compute the gravitational wave spectrum.
     */
-    Spectrum::PowerSpec OmegaGW_from_eos = Spectrum::GWSpec(kRs_vals, params);
+    Spectrum::PowerSpec OmegaGW_from_eos = Spectrum::GWSpec(kRs_vals, params, dtau);
 
     /*
         The fluid profile is constructed internally within Spectrum::GWSpec and can be
@@ -103,7 +112,7 @@ int main() {
     */
     PhaseTransition::PTParams_Veff params_from_path(vw, alN, TN, beta, Rs, nuc_type, un, eos_path);
 
-    Spectrum::PowerSpec OmegaGW_from_path = Spectrum::GWSpec(kRs_vals, params_from_path);
+    Spectrum::PowerSpec OmegaGW_from_path = Spectrum::GWSpec(kRs_vals, params_from_path, dtau);
 
     const auto profile_from_path = OmegaGW_from_path.profile();
 
