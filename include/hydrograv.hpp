@@ -12,5 +12,6 @@
 #include "phasetransition.hpp"
 #include "profile.hpp"
 #include "ssm.hpp"
+#include "snr.hpp"
 
 #endif // INCLUDE_HYDROGRAV_HPP_H
