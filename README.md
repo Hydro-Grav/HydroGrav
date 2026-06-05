@@ -13,11 +13,11 @@ HydroGrav
 You need a C++17 compliant compiler, git, and the following dependencies:
 * CMake, version 3.11 or higher
 * OpenMP, version 4.5 or higher
-* GSL, version 2.7.1 or higher
+* Boost, version 1.83 or higher
 * ALGLIB, version 4.0 or higher
-* BOOST, version 1.83 or higher
+* GSL, version 2.7.1 or higher
 
-On *Ubuntu/Debian*-based distributions, `ALGLIB` and `GSL` can be installed by running:
+On *Ubuntu/Debian*-based distributions, `Boost`, `ALGLIB` and `GSL` can be installed by running:
 
     sudo apt install libalglib-dev libgsl-dev libboost-all-dev
 
@@ -25,7 +25,7 @@ On *Fedora*-based distributions, instead use:
 
     sudo dnf install alglib-devel gsl-devel boost-devel
 
-Finally on *Mac*:
+Finally, on *Mac*:
 
     brew install gsl alglib boost
 
@@ -35,9 +35,9 @@ Finally on *Mac*:
 
 
 ## Building
-To build the shared library and examples, use: ***URL subject to change***
+To build the shared library and examples, use:
 
-    git clone https://github.com/William-Searle/HydroGrav
+    git clone https://github.com/HydroGrav/HydroGrav.git
     cd HydroGrav
     mkdir build
     cd build
