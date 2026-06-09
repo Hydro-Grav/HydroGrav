@@ -12,8 +12,8 @@ int main() {
         const auto TN = 100;
         const auto beta = 100 * 9.868763e-15;
         const auto Rs = PhaseTransition::Rs_approx(vw, beta);
-        const auto cs_p = 0.573788;
-        const auto cs_m = 0.562375;
+        // const auto cs_p = 0.573788;
+        // const auto cs_m = 0.562375;
 
         const PhaseTransition::Universe un;
 
