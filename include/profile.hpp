@@ -150,12 +150,15 @@ class FluidProfile {
     /// Inner boundary of the integration domain (\f$v_w\f$ for deflagrations, \f$c_-\f$ for hybrids/detonations).
     double xi_min() const { return xi_min_integrate_; } // vw (def), cm (det/hyb)
 
+    double cpsq() const { return cpsq_; }
+    double cmsq() const { return cmsq_; }
+
     /**
      * @brief Integer code identifying the hydrodynamic mode.
      * @return 0 = deflagration, 1 = hybrid, 2 = detonation.
      */
     int mode() const { return mode_; }; // Hydrodynamic mode (0=deflagration, 1=hybrid, 2=detonation)
-    /// Human-readable string for the hydrodynamic mode.
+    /// String for the hydrodynamic mode.
     std::string mode_str() const;
 
     /**
@@ -182,8 +185,8 @@ class FluidProfile {
 
     std::string eos_; ///< Equation of state identifier: "bag" or "veff".
     
-    const double cpsq_; ///< Speed of sound squared in the symmetric phase.
-    const double cmsq_; ///< Speed of sound squared in the broken phase.
+    double cpsq_;       ///< Speed of sound squared in the symmetric phase.
+    double cmsq_;       ///< Speed of sound squared in the broken phase.
     const double vw_;   ///< Wall velocity.
     const double alN_;  ///< Phase transition strength parameter at the nucleation temperature.
     double alp_min_;    ///< Minimum physical value of \f$\alpha_+\f$ (lower bound for root search).

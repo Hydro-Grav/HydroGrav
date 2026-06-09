@@ -1563,6 +1563,10 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         if (TpTN <= 1.0) throw std::runtime_error("solve_profile failed (Tp/TN must be > 1)!");
         if (TpTN <= T_sol_tmp.front()) throw std::runtime_error("solve_profile failed (Tp/TN must be > T1/TN)!");
 
+        // update sound speed values
+        cpsq_ = veff_params_->csq_s(TpTN);
+        cmsq_ = veff_params_->csq_b(TmTN);
+
         if (mode_ == 0) { // deflagration
             xif = vw_;
 
@@ -1671,6 +1675,9 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         w_end_val = w_sol_tmp.back();
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
+
+        // update sound speed values (cp doesn't change since Tp=TN for detonations)
+        cmsq_ = veff_params_->csq_b(y0[2]);
 
         if (dev_log_) {
             std::cout << "Detonation profile:\n"
