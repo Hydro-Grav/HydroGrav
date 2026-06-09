@@ -1144,7 +1144,7 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff(const double 
     // auto vm_TmTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max, 100, 100, true, "det_grid_search.csv");
 
     // prevents solution from landing in wrong minima if grid search fails
-    if (dxidv(vw_, mu(vw_, vm_TmTN_guess[0]), veff_params_->csq_b(vm_TmTN_guess[2])) < 0.0) {
+    if (dxidv(vw_, mu(vw_, vm_TmTN_guess[0]), veff_params_->csq_b(vm_TmTN_guess[1])) < 0.0) {
         vm_TmTN_guess = {vp, TpTN};
     }
 
