@@ -49,40 +49,28 @@ namespace Spectrum {
 
 /**
  * @class PowerSpec
- * @brief Encapsulates a power spectrum as a function of momentum.
+ * @brief Encapsulates a power spectrum as a function of frequency.
  *
- * The class stores lists of momentum values @c K and corresponding spectrum
+ * The class stores lists of frequency values @c freq and corresponding spectrum
  * values @c P together with derived frequency values.  It provides arithmetic
  * operators, file I/O, and accessors for peak frequency/amplitude properties.
  */
 class PowerSpec {
   public:
     /**
-     * @brief Construct from momentum and spectrum vectors.
+     * @brief Construct from frequency and spectrum vectors.
      *
-     * @param K_vals   Momentum samples (dimensionless K=k*Rs).
-     * @param P_vals   Spectrum values at each momentum point.
-     * @param profile  Fluid profile used to generate the spectrum.
-     * @param dtau     Sound–shell duration.
+     * @param freq_vals   Frequency samples.
+     * @param P_vals      Spectrum values at each frequency point.
      *
-     * Throws std::invalid_argument if @p K_vals and @p P_vals differ in size.
+     * Throws std::invalid_argument if @p freq_vals and @p P_vals differ in size.
      */
-    PowerSpec(const std::vector<double>& K_vals, std::vector<double>& P_vals, const Hydrodynamics::FluidProfile& profile, double dtau=std::numeric_limits<double>::quiet_NaN());
+    PowerSpec(const std::vector<double>& freq_vals, std::vector<double>& P_vals);
 
-    /// Frequency values corresponding to the stored momenta.
+    /// Frequency values.
     const std::vector<double>& freq() const { return freq_vals_; };
-    /// Momentum (kRs) values.
-    const std::vector<double>& K() const { return K_vals_; };
     /// Power spectrum values.
     const std::vector<double>& P() const { return P_vals_; };
-
-    /// Fluid profile used to compute this spectrum.
-    const Hydrodynamics::FluidProfile profile() const { return profile_; };
-    /// Phase transition parameters pointer (owned externally).
-    const PhaseTransition::PTParams* params() const { return params_; };
-
-    /// Sound‑wave duration parameter.
-    double dtau() const { return dtau_; };
 
     /**
      * @brief Return peak frequency and amplitude of the spectrum.
@@ -96,7 +84,7 @@ class PowerSpec {
      *
      * @param filename Path to output file (default "spectrum.csv").
      */
-    void write(const std::string& filename="spectrum.csv", const bool write_header=false) const;
+    void write(const std::string& filename="spectrum.csv") const;
 
     #ifdef ENABLE_MATPLOTLIB
     /**
@@ -108,7 +96,7 @@ class PowerSpec {
     #endif
 
     /// Cubic spline interpolation over the stored (K,P) data.
-    CubicSpline<double> interpolate() const;
+    // CubicSpline<double> interpolate() const;
 
     // Scalar arithmetic operators ------------------------------------------------
     friend PowerSpec operator*(const PowerSpec &spec, double scalar);
@@ -118,11 +106,53 @@ class PowerSpec {
     friend PowerSpec operator/(const PowerSpec& spec, double scalar);
     PowerSpec &operator/=(double scalar);
 
+    PowerSpec norm_spec();
+
+  protected:
+    std::vector<double> freq_vals_, P_vals_;
+};
+
+class SSM_PowerSpec : public PowerSpec {
+  public:
+    /**
+     * @brief Construct from frequency and spectrum vectors.
+     *
+     * @param freq_vals  Frequency samples.
+     * @param P_vals     Spectrum values at each momentum point.
+     * @param profile    Fluid profile used to generate the spectrum.
+     * @param dtau       Sound–shell duration.
+     *
+     * Throws std::invalid_argument if @p freq_vals and @p P_vals differ in size.
+     */
+    SSM_PowerSpec(const std::vector<double>& freq_vals, std::vector<double>& P_vals, const Hydrodynamics::FluidProfile& profile, double dtau=std::numeric_limits<double>::quiet_NaN());
+
+    /// Frequency values corresponding to the stored momenta.
+    const std::vector<double>& freq() const { return freq_vals_; };
+    /// Momentum (kRs) values.
+    const std::vector<double>& K() const { return K_vals_; };
+    /// Power spectrum values.
+    const std::vector<double>& P() const { return P_vals_; };
+
+    /// Phase transition parameters pointer (owned externally).
+    const PhaseTransition::PTParams* params() const { return params_; };
+
+    /// Fluid profile used to compute this spectrum.
+    const Hydrodynamics::FluidProfile profile() const { return profile_; };
+
+    /// Sound‑wave duration parameter.
+    double dtau() const { return dtau_; };
+
+    friend SSM_PowerSpec operator*(const SSM_PowerSpec &spec, double scalar);
+    friend SSM_PowerSpec operator*(double scalar, const SSM_PowerSpec &spec);
+    friend SSM_PowerSpec operator/(const SSM_PowerSpec& spec, double scalar);
+
+    SSM_PowerSpec norm_spec();
+
   private:
-    std::vector<double> freq_vals_, K_vals_, P_vals_;
-    double dtau_;
+    const std::vector<double> K_vals_;
+    const double dtau_;
     const Hydrodynamics::FluidProfile profile_;
-    const PhaseTransition::PTParams* params_;
+    const PhaseTransition::PTParams* params_;    
 };
 
 /// Helper that computes \f$\tilde p=\sqrt{k^2-2kpz+p^2}\f$
@@ -156,31 +186,34 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
  */
 double dlt_SSM(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin);
 
+std::vector<double> kRs_to_freq(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
+std::vector<double> freq_to_kRs(const std::vector<double>& freq_vals, const PhaseTransition::PTParams& params);
+
 /**
  * @brief Calculates kinetic (velocity) power spectrum.
  *
  * Overloaded versions accept either a @c FluidProfile or a @c PTParams object
  */
-PowerSpec Ekin(const std::vector<double>& k_vec, const Hydrodynamics::FluidProfile& prof);
-PowerSpec Ekin(const std::vector<double>& k_vec, const PhaseTransition::PTParams& params);
+SSM_PowerSpec Ekin(const std::vector<double>& k_vec, const Hydrodynamics::FluidProfile& prof);
+SSM_PowerSpec Ekin(const std::vector<double>& k_vec, const PhaseTransition::PTParams& params);
 
 /**
  * @brief Normalise a kinetic spectrum to unit integral.
  */
-PowerSpec norm_spec(const PowerSpec& spec);
+SSM_PowerSpec norm_spec(const SSM_PowerSpec& spec);
 
 /**
  * @brief Normalised kinetic spectrum.
  * 
  * Overloaded versions accept either a @c FluidProfile or a @c PTParams object
  */
-PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof);
-PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
+SSM_PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof);
+SSM_PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
 
 /**
  * @brief Calculates gravitational wave spectrum.
  */
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const double dtau);
+SSM_PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const double dtau);
 
 /**
  * @brief Builds spline interpolating functions for kinetic spectrum

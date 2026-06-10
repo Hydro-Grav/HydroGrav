@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
     // const auto dtau = Spectrum::get_nl_timescale(profile);
 
     // GW power spectrum
-    Spectrum::PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params, dtau);
+    Spectrum::SSM_PowerSpec OmegaGW = Spectrum::GWSpec(kRs_vals, params, dtau);
 
     OmegaGW.write("gw_spectrum.csv");
 

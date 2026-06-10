@@ -28,8 +28,8 @@ int main(int argc, char* argv[]) {
     const auto kRs_vals = logspace(-1.0, 3.0, 100);
 
     // Kinetic power spectrum
-    Spectrum::PowerSpec Ek = Spectrum::Ekin(kRs_vals, params);
-    Spectrum::PowerSpec Eks = Spectrum::norm_spec(Ek); // Normalised spectrum
+    Spectrum::SSM_PowerSpec Ek = Spectrum::Ekin(kRs_vals, params);
+    Spectrum::SSM_PowerSpec Eks = Ek.norm_spec(); // Normalised spectrum
 
     Eks.write("kinetic_spectrum.csv");
 

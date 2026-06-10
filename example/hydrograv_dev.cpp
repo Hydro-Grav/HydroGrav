@@ -1602,14 +1602,14 @@ int main() {
     // }
 
     // for (size_t i = 0; i < scan2_bp_list.size(); i++) {
-        const int i = 9;
+        const int i = 5;
         const auto bp = scan4_bp_list[i];
         const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
         const auto kRs_vals = logspace(-3.0, 3.0, 100);
-        const auto dtau = 10*bp.Rs();
 
         const PhaseTransition::PTParams_Veff params_veff(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.dir());
-        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff, dtau);
+        const auto dtau_veff = Spectrum::get_nl_timescale(Hydrodynamics::FluidProfile(params_veff));
+        const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff, dtau_veff);
         
         // std::cout << "wNeN_rat=" << params_veff.wNeN_rat() << "\n";
         // OmegaGW_veff.profile().write("fp_" + bp.name() + "_veff.csv");
@@ -1618,13 +1618,15 @@ int main() {
         // std::cout << "shock_flag=" << OmegaGW_veff.profile().shock_flag() << "\n";
 
         const PhaseTransition::PTParams_Bag params_bag(bp.vw(), bp.alN_bag(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, 1./3., 1./3.);
-        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, dtau);
+        const auto dtau_bag = Spectrum::get_nl_timescale(Hydrodynamics::FluidProfile(params_bag));
+        const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, dtau_bag);
         
         // OmegaGW_bag.profile().write("fp_" + bp.name() + "_bag.csv");
         // OmegaGW_bag.write("gw_" + bp.name() + "_bag.csv");
 
         const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.cpsq(), bp.cmsq());
-        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu, dtau);
+        const auto dtau_munu = Spectrum::get_nl_timescale(Hydrodynamics::FluidProfile(params_munu));
+        const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu, dtau_munu);
 
         std::cout << "sound speed:\n" 
                   << "bag: cp=" << std::sqrt(OmegaGW_bag.profile().cpsq()) << ", cm=" << std::sqrt(OmegaGW_bag.profile().cmsq()) << "\n"

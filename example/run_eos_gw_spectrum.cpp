@@ -70,7 +70,7 @@ int main() {
     /*
         Lastly, we use this to compute the gravitational wave spectrum.
     */
-    Spectrum::PowerSpec OmegaGW_from_eos = Spectrum::GWSpec(kRs_vals, params, dtau);
+    Spectrum::SSM_PowerSpec OmegaGW_from_eos = Spectrum::GWSpec(kRs_vals, params, dtau);
 
     /*
         The fluid profile is constructed internally within Spectrum::GWSpec and can be
@@ -112,7 +112,7 @@ int main() {
     */
     PhaseTransition::PTParams_Veff params_from_path(vw, alN, TN, beta, Rs, nuc_type, un, eos_path);
 
-    Spectrum::PowerSpec OmegaGW_from_path = Spectrum::GWSpec(kRs_vals, params_from_path, dtau);
+    Spectrum::SSM_PowerSpec OmegaGW_from_path = Spectrum::GWSpec(kRs_vals, params_from_path, dtau);
 
     const auto profile_from_path = OmegaGW_from_path.profile();
 
