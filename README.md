@@ -37,7 +37,7 @@ Finally, on *Mac*:
 ## Building
 To build the shared library and examples, use:
 
-    git clone https://github.com/HydroGrav/HydroGrav.git
+    git clone https://github.com/Hydro-Grav/HydroGrav.git
     cd HydroGrav
     mkdir build
     cd build
