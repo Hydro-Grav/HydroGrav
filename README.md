@@ -6,7 +6,7 @@ HydroGrav
 <i>Precise hydrodynamics for gravitational waves from phase transitions.</i>
 </div>
 
-**HydroGrav** is a C++17 software package for calculating fluid profiles and gravitational wave spectra from a first-order electroweak phase transition using either a simplified equation of state (bag or $\mu\nu$ models) or a via a direct calculation of thermodynamics from the effective potential.
+**HydroGrav** is a C++17 software package for calculating fluid profiles and gravitational wave spectra from a first-order electroweak phase transition using either a simplified equation of state (bag or $\mu\nu$ models) or a via a direct calculation of thermodynamics from the effective potential. Documentation for the code can be found [here](https://hydro-grav.github.io/HydroGrav/).
 
 ## Dependencies
 
