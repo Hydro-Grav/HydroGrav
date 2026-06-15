@@ -19,6 +19,10 @@
 
 #include "physics.hpp"
 
+/**
+ * @namespace PhaseTransition
+ * @brief Contains classes that store phase transition parameters
+ */
 namespace PhaseTransition {
 
 // DO NOT CHANGE DEFAULT VALS

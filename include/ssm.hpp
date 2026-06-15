@@ -45,6 +45,10 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
 
 } // namespace Hydrodynamics
 
+/**
+ * @namespace Spectrum
+ * @brief Sound shell model implementation of gravitational wave spectra
+ */
 namespace Spectrum {
 
 /**
