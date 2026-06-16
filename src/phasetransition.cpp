@@ -18,7 +18,7 @@ namespace plt = matplotlibcpp;
 #endif
 
 #include "phasetransition.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 /*
 TO DO:

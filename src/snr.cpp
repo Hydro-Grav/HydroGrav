@@ -4,7 +4,7 @@
 #include <string>
 
 #include "snr.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 double calculate_snr
 (

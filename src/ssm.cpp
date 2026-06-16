@@ -21,7 +21,7 @@
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 
 #include "config.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 #include "phasetransition.hpp"
 #include "profile.hpp"
 #include "ssm.hpp"

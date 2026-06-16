@@ -17,7 +17,7 @@
 #include "profile.hpp"
 #include "phasetransition.hpp"
 #include "physics.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 #include "config.hpp"
 
 #ifdef ENABLE_MATPLOTLIB

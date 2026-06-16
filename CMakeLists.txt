@@ -71,7 +71,7 @@ set(HEADERS
   include/constants.hpp
   include/CubicSpline.tpp
   include/hydrograv.hpp
-  include/maths_ops.hpp
+  include/maths.hpp
   include/phasetransition.hpp
   include/physics.hpp
   include/profile.hpp

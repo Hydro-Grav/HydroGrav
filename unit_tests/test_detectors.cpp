@@ -5,7 +5,7 @@
 
 #include "detectors.hpp"
 #include "snr.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 // ============================================================
 // Detector::name() and ndet()

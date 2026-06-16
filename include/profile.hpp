@@ -18,7 +18,7 @@
 #include "ap.h"
 #include "interpolation.h"
 
-#include "maths_ops.hpp"
+#include "maths.hpp"
 #include "phasetransition.hpp"
 
 /**

@@ -7,7 +7,7 @@
  * all supplied data points and satisfies the natural boundary condition
  * \f$S''(x_0) = S''(x_{n-1}) = 0\f$.
  *
- * This file is included directly by `maths_ops.hpp` and should not be
+ * This file is included directly by `maths.hpp` and should not be
  * compiled separately.
  */
 #ifndef INCLUDE_CUBICSPLINE_TPP_H

@@ -17,7 +17,7 @@
 #include "ssm.hpp"
 #include "profile.hpp"
 #include "physics.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 #include "constants.hpp"
 #include "snr.hpp"
 

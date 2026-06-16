@@ -3,7 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <interpolation.h> // ALGLIB
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 // ============================================================
 // linspace / logspace

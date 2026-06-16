@@ -11,7 +11,7 @@
 
 #include "phasetransition.hpp"
 #include "profile.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 namespace Hydrodynamics {
 
