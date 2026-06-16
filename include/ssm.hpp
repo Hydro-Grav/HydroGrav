@@ -11,7 +11,7 @@
 
 #include "phasetransition.hpp"
 #include "profile.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 namespace Hydrodynamics {
 
@@ -110,9 +110,6 @@ class PowerSpec {
      */
     void plot(const std::string& filename="spectrum.png") const;
     #endif
-
-    /// Cubic spline interpolation over the stored (K,P) data.
-    CubicSpline<double> interpolate() const;
 
     // Scalar arithmetic operators ------------------------------------------------
     friend PowerSpec operator*(const PowerSpec &spec, double scalar);

@@ -17,8 +17,9 @@
 #include "ssm.hpp"
 #include "profile.hpp"
 #include "physics.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 #include "constants.hpp"
+#include "snr.hpp"
 
 #include "ap.h"
 #include "interpolation.h"
@@ -1510,7 +1511,7 @@ int main() {
         gs,
         nuc_type,
         "scan4_BP5",
-        "parameter_scan/eos_scan4/bps/eos_118.884000_0.949788.csv"
+        "parameter_scan/eos_118.884000_0.949788.csv"
     );
 
     benchmark_point scan4_BP6(
@@ -1602,8 +1603,8 @@ int main() {
     // }
 
     // for (size_t i = 0; i < scan2_bp_list.size(); i++) {
-        const int i = 5;
-        const auto bp = scan4_bp_list[i];
+        const int i = 10;
+        const auto bp = scan2_bp_list[i];
         const PhaseTransition::Universe un(bp.Ts(), bp.gs(), bp.Hs());
         const auto kRs_vals = logspace(-3.0, 3.0, 100);
         // const auto dtau = 10*bp.Rs();
@@ -1613,7 +1614,7 @@ int main() {
         const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff, dtau_veff);
         
         // std::cout << "wNeN_rat=" << params_veff.wNeN_rat() << "\n";
-        // OmegaGW_veff.profile().write("fp_" + bp.name() + "_veff.csv");
+        OmegaGW_veff.profile().write("fp_" + bp.name() + "_veff.csv");
         OmegaGW_veff.write("gw_" + bp.name() + "_veff.csv");
 
         // std::cout << "shock_flag=" << OmegaGW_veff.profile().shock_flag() << "\n";
@@ -1622,14 +1623,14 @@ int main() {
         const auto dtau_bag = Spectrum::get_nl_timescale(Hydrodynamics::FluidProfile(params_bag));
         const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag, dtau_bag);
         
-        // OmegaGW_bag.profile().write("fp_" + bp.name() + "_bag.csv");
+        OmegaGW_bag.profile().write("fp_" + bp.name() + "_bag.csv");
         OmegaGW_bag.write("gw_" + bp.name() + "_bag.csv");
 
         const PhaseTransition::PTParams_Bag params_munu(bp.vw(), bp.alN_munu(), bp.Ts(), bp.beta(), bp.Rs(), bp.nuc_type(), un, bp.cpsq(), bp.cmsq());
         const auto dtau_munu = Spectrum::get_nl_timescale(Hydrodynamics::FluidProfile(params_munu));
         const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu, dtau_munu);
 
-        // OmegaGW_munu.profile().write("fp_" + bp.name() + "_munu.csv");
+        OmegaGW_munu.profile().write("fp_" + bp.name() + "_munu.csv");
         OmegaGW_munu.write("gw_" + bp.name() + "_munu.csv");
 
         std::cout << "sound speed:\n" 
@@ -1662,8 +1663,8 @@ int main() {
 
         #ifdef ENABLE_MATPLOTLIB
         const std::string filename_fp = "fp_" + bp.name() + ".png";
-        // Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
-        // Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
+        Hydrodynamics::plot_profiles(OmegaGW_bag.profile(), OmegaGW_munu.profile(), OmegaGW_veff.profile(), filename_fp);
+        Spectrum::plot_spectra(OmegaGW_bag, OmegaGW_munu, OmegaGW_veff, "gw_" + bp.name() + ".png");
         // Spectrum::plot_spectra(Ekin_bag, Ekin_munu, Ekin_veff, "ekin_" + bp.name() + ".png");
         // params_veff.plot_thermo("thermo.png");
         // params_veff.plot_csq("csq_" + bp.name() + ".png");

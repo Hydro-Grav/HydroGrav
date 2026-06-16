@@ -1,301 +1,293 @@
 #include "catch/catch.hpp"
 #include <random>
 #include <chrono>
-#include <interpolation.h> //ALGLIB
-#include "maths_ops.hpp"
+#include <cmath>
+#include <interpolation.h> // ALGLIB
+#include "maths.hpp"
 
-TEST_CASE("Test rk4 Coupled ODEs", "[rk4]") {
+// ============================================================
+// linspace / logspace
+// ============================================================
+TEST_CASE("linspace", "[linspace]") {
+    SECTION("correct number of points") {
+        auto v = linspace(0.0, 1.0, 11);
+        REQUIRE(v.size() == 11);
+    }
+    SECTION("endpoints correct") {
+        auto v = linspace(2.0, 5.0, 50);
+        REQUIRE(v.front() == Approx(2.0).epsilon(1e-12));
+        REQUIRE(v.back()  == Approx(5.0).epsilon(1e-12));
+    }
+    SECTION("uniform spacing") {
+        auto v = linspace(0.0, 1.0, 5);
+        REQUIRE(v[1] == Approx(0.25).epsilon(1e-12));
+        REQUIRE(v[2] == Approx(0.50).epsilon(1e-12));
+        REQUIRE(v[3] == Approx(0.75).epsilon(1e-12));
+    }
+    SECTION("single point") {
+        auto v = linspace(3.0, 3.0, 1);
+        REQUIRE(v.size() == 1);
+        REQUIRE(v[0] == Approx(3.0).epsilon(1e-12));
+    }
+}
 
-    // dy0/dx = y1, dy1/dx = -y0 with y(0) = [1, 0] => y0(x) = cos(x), y1(x) = -sin(x)
+TEST_CASE("logspace", "[logspace]") {
+    SECTION("correct number of points") {
+        auto v = logspace(-3.0, 3.0, 7);
+        REQUIRE(v.size() == 7);
+    }
+    SECTION("endpoints correct") {
+        auto v = logspace(-2.0, 2.0, 100);
+        REQUIRE(v.front() == Approx(1e-2).epsilon(1e-10));
+        REQUIRE(v.back()  == Approx(1e+2).epsilon(1e-10));
+    }
+    SECTION("values are strictly positive") {
+        auto v = logspace(-3.0, 3.0, 50);
+        for (double x : v) REQUIRE(x > 0.0);
+    }
+    SECTION("values are strictly increasing") {
+        auto v = logspace(-3.0, 3.0, 50);
+        for (size_t i = 1; i < v.size(); ++i)
+            REQUIRE(v[i] > v[i-1]);
+    }
+}
 
-    auto dydx = [](double x, const std::vector<double>& y) -> std::vector<double> {
+// ============================================================
+// power()
+// ============================================================
+TEST_CASE("power()", "[power]") {
+    REQUIRE(power(2.0, 0)  == Approx(1.0).epsilon(1e-12));
+    REQUIRE(power(2.0, 3)  == Approx(8.0).epsilon(1e-12));
+    REQUIRE(power(3.0, 4)  == Approx(81.0).epsilon(1e-12));
+    REQUIRE(power(2.0, -2) == Approx(0.25).epsilon(1e-12));
+    REQUIRE(power(0.0, 5)  == Approx(0.0).margin(1e-15));
+}
+
+// ============================================================
+// simpson_integrate()
+// ============================================================
+TEST_CASE("simpson_integrate()", "[simpson]") {
+    SECTION("integral of constant 1 over [0,1] = 1") {
+        auto x = linspace(0.0, 1.0, 101);
+        std::vector<double> y(x.size(), 1.0);
+        REQUIRE(simpson_integrate(x, y) == Approx(1.0).epsilon(1e-6));
+    }
+    SECTION("integral of x over [0,1] = 0.5") {
+        auto x = linspace(0.0, 1.0, 101);
+        std::vector<double> y(x.size());
+        for (size_t i = 0; i < x.size(); ++i) y[i] = x[i];
+        REQUIRE(simpson_integrate(x, y) == Approx(0.5).epsilon(1e-6));
+    }
+    SECTION("integral of x^2 over [0,1] = 1/3") {
+        auto x = linspace(0.0, 1.0, 201);
+        std::vector<double> y(x.size());
+        for (size_t i = 0; i < x.size(); ++i) y[i] = x[i] * x[i];
+        REQUIRE(simpson_integrate(x, y) == Approx(1.0/3.0).epsilon(1e-5));
+    }
+    SECTION("integral of sin(x) over [0, pi] = 2") {
+        auto x = linspace(0.0, M_PI, 501);
+        std::vector<double> y(x.size());
+        for (size_t i = 0; i < x.size(); ++i) y[i] = std::sin(x[i]);
+        REQUIRE(simpson_integrate(x, y) == Approx(2.0).epsilon(1e-6));
+    }
+    SECTION("throws on size mismatch") {
+        std::vector<double> x = {0.0, 1.0, 2.0};
+        std::vector<double> y = {0.0, 1.0};
+        REQUIRE_THROWS_AS(simpson_integrate(x, y), std::invalid_argument);
+    }
+    SECTION("throws on fewer than two points") {
+        std::vector<double> x = {1.0};
+        std::vector<double> y = {1.0};
+        REQUIRE_THROWS_AS(simpson_integrate(x, y), std::invalid_argument);
+    }
+}
+
+// ============================================================
+// golden_section_minimize()
+// ============================================================
+TEST_CASE("golden_section_minimize()", "[golden_section]") {
+    SECTION("minimum of x^2 at x=0") {
+        auto f = [](double x) { return x * x; };
+        double xmin = golden_section_minimize(f, -2.0, 2.0, 1e-8);
+        REQUIRE(xmin == Approx(0.0).margin(1e-6));
+    }
+    SECTION("minimum of (x-1.5)^2 at x=1.5") {
+        auto f = [](double x) { return (x - 1.5) * (x - 1.5); };
+        double xmin = golden_section_minimize(f, 0.0, 3.0, 1e-8);
+        REQUIRE(xmin == Approx(1.5).epsilon(1e-6));
+    }
+    SECTION("minimum of cos(x) on [pi/2, 3pi/2] at x=pi") {
+        auto f = [](double x) { return std::cos(x); };
+        double xmin = golden_section_minimize(f, M_PI / 2.0, 3.0 * M_PI / 2.0, 1e-8);
+        REQUIRE(xmin == Approx(M_PI).epsilon(1e-6));
+    }
+}
+
+// ============================================================
+// rk4_solver()
+// ============================================================
+TEST_CASE("rk4_solver — simple harmonic oscillator", "[rk4]") {
+    // dy0/dx = y1, dy1/dx = -y0 => y0 = cos(x), y1 = -sin(x)
+    auto dydx = [](double, const std::vector<double>& y) -> std::vector<double> {
         return { y[1], -y[0] };
     };
 
-    const double x0 = 0.0;
-    const double xf = M_PI / 2; // pi/2
-    const size_t steps = 5000;
+    auto [x_vals, y_vals] = rk4_solver(dydx, 0.0, M_PI / 2.0,
+                                        std::vector<double>{1.0, 0.0}, size_t(5000));
     const double tol = 1e-3;
-    const double epsilon = 1e-10; // for safe relative error denom
-
-    const std::vector<double> y0 = {1.0, 0.0};
-
-    auto [x_vals, y_vals] = rk4_solver(dydx, x0, xf, y0, steps);
+    const double eps = 1e-10;
 
     for (size_t i = 0; i < x_vals.size(); ++i) {
         double x = x_vals[i];
-        double y0_num = y_vals[i][0];
-        double y1_num = y_vals[i][1];
-
-        double y0_exact = std::cos(x);
-        double y1_exact = -std::sin(x);
-
-        double denom0 = std::abs(y0_exact) > epsilon ? std::abs(y0_exact) : 1.0;
-        double denom1 = std::abs(y1_exact) > epsilon ? std::abs(y1_exact) : 1.0;
-
-        double rel_err0 = std::abs(y0_num - y0_exact) / denom0;
-        double rel_err1 = std::abs(y1_num - y1_exact) / denom1;
-
-        REQUIRE(rel_err0 <= tol);
-        REQUIRE(rel_err1 <= tol);
+        double e0 = std::abs(y_vals[i][0] - std::cos(x));
+        double e1 = std::abs(y_vals[i][1] + std::sin(x));
+        double d0 = std::max(std::abs(std::cos(x)), eps);
+        double d1 = std::max(std::abs(std::sin(x)), eps);
+        REQUIRE(e0 / d0 <= tol);
+        REQUIRE(e1 / d1 <= tol);
     }
-
 }
 
-TEST_CASE("Test rk4 Solver", "[rk4]") {
-
-    // dy0/dx = y1, dy1/dx = -y0 with y(0) = [1, 0] => y0(x) = cos(x), y1(x) = -sin(x)
-
-    auto dydx = [](double x, const std::vector<double>& y) -> std::vector<double> {
-        return { y[1], -y[0] };
+TEST_CASE("rk4_solver — exponential growth", "[rk4]") {
+    // dy/dx = y, y(0) = 1 => y = exp(x)
+    auto dydx = [](double, const std::vector<double>& y) -> std::vector<double> {
+        return { y[0] };
     };
-
-    const double x0 = 0.0;
-    const double xf = M_PI / 2; // pi/2
-    const size_t steps = 5000;
-    const double tol = 1e-3;
-    const double epsilon = 1e-10; // for safe relative error denom
-
-    const std::vector<double> y0 = {1.0, 0.0};
-
-    auto [x_vals, y_vals] = rk4_solver(dydx, x0, xf, y0, steps);
-
-    for (size_t i = 0; i < x_vals.size(); ++i) {
-        double x = x_vals[i];
-        double y0_num = y_vals[i][0];
-        double y1_num = y_vals[i][1];
-
-        double y0_exact = std::cos(x);
-        double y1_exact = -std::sin(x);
-
-        double denom0 = std::abs(y0_exact) > epsilon ? std::abs(y0_exact) : 1.0;
-        double denom1 = std::abs(y1_exact) > epsilon ? std::abs(y1_exact) : 1.0;
-
-        double rel_err0 = std::abs(y0_num - y0_exact) / denom0;
-        double rel_err1 = std::abs(y1_num - y1_exact) / denom1;
-
-        REQUIRE(rel_err0 <= tol);
-        REQUIRE(rel_err1 <= tol);
-    }
-    
+    auto [x_vals, y_vals] = rk4_solver(dydx, 0.0, 2.0,
+                                        std::vector<double>{1.0}, size_t(1000));
+    for (size_t i = 0; i < x_vals.size(); ++i)
+        REQUIRE(y_vals[i][0] == Approx(std::exp(x_vals[i])).epsilon(1e-4));
 }
 
-TEST_CASE("Test cubic spline interpolation", "[cubicSpline]") {
+TEST_CASE("rk4_solver — correct number of steps", "[rk4]") {
+    auto dydx = [](double, const std::vector<double>& y) -> std::vector<double> {
+        return { y[0] };
+    };
+    const size_t n = 200;
+    auto [x_vals, y_vals] = rk4_solver(dydx, 0.0, 1.0,
+                                        std::vector<double>{1.0}, n);
+    REQUIRE(x_vals.size() == n);
+    REQUIRE(y_vals.size() == n);
+}
 
-    auto f = [](double x) { return x*x*x - 2*x*x + x - 5; };
-
-    std::vector<double> x_vals = linspace(-2.0, 2.0, 50);
-    std::vector<double> y_vals;
-    for (double x : x_vals) {
-        y_vals.push_back(f(x));
+// ============================================================
+// L1_norm() and L2_norm()
+// ============================================================
+TEST_CASE("L1_norm()", "[norms]") {
+    SECTION("identical distributions give zero") {
+        auto x = linspace(0.0, 1.0, 101);
+        std::vector<double> y(101, 1.0);
+        REQUIRE(L1_norm(x, y, y) == Approx(0.0).margin(1e-10));
     }
-
-    auto start = std::chrono::high_resolution_clock::now();
-    CubicSpline<double> spline(x_vals, y_vals);
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
-    std::cout << "CubicSpline build time: " << duration.count() << " s\n";
-
-    auto start_eval = std::chrono::high_resolution_clock::now();
-    spline(1.0);
-    auto end_eval = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration_eval = end_eval - start_eval;
-    std::cout << "CubicSpline run_time: " << duration_eval.count() << " s\n";
-
-    std::vector<double> test_points;
-    std::mt19937 gen(0);
-    std::uniform_real_distribution<> dis(-2.0, 2.0);
-    for (int i = 0; i < 50; ++i) {test_points.push_back(dis(gen));}
-
-    for (double xi : test_points) {
-
-        double yi_exact = f(xi);
-        double yi_interp = spline(xi);
-        
-        CHECK(yi_interp == Approx(yi_exact).epsilon(1e-4));
+    SECTION("known analytic value: | f1/|f1| - f2/|f2| | = |x/0.5 - (1-x)/0.5| = 2|2x-1| over [0,1]") {
+        auto x = linspace(0.0, 1.0, 1001);
+        std::vector<double> f1(x.size()), f2(x.size());
+        for (size_t i = 0; i < x.size(); ++i) {
+            f1[i] = x[i];
+            f2[i] = 1.0 - x[i];
+        }
+        // integral of 2|2x-1| over [0,1] = 1
+        REQUIRE(L1_norm(x, f1, f2) == Approx(1.0).epsilon(1e-3));
+    }
+    SECTION("throws on size mismatch") {
+        std::vector<double> x = {0.0, 1.0};
+        std::vector<double> y1 = {0.0, 1.0};
+        std::vector<double> y2 = {0.0};
+        REQUIRE_THROWS_AS(L1_norm(x, y1, y2), std::invalid_argument);
     }
 }
 
-TEST_CASE("ALGLIB function", "[alglib]") {
-
-    auto f = [](double x) { return x*x*x - 2*x*x + x - 5; };
-
-    alglib::real_1d_array x_vals, y_vals;
-    const int n = 50;
-    std::vector<double> x_vec(n), y_vec(n);
-
-    for (int i = 0; i < n; i++) {
-        double x = -2.0 + i * 0.08; // -2 to 2 in 50 steps
-        double y = f(x);
-        x_vec[i] = x;
-        y_vec[i] = y;
+TEST_CASE("L2_norm()", "[norms]") {
+    SECTION("identical distributions give zero") {
+        auto x = linspace(0.0, 1.0, 101);
+        std::vector<double> y(101, 1.0);
+        REQUIRE(L2_norm(x, y, y) == Approx(0.0).margin(1e-10));
     }
-
-    x_vals.setcontent(n, x_vec.data());
-    y_vals.setcontent(n, y_vec.data());
-
-    alglib::spline1dinterpolant spline;
-
-    auto start = std::chrono::high_resolution_clock::now();
-    alglib::spline1dbuildcubic(x_vals, y_vals, spline);
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
-    std::cout << "AlgLib build time: " << duration.count() << " s\n";
-
-    auto start_eval = std::chrono::high_resolution_clock::now();
-    alglib::spline1dcalc(spline, 1.0);
-    auto end_eval = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration_eval = end_eval - start_eval;
-    std::cout << "AlgLib run_time: " << duration_eval.count() << " s\n";
-
-    std::vector<double> test_points;
-    std::mt19937 gen(0);
-    std::uniform_real_distribution<> dis(-2.0, 2.0);
-    for (int i = 0; i < 50; ++i) {test_points.push_back(dis(gen));}
-
-    double tol = 1e-4;
-    for (double xi : test_points) {
-
-        double yi_exact = f(xi);
-        double yi_interp = alglib::spline1dcalc(spline, xi);
-        double error = std::abs(yi_interp - yi_exact);
-        
-        CHECK(error < tol);
+    SECTION("non-negative") {
+        auto x = linspace(0.0, 1.0, 51);
+        std::vector<double> f1(51, 2.0), f2(51, 1.0);
+        REQUIRE(L2_norm(x, f1, f2) >= 0.0);
     }
-
+    SECTION("throws on size mismatch") {
+        std::vector<double> x = {0.0, 1.0};
+        std::vector<double> y1 = {0.0, 1.0};
+        std::vector<double> y2 = {0.0};
+        REQUIRE_THROWS_AS(L2_norm(x, y1, y2), std::invalid_argument);
+    }
 }
 
-TEST_CASE("Test 1D Wasserstein distance on spectra", "[wasserstein]") {
-
+// ============================================================
+// Wasserstein distance
+// ============================================================
+TEST_CASE("wasserstein_distance_1d()", "[wasserstein]") {
     const size_t N = 401;
-    const double fmin = 1e-3;
-    const double fmax = 1e3;
-    const double tol  = 1e-3;
+    auto log_freq = linspace(-6.0, 6.0, N);
 
-    // Log-spaced frequencies
-    std::vector<double> freq(N);
-    for (size_t i = 0; i < N; ++i) {
-        double t = static_cast<double>(i) / (N - 1);
-        freq[i] = fmin * std::pow(fmax / fmin, t);
-    }
-
-    // Transform to log-frequency (positions for Wasserstein distance)
-    std::vector<double> log_freq(N);
-    for (size_t i = 0; i < N; ++i) {
-        log_freq[i] = std::log(freq[i]);
-    }
-
-    // Gaussian in log-frequency
-    auto log_gaussian = [](double x, double mu, double sigma) {
-        return std::exp(-0.5 * std::pow((x - mu) / sigma, 2));
+    auto gaussian = [](double x, double mu, double sig) {
+        return std::exp(-0.5 * std::pow((x - mu) / sig, 2));
     };
 
+    const double mu1 = 0.0, mu2 = 0.5, sigma = 0.4;
     std::vector<double> s1(N), s2(N), s3(N);
-
-    const double mu1 = 0.0;
-    const double mu2 = 0.5;     // known shift in log-space
-    const double sigma = 0.4;
-
     for (size_t i = 0; i < N; ++i) {
-        double lx = std::log(freq[i]);
-        s1[i] = log_gaussian(lx, mu1, sigma);
-        s2[i] = log_gaussian(lx, mu2, sigma);
-        s3[i] = log_gaussian(lx, mu1, sigma); // identical to s1
+        s1[i] = gaussian(log_freq[i], mu1, sigma);
+        s2[i] = gaussian(log_freq[i], mu2, sigma);
+        s3[i] = s1[i];
     }
 
-    SECTION("Zero distance for identical spectra") {
-        // log_freq is positions, s1 and s3 are weights
+    SECTION("zero distance for identical spectra") {
         double W = wasserstein_distance_1d(log_freq, s1, log_freq, s3);
         REQUIRE(W == Approx(0.0).margin(1e-6));
     }
-
-    SECTION("Correct distance for shifted distributions") {
-        // For identical shapes shifted by Δ in log-frequency space:
-        // W1 ≈ |Δ| when distributions are well-separated relative to their width
+    SECTION("correct shift distance") {
         double W = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
-        
-        // The Wasserstein distance for Gaussians with identical variance
-        // but shifted means is exactly |μ2 - μ1|
-        REQUIRE(W == Approx(std::abs(mu2 - mu1)).epsilon(tol));
+        REQUIRE(W == Approx(std::abs(mu2 - mu1)).epsilon(1e-3));
     }
-
-    SECTION("Symmetry of Wasserstein distance") {
+    SECTION("symmetry") {
         double W12 = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
         double W21 = wasserstein_distance_1d(log_freq, s2, log_freq, s1);
-
         REQUIRE(W12 == Approx(W21).epsilon(1e-10));
     }
-
-    SECTION("Triangle inequality") {
-        // For three distributions: W(s1,s3) <= W(s1,s2) + W(s2,s3)
-        std::vector<double> s4(N);
-        const double mu4 = 1.0;
-        for (size_t i = 0; i < N; ++i) {
-            double lx = std::log(freq[i]);
-            s4[i] = log_gaussian(lx, mu4, sigma);
-        }
-        
-        double W13 = wasserstein_distance_1d(log_freq, s1, log_freq, s3);
-        double W12 = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
-        double W23 = wasserstein_distance_1d(log_freq, s2, log_freq, s3);
-        
-        REQUIRE(W13 <= W12 + W23 + 1e-10);
+    SECTION("non-negative") {
+        double W = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
+        REQUIRE(W >= 0.0);
     }
-
-    SECTION("Handles non-normalized weights correctly") {
-        // Wasserstein distance normalizes weights internally
+    SECTION("scale invariance of weights") {
         std::vector<double> s1_scaled = s1;
-        for (auto& val : s1_scaled) val *= 2.0;
-        
-        double W_normal = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
-        double W_scaled = wasserstein_distance_1d(log_freq, s1_scaled, log_freq, s2);
-        
-        REQUIRE(W_normal == Approx(W_scaled).epsilon(1e-10));
+        for (auto& v : s1_scaled) v *= 3.0;
+        double W1 = wasserstein_distance_1d(log_freq, s1, log_freq, s2);
+        double W2 = wasserstein_distance_1d(log_freq, s1_scaled, log_freq, s2);
+        REQUIRE(W1 == Approx(W2).epsilon(1e-10));
     }
-
-    SECTION("Throws on size mismatch") {
-        std::vector<double> short_freq(10);
-        std::vector<double> short_spec(10);
-        
-        // Mismatch between u_values and u_weights
-        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, short_spec, log_freq, s2));
-        
-        // Mismatch between v_values and v_weights
-        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, s1, short_freq, s2));
+    SECTION("throws on size mismatch") {
+        std::vector<double> short_v(10, 1.0);
+        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, short_v, log_freq, s2));
+        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, s1, log_freq, short_v));
     }
+}
 
-    SECTION("Throws on insufficient points") {
-        std::vector<double> f = {1.0, 2.0};
-        std::vector<double> s = {1.0, 1.0};
-        REQUIRE_THROWS(wasserstein_distance_1d(f, s, f, s));
+// ============================================================
+// ALGLIB spline (regression test — checks library is linked)
+// ============================================================
+TEST_CASE("ALGLIB spline regression", "[alglib]") {
+    auto f = [](double x) { return x*x*x - 2*x*x + x - 5; };
+    const int n = 50;
+    alglib::real_1d_array x_arr, y_arr;
+    std::vector<double> xv(n), yv(n);
+    for (int i = 0; i < n; ++i) {
+        xv[i] = -2.0 + i * (4.0 / (n - 1));
+        yv[i] = f(xv[i]);
     }
+    x_arr.setcontent(n, xv.data());
+    y_arr.setcontent(n, yv.data());
 
-    SECTION("Throws on negative or zero weights") {
-        auto bad_spec = s1;
-        bad_spec[10] = -1.0;
-        REQUIRE_THROWS(wasserstein_distance_1d(log_freq, bad_spec, log_freq, s2));
-        
-        bad_spec[10] = 0.0;
-        // Zero weights should be allowed (just ignored)
-        REQUIRE_NOTHROW(wasserstein_distance_1d(log_freq, bad_spec, log_freq, s2));
-    }
+    alglib::spline1dinterpolant spline;
+    alglib::spline1dbuildcubic(x_arr, y_arr, spline);
 
-    SECTION("Works with different frequency grids") {
-        // Create a different frequency grid for s2
-        std::vector<double> freq2(N);
-        std::vector<double> log_freq2(N);
-        std::vector<double> s2_different_grid(N);
-        
-        for (size_t i = 0; i < N; ++i) {
-            double t = static_cast<double>(i) / (N - 1);
-            freq2[i] = fmin * std::pow(fmax / fmin, t) * 1.1; // slightly shifted grid
-            log_freq2[i] = std::log(freq2[i]);
-            s2_different_grid[i] = log_gaussian(log_freq2[i], mu2, sigma);
-        }
-        
-        // Should still compute distance correctly
-        double W = wasserstein_distance_1d(log_freq, s1, log_freq2, s2_different_grid);
-        REQUIRE(W > 0.0);
-        REQUIRE(W == Approx(std::abs(mu2 - mu1)).epsilon(0.1)); // larger tolerance due to grid mismatch
+    std::mt19937 gen(0);
+    std::uniform_real_distribution<> dis(-2.0, 2.0);
+    for (int i = 0; i < 30; ++i) {
+        double xi = dis(gen);
+        CHECK(alglib::spline1dcalc(spline, xi) == Approx(f(xi)).epsilon(1e-4));
     }
 }

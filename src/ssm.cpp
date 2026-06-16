@@ -21,7 +21,7 @@
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 
 #include "config.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 #include "phasetransition.hpp"
 #include "profile.hpp"
 #include "ssm.hpp"
@@ -373,10 +373,6 @@ void PowerSpec::plot(const std::string& filename) const {
     return;
 }
 #endif
-
-CubicSpline<double> PowerSpec::interpolate() const {
-    return CubicSpline(K(), P());
-}
 
 // PowerSpec [op] Scalar arithmetic (can't use copy/move assignments if passing in PTParams to PowerSpec)
 PowerSpec operator*(const PowerSpec& spec, double scalar) {

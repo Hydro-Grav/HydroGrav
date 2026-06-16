@@ -69,9 +69,8 @@ find_package(Boost REQUIRED)
 file(GLOB SOURCES "src/*.cpp")
 set(HEADERS 
   include/constants.hpp
-  include/CubicSpline.tpp
   include/hydrograv.hpp
-  include/maths_ops.hpp
+  include/maths.hpp
   include/phasetransition.hpp
   include/physics.hpp
   include/profile.hpp
@@ -79,6 +78,8 @@ set(HEADERS
   include/sici.hpp
   include/sici_arrays.hpp
   include/solvers.tpp
+  include/snr.hpp
+  include/detectors.hpp
 )
 
 # --------------------------
