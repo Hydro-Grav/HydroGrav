@@ -111,9 +111,6 @@ class PowerSpec {
     void plot(const std::string& filename="spectrum.png") const;
     #endif
 
-    /// Cubic spline interpolation over the stored (K,P) data.
-    CubicSpline<double> interpolate() const;
-
     // Scalar arithmetic operators ------------------------------------------------
     friend PowerSpec operator*(const PowerSpec &spec, double scalar);
     friend PowerSpec operator*(double scalar, const PowerSpec &spec);

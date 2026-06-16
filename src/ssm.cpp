@@ -374,10 +374,6 @@ void PowerSpec::plot(const std::string& filename) const {
 }
 #endif
 
-CubicSpline<double> PowerSpec::interpolate() const {
-    return CubicSpline(K(), P());
-}
-
 // PowerSpec [op] Scalar arithmetic (can't use copy/move assignments if passing in PTParams to PowerSpec)
 PowerSpec operator*(const PowerSpec& spec, double scalar) {
     std::vector<double> scaled_P;

@@ -173,30 +173,6 @@ TEST_CASE("norm_spec()", "[powerSpec]") {
 }
 
 // ============================================================
-// interpolate()
-// ============================================================
-TEST_CASE("PowerSpec interpolate()", "[powerSpec]") {
-    auto profile = make_profile();
-    // Use enough points for a meaningful spline
-    std::vector<double> K = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0};
-    std::vector<double> P;
-    for (double k : K) P.push_back(k * k); // P = K^2
-
-    Spectrum::PowerSpec spec(K, P, profile);
-    auto interp = spec.interpolate();
-
-    SECTION("reproduces knot values exactly") {
-        for (size_t i = 0; i < K.size(); ++i)
-            CHECK(interp(K[i]) == Approx(P[i]).epsilon(1e-6));
-    }
-    SECTION("interpolated value is finite at interior point") {
-        double val = interp(4.5);
-        REQUIRE(std::isfinite(val));
-        REQUIRE(val > 0.0);
-    }
-}
-
-// ============================================================
 // SSM functions — Ekin, zetaKin
 // ============================================================
 TEST_CASE("Ekin() from FluidProfile", "[ekin]") {

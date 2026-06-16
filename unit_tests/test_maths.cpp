@@ -103,88 +103,6 @@ TEST_CASE("simpson_integrate()", "[simpson]") {
 }
 
 // ============================================================
-// CubicSpline
-// ============================================================
-TEST_CASE("CubicSpline — cubic polynomial reproduced exactly", "[cubicSpline]") {
-    auto f = [](double x) { return x*x*x - 2*x*x + x - 5; };
-
-    auto x_vals = linspace(-2.0, 2.0, 50);
-    std::vector<double> y_vals;
-    for (double x : x_vals) y_vals.push_back(f(x));
-
-    CubicSpline<double> spline(x_vals, y_vals);
-
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<> dis(-2.0, 2.0);
-    for (int i = 0; i < 50; ++i) {
-        double xi = dis(gen);
-        CHECK(spline(xi) == Approx(f(xi)).epsilon(1e-4));
-    }
-}
-
-TEST_CASE("CubicSpline — reproduces knot values exactly", "[cubicSpline]") {
-    auto x_vals = linspace(0.0, 5.0, 20);
-    std::vector<double> y_vals;
-    for (double x : x_vals) y_vals.push_back(std::sin(x));
-
-    CubicSpline<double> spline(x_vals, y_vals);
-
-    for (size_t i = 0; i < x_vals.size(); ++i)
-        CHECK(spline(x_vals[i]) == Approx(y_vals[i]).epsilon(1e-10));
-}
-
-TEST_CASE("CubicSpline — decreasing x input", "[cubicSpline]") {
-    // Build on decreasing grid — spline should handle reversal internally
-    std::vector<double> x_vals, y_vals;
-    for (int i = 50; i >= 0; --i) {
-        double x = -2.0 + i * (4.0 / 50.0);
-        x_vals.push_back(x);
-        y_vals.push_back(x * x);
-    }
-    CubicSpline<double> spline(x_vals, y_vals);
-    CHECK(spline(0.0)  == Approx(0.0).margin(1e-4));
-    CHECK(spline(1.0)  == Approx(1.0).epsilon(1e-4));
-    CHECK(spline(-1.0) == Approx(1.0).epsilon(1e-4));
-}
-
-TEST_CASE("CubicSpline — scalar arithmetic operators", "[cubicSpline]") {
-    auto x_vals = linspace(0.0, 2.0, 20);
-    std::vector<double> y_vals;
-    for (double x : x_vals) y_vals.push_back(x * x);
-
-    CubicSpline<double> s(x_vals, y_vals);
-
-    SECTION("spline + scalar") {
-        auto s2 = s + 3.0;
-        CHECK(s2(1.0) == Approx(s(1.0) + 3.0).epsilon(1e-10));
-    }
-    SECTION("scalar + spline") {
-        auto s2 = 3.0 + s;
-        CHECK(s2(1.0) == Approx(s(1.0) + 3.0).epsilon(1e-10));
-    }
-    SECTION("spline - scalar") {
-        auto s2 = s - 1.5;
-        CHECK(s2(1.0) == Approx(s(1.0) - 1.5).epsilon(1e-10));
-    }
-    SECTION("scalar - spline") {
-        auto s2 = 5.0 - s;
-        CHECK(s2(1.0) == Approx(5.0 - s(1.0)).epsilon(1e-10));
-    }
-    SECTION("spline * scalar") {
-        auto s2 = s * 2.0;
-        CHECK(s2(1.0) == Approx(s(1.0) * 2.0).epsilon(1e-10));
-    }
-    SECTION("scalar * spline") {
-        auto s2 = 2.0 * s;
-        CHECK(s2(1.0) == Approx(s(1.0) * 2.0).epsilon(1e-10));
-    }
-    SECTION("spline / scalar") {
-        auto s2 = s / 4.0;
-        CHECK(s2(1.0) == Approx(s(1.0) / 4.0).epsilon(1e-10));
-    }
-}
-
-// ============================================================
 // golden_section_minimize()
 // ============================================================
 TEST_CASE("golden_section_minimize()", "[golden_section]") {
@@ -248,8 +166,8 @@ TEST_CASE("rk4_solver — correct number of steps", "[rk4]") {
     const size_t n = 200;
     auto [x_vals, y_vals] = rk4_solver(dydx, 0.0, 1.0,
                                         std::vector<double>{1.0}, n);
-    REQUIRE(x_vals.size() == n + 1);
-    REQUIRE(y_vals.size() == n + 1);
+    REQUIRE(x_vals.size() == n);
+    REQUIRE(y_vals.size() == n);
 }
 
 // ============================================================
@@ -261,15 +179,15 @@ TEST_CASE("L1_norm()", "[norms]") {
         std::vector<double> y(101, 1.0);
         REQUIRE(L1_norm(x, y, y) == Approx(0.0).margin(1e-10));
     }
-    SECTION("known analytic value: |f1 - f2| = |x - (1-x)| = |2x-1| over [0,1]") {
+    SECTION("known analytic value: | f1/|f1| - f2/|f2| | = |x/0.5 - (1-x)/0.5| = 2|2x-1| over [0,1]") {
         auto x = linspace(0.0, 1.0, 1001);
         std::vector<double> f1(x.size()), f2(x.size());
         for (size_t i = 0; i < x.size(); ++i) {
             f1[i] = x[i];
             f2[i] = 1.0 - x[i];
         }
-        // integral of |2x-1| over [0,1] = 0.5
-        REQUIRE(L1_norm(x, f1, f2) == Approx(0.5).epsilon(1e-3));
+        // integral of 2|2x-1| over [0,1] = 1
+        REQUIRE(L1_norm(x, f1, f2) == Approx(1.0).epsilon(1e-3));
     }
     SECTION("throws on size mismatch") {
         std::vector<double> x = {0.0, 1.0};

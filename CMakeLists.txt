@@ -69,7 +69,6 @@ find_package(Boost REQUIRED)
 file(GLOB SOURCES "src/*.cpp")
 set(HEADERS 
   include/constants.hpp
-  include/CubicSpline.tpp
   include/hydrograv.hpp
   include/maths.hpp
   include/phasetransition.hpp
