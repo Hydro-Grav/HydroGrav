@@ -7,14 +7,14 @@
 
 // Shared fixture
 static Hydrodynamics::FluidProfile make_profile() {
-    PhaseTransition::PTParams_Bag params(
-        0.9, 0.1,
-        PhaseTransition::dflt_PTParams::TN,
-        PhaseTransition::dflt_PTParams::beta,
-        PhaseTransition::dflt_PTParams::Rs,
-        PhaseTransition::dflt_PTParams::nuc_type,
-        PhaseTransition::default_universe()
-    );
+    static PhaseTransition::PTParams_Bag params(
+            0.9, 0.1,
+            PhaseTransition::dflt_PTParams::TN,
+            PhaseTransition::dflt_PTParams::beta,
+            PhaseTransition::dflt_PTParams::Rs,
+            PhaseTransition::dflt_PTParams::nuc_type,
+            PhaseTransition::default_universe()
+            );
     return Hydrodynamics::FluidProfile(params);
 }
 
