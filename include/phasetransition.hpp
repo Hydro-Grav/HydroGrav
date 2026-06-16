@@ -152,7 +152,6 @@ class PTParams {
     double betaHs() const { return beta_ / un_.Hs(); } // beta/Hs
     double Rs() const { return Rs_; } // characteristic length scale R_*
     double tau_s() const { return tau_s_; } // start time of PT
-    double tau_fin() const { return tau_fin_; } // end time of PT
     const std::string nuc_type() const { return nuc_type_; } // bubble nucleation type
 
     // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
@@ -163,7 +162,7 @@ class PTParams {
 
   protected:
     const Universe un_;
-    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_;
+    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_;
     std::string nuc_type_;
 
     virtual void print() const;
