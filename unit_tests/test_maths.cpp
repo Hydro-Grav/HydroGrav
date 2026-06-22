@@ -156,7 +156,7 @@ TEST_CASE("rk4_solver — exponential growth", "[rk4]") {
     auto [x_vals, y_vals] = rk4_solver(dydx, 0.0, 2.0,
                                         std::vector<double>{1.0}, size_t(1000));
     for (size_t i = 0; i < x_vals.size(); ++i)
-        REQUIRE(y_vals[i][0] == Approx(std::exp(x_vals[i])).epsilon(1e-4));
+        REQUIRE(y_vals[i][0] == Approx(std::exp(x_vals[i])).epsilon(1e-10));
 }
 
 TEST_CASE("rk4_solver — correct number of steps", "[rk4]") {
