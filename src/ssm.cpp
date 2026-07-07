@@ -485,7 +485,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 }
 
 /*** GW power spectrum ***/
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const double dtau) {
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau) {
 
     const auto ti = std::chrono::high_resolution_clock::now();
 
@@ -498,6 +498,11 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const Hydrodynamics::FluidProfile profile(params);
 
     std::cout << "Calculating gravitational wave power spectrum...\n";
+
+    if (dtau == 0) {
+        std::cout << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!\n";
+        dtau = get_nl_timescale(profile);
+    }
 
     const auto cs = std::sqrt(params.cpsq());
     const auto Rs_inv = 1.0 / params.Rs();

@@ -181,7 +181,7 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 /**
  * @brief Calculates gravitational wave spectrum.
  */
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const double dtau);
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau=0.0);
 
 /**
  * @brief Builds spline interpolating functions for kinetic spectrum
