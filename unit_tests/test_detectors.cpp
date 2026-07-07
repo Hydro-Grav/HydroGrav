@@ -12,19 +12,15 @@
 // ============================================================
 TEST_CASE("Detector names", "[detectors]") {
     REQUIRE(LISA().name() == "LISA");
-    REQUIRE(BBO().name() == "BBO");
     REQUIRE(DECIGO().name() == "DECIGO");
-    REQUIRE(EinsteinTelescope().name() == "ET");
 }
 
 TEST_CASE("Detector ndet() defaults and overrides", "[detectors]") {
     SECTION("default ndet is 1") {
         REQUIRE(LISA().ndet() == Approx(1.0).epsilon(1e-12));
-        REQUIRE(BBO().ndet() == Approx(1.0).epsilon(1e-12));
-        REQUIRE(EinsteinTelescope().ndet() == Approx(1.0).epsilon(1e-12));
     }
-    SECTION("DECIGO overrides ndet to 3") {
-        REQUIRE(DECIGO().ndet() == Approx(3.0).epsilon(1e-12));
+    SECTION("DECIGO overrides ndet to 2") {
+        REQUIRE(DECIGO().ndet() == Approx(2.0).epsilon(1e-12));
     }
 }
 
@@ -49,17 +45,6 @@ TEST_CASE("LISA omega_noise()", "[detectors][lisa]") {
     }
 }
 
-TEST_CASE("BBO omega_noise()", "[detectors][bbo]") {
-    BBO bbo;
-    SECTION("positive across the BBO band") {
-        for (double f : {1e-2, 1e-1, 1.0, 10.0})
-            REQUIRE(bbo.omega_noise(f) > 0.0);
-    }
-    SECTION("finite for typical frequencies") {
-        REQUIRE(std::isfinite(bbo.omega_noise(0.3)));
-    }
-}
-
 TEST_CASE("DECIGO omega_noise()", "[detectors][decigo]") {
     DECIGO decigo;
     SECTION("positive across the DECIGO band") {
@@ -68,20 +53,6 @@ TEST_CASE("DECIGO omega_noise()", "[detectors][decigo]") {
     }
     SECTION("finite near the characteristic frequency f_p = 7.36 Hz") {
         REQUIRE(std::isfinite(decigo.omega_noise(7.36)));
-    }
-}
-
-TEST_CASE("EinsteinTelescope omega_noise()", "[detectors][et]") {
-    EinsteinTelescope et;
-    SECTION("positive across the ET band") {
-        for (double f : {1.0, 10.0, 100.0, 1000.0})
-            REQUIRE(et.omega_noise(f) > 0.0);
-    }
-    SECTION("finite below 1 Hz cutoff branch") {
-        // Sn(f) returns 1.0 for f < 1.0 inside the private helper;
-        // omega_noise should still be finite and positive there.
-        REQUIRE(std::isfinite(et.omega_noise(0.5)));
-        REQUIRE(et.omega_noise(0.5) > 0.0);
     }
 }
 
@@ -128,25 +99,6 @@ TEST_CASE("calculate_snr() with LISA", "[snr]") {
     }
 }
 
-TEST_CASE("calculate_snr() reflects ndet for DECIGO", "[snr][decigo]") {
-    // DECIGO has ndet=3, so its SNR should be sqrt(3) times what an
-    // otherwise-identical ndet=1 detector would give for the same
-    // signal/noise combination. We verify this indirectly: DECIGO_snr should
-    // equal calculate_snr(..., decigo) and scale with sqrt(ndet) relative
-    // to a manually-integrated ndet=1 baseline.
-    const size_t N = 100;
-    auto freqs = linspace(1e-1, 10.0, N);
-    DECIGO decigo;
-
-    std::vector<double> amp(N);
-    for (size_t i = 0; i < N; ++i)
-        amp[i] = 5.0 * decigo.omega_noise(freqs[i]);
-
-    double snr_decigo = calculate_snr(freqs, amp, decigo);
-    REQUIRE(snr_decigo > 0.0);
-    REQUIRE(std::isfinite(snr_decigo));
-}
-
 // ============================================================
 // calculate_all_snrs()
 // ============================================================
@@ -155,26 +107,27 @@ TEST_CASE("calculate_all_snrs()", "[snr]") {
     auto freqs = linspace(1e-3, 1e-1, N);
 
     static const LISA lisa;
-    static const BBO bbo;
+    static const DECIGO decigo;
+    
     std::vector<double> amp(N);
     for (size_t i = 0; i < N; ++i)
         amp[i] = 50.0 * lisa.omega_noise(freqs[i]);
 
     SECTION("returns one result per detector, in order") {
-        std::vector<const Detector*> detectors = { &lisa, &bbo };
+        std::vector<const Detector*> detectors = { &lisa, &decigo };
         auto results = calculate_all_snrs(freqs, amp, detectors);
 
         REQUIRE(results.size() == 2);
         REQUIRE(results[0].detector_name == "LISA");
-        REQUIRE(results[1].detector_name == "BBO");
+        REQUIRE(results[1].detector_name == "DECIGO");
     }
 
     SECTION("each SNR matches a direct calculate_snr() call") {
-        std::vector<const Detector*> detectors = { &lisa, &bbo };
+        std::vector<const Detector*> detectors = { &lisa, &decigo };
         auto results = calculate_all_snrs(freqs, amp, detectors);
 
         REQUIRE(results[0].snr == Approx(calculate_snr(freqs, amp, lisa)).epsilon(1e-10));
-        REQUIRE(results[1].snr == Approx(calculate_snr(freqs, amp, bbo)).epsilon(1e-10));
+        REQUIRE(results[1].snr == Approx(calculate_snr(freqs, amp, decigo)).epsilon(1e-10));
     }
 
     SECTION("empty detector list returns empty result") {
@@ -187,7 +140,7 @@ TEST_CASE("calculate_all_snrs()", "[snr]") {
 // ============================================================
 // get_SNR() — all four standard detectors
 // ============================================================
-TEST_CASE("get_SNR() returns LISA, BBO, DECIGO, ET in order", "[snr]") {
+TEST_CASE("get_SNR() returns LISA, DECIGO in order", "[snr]") {
     const size_t N = 100;
     auto freqs = linspace(1e-3, 1e2, N);
 
@@ -198,11 +151,9 @@ TEST_CASE("get_SNR() returns LISA, BBO, DECIGO, ET in order", "[snr]") {
 
     auto results = get_SNR(freqs, amp);
 
-    REQUIRE(results.size() == 4);
+    REQUIRE(results.size() == 2);
     REQUIRE(results[0].detector_name == "LISA");
-    REQUIRE(results[1].detector_name == "BBO");
-    REQUIRE(results[2].detector_name == "DECIGO");
-    REQUIRE(results[3].detector_name == "ET");
+    REQUIRE(results[1].detector_name == "DECIGO");
 
     SECTION("all SNRs are finite and non-negative") {
         for (const auto& r : results) {
@@ -213,43 +164,31 @@ TEST_CASE("get_SNR() returns LISA, BBO, DECIGO, ET in order", "[snr]") {
 }
 
 // ============================================================
-// Individual convenience functions: LISA_snr, BBO_snr, DECIGO_snr, ET_snr
+// Individual convenience functions: LISA_snr, DECIGO_snr
 // ============================================================
 TEST_CASE("Individual detector convenience functions match calculate_snr()", "[snr]") {
     const size_t N = 100;
     auto freqs = linspace(1e-2, 10.0, N);
 
     LISA lisa;
-    BBO bbo;
     DECIGO decigo;
-    EinsteinTelescope et;
 
-    std::vector<double> amp_lisa(N), amp_bbo(N), amp_decigo(N), amp_et(N);
+    std::vector<double> amp_lisa(N), amp_decigo(N);
     for (size_t i = 0; i < N; ++i) {
         amp_lisa[i]   = 20.0 * lisa.omega_noise(std::max(freqs[i], 1e-4));
-        amp_bbo[i]    = 20.0 * bbo.omega_noise(freqs[i]);
         amp_decigo[i] = 20.0 * decigo.omega_noise(freqs[i]);
-        amp_et[i]     = 20.0 * et.omega_noise(std::max(freqs[i], 1.0));
     }
 
     SECTION("LISA_snr matches calculate_snr") {
         REQUIRE(LISA_snr(freqs, amp_lisa) == Approx(calculate_snr(freqs, amp_lisa, lisa)).epsilon(1e-10));
     }
-    SECTION("BBO_snr matches calculate_snr") {
-        REQUIRE(BBO_snr(freqs, amp_bbo) == Approx(calculate_snr(freqs, amp_bbo, bbo)).epsilon(1e-10));
-    }
     SECTION("DECIGO_snr matches calculate_snr") {
         REQUIRE(DECIGO_snr(freqs, amp_decigo) == Approx(calculate_snr(freqs, amp_decigo, decigo)).epsilon(1e-10));
-    }
-    SECTION("ET_snr matches calculate_snr") {
-        REQUIRE(ET_snr(freqs, amp_et) == Approx(calculate_snr(freqs, amp_et, et)).epsilon(1e-10));
     }
 
     SECTION("all throw on size mismatch") {
         std::vector<double> bad(N - 1, 1e-10);
         REQUIRE_THROWS_AS(LISA_snr(freqs, bad), std::invalid_argument);
-        REQUIRE_THROWS_AS(BBO_snr(freqs, bad), std::invalid_argument);
         REQUIRE_THROWS_AS(DECIGO_snr(freqs, bad), std::invalid_argument);
-        REQUIRE_THROWS_AS(ET_snr(freqs, bad), std::invalid_argument);
     }
 }

@@ -69,19 +69,6 @@ double LISA_snr(
     double Tyear = 4.0);
 
 /**
- * Convenience function to calculate SNR for BBO only.
- *
- * @param freqVals  Frequency values in Hz
- * @param ampVals   Signal amplitude in Omega_GW h^2
- * @param Tyear     Observation time in years
- * @return SNR value for BBO
- */
-double BBO_snr(
-    const std::vector<double>& freqVals,
-    const std::vector<double>& ampVals,
-    double Tyear = 4.0);
-
-/**
  * Convenience function to calculate SNR for DECIGO only.
  *
  * @param freqVals  Frequency values in Hz
@@ -95,16 +82,16 @@ double DECIGO_snr(
     double Tyear = 4.0);
 
 /**
- * Convenience function to calculate SNR for Einstein Telescope only.
+ * Convenience function to calculate SNR for BBO only.
  *
  * @param freqVals  Frequency values in Hz
  * @param ampVals   Signal amplitude in Omega_GW h^2
  * @param Tyear     Observation time in years
- * @return SNR value for Einstein Telescope
+ * @return SNR value for BBO
  */
-double ET_snr(
-    const std::vector<double>& freqVals,
-    const std::vector<double>& ampVals,
-    double Tyear = 4.0);
+// double BBO_snr(
+//     const std::vector<double>& freqVals,
+//     const std::vector<double>& ampVals,
+//     double Tyear = 4.0);
 
 #endif // INCLUDE_SNR_HPP_H

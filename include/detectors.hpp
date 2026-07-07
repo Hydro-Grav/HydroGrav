@@ -4,6 +4,7 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include "constants.hpp"
 
 static constexpr double H_0 = 67.8 / 3.086e19; // Hubble constant in SI units
 static constexpr double h   = 0.678; // Reduced Hubble constant
@@ -19,13 +20,22 @@ public:
     // Override in derived classes where ndet != 1 (e.g. DECIGO).
     virtual double ndet() const { return 1.0; }
 
-    // Noise sensitivity curve in Omega_GW h^2 units.
-    virtual double omega_noise(double f) const = 0;
+    virtual double Pn(double f) const = 0;
+    virtual double R(double f) const = 0;
 
-protected:
-    double sn_to_omegahsq(double f, double Sn) const {
-        return (2.0 * M_PI * M_PI / (3.0 * H_0 * H_0)) * std::pow(f, 3) * Sn * h * h;
+    // Transfer frequency f_* = c / (2 pi L)
+    double fs(double L) const {
+        return c / (2.0 * M_PI * L);
     }
+
+    double Sn(double f) const {
+        return Pn(f) / R(f);
+    }
+
+    // Noise sensitivity curve in Omega_GW h^2 units.
+    double omega_noise(double f) const {
+        return (2.0 * M_PI * M_PI / (3.0 * H_0 * H_0)) * std::pow(f, 3) * Sn(f) * h * h;
+    }    
 };
     
 // LISA
@@ -33,103 +43,103 @@ class LISA : public Detector {
 public:
     std::string name() const override { return "LISA"; }
 
-    double omega_noise(double f) const override {
-        return sn_to_omegahsq(f, Sn(f));
-    }
-
 private:
-
-    // Galactic binary confusion noise
-    // double gb_omegahsq(double /*f*/) const { return 0.0; }
-
-    // Extragalactic binary confusion noise
-    // double eb_omegahsq(double /*f*/, const std::string& /*flag*/ = "central") const { return 0.0; }
+    static constexpr double L  = 2.5e9;
+    const double fs_LISA = fs(L);
 
     double P_oms(double f) const {
         return (1.5e-11) * (1.5e-11) * (1.0 + std::pow(2e-3 / f, 4));
     }
 
     double P_acc(double f) const {
-        double term1 = (3e-15) * (3e-15) / std::pow(2.0 * M_PI * f, 4);
+        double term1 = (3e-15) * (3e-15);
         double term2 = 1.0 + std::pow(0.4e-3 / f, 2);
         double term3 = 1.0 + std::pow(f / 8e-3, 4);
         return term1 * term2 * term3;
     }
 
-    double Sn(double f) const {
-        double L  = 2.5e9;
-        double fs = 2.998e8 / (2.0 * M_PI * L);
+    double Pn(double f) const {
+        return (P_oms(f) + 4.0 * P_acc(f) / std::pow(2.0 * M_PI * f, 4)) / (L * L);
+    }
 
-        double Sn = (10.0 / (3.0 * L * L))
-                * (P_oms(f) + 4.0 * P_acc(f))
-                * (1.0 + 0.54 * std::pow(f / fs, 2));
-        return Sn;
+    double R(double f) const {
+        return (3.0 / 10.0) / (1.0 + 0.54 * std::pow(f / fs_LISA, 2));
     }
 };
 
-// BBO - AI SLOP DOUBLE CHECK THIS ONE
-class BBO : public Detector {
-public:
-    std::string name() const override { return "BBO"; }
-
-    double omega_noise(double f) const override {
-        return sn_to_omegahsq(f, Sn(f));
-    }
-
-private:
-    // Strain noise spectral density (Cutler & Harms 2006 approximation)
-    double Sn(double f) const {
-        double S_acc  = 9.0e-54 / std::pow(f, 4);
-        double S_sn   = 3.6e-37 * std::pow(f, 2);
-        double S_omni = 1.8e-44;
-        return S_acc + S_sn + S_omni;
-    }
-};
-
-// DECIGO - AI SLOP DOUBLE CHECK THIS ONE
+// DECIGO
 class DECIGO : public Detector {
 public:
     std::string name() const override { return "DECIGO"; }
-    double ndet() const override { return 3.0; }  // 3 correlated detector pairs
-
-    double omega_noise(double f) const override {
-        return sn_to_omegahsq(f, Sn(f));
-    }
+    double ndet() const override { return 2.0; }  // 2 correlated detector pairs
 
 private:
-    // Strain noise spectral density (Seto et al. 2001 approximation)
+    // Physical constants
+    static constexpr double L       = 1.0e3;           // Arm length (m)
+    static constexpr double la      = 532e-9;          // Laser wavelength (m)
+    static constexpr double M_mir   = 100.0;           // Mirror mass (kg)
+    static constexpr double P_las   = 10.0;            // Laser output power (W)
+    static constexpr double P_eff   = 6.68;            // Effective laser power (W)
+    static constexpr double F_cav   = 10.18;           // Cavity finesse
+
+    const double fs_DECIGO = fs(L);
+
+    // Shot noise PSD
+    double P_shot(double f) const {
+        return (hbar * c * M_PI * la / P_eff)
+             * std::pow(1.0 / (4.0 * F_cav * L), 2)
+             * (1.0 + std::pow(f / fs_DECIGO, 2));
+    }
+
+    // Radiation pressure noise PSD
+    double P_rad(double f) const {
+        return (hbar * P_las / (c * M_PI * la))
+             * std::pow(16.0 * F_cav / (M_mir * L), 2)
+             * std::pow(1.0 / (2.0 * M_PI * f), 4)
+             / (1.0 + std::pow(f / fs_DECIGO, 2));
+    }
+
+    // Acceleration noise PSD
+    double P_acc(double f) const {
+        return (hbar * P_las / (c * M_PI * la))
+             * std::pow(16.0 * F_cav / (3.0 * M_mir * L), 2)
+             * std::pow(1.0 / (2.0 * M_PI * f), 4);
+    }
+
+    // Total detector noise PSD
+    double Pn(double f) const {
+        return P_shot(f) + P_rad(f) + P_acc(f);
+    }
+
+    // Signal response function
+    double R(double f) const {
+        return (3.0 / 10.0) / (1.0 + 0.54 * std::pow(f / fs_DECIGO, 2));
+    }
+
+    // Strain noise spectral density Sn = Pn / R
     double Sn(double f) const {
-        double f_p   = 7.36;
-        double S_rp  = 1.05e-46 / (1.0 + std::pow(f / f_p, 2));  // Radiation pressure
-        double S_sn  = 6.53e-51 * std::pow(f, 2);                // Shot noise
-        double S_acc = 3.15e-60 / std::pow(f, 4);                // Acceleration
-        return S_rp + S_sn + S_acc;
+        return Pn(f) / R(f);
     }
 };
 
-// Einstein Telescope - AI SLOP DOUBLE CHECK THIS ONE
-class EinsteinTelescope : public Detector {
+// BBO
+class BBO : public Detector {
 public:
-    std::string name() const override { return "ET"; }
-
-    double omega_noise(double f) const override {
-        return sn_to_omegahsq(f, Sn(f));
-    }
+    std::string name() const override { return "BBO"; }
+    double ndet() const override { return 2.0; }
 
 private:
-    // ET-D sensitivity curve approximation (Hild et al. 2011)
-    double Sn(double f) const {
-        if (f < 1.0) return 1.0;
+    static constexpr double L = 5e+7;
+    static constexpr double P_oms = (1.4e-17) * (1.4e-17);
+    static constexpr double P_acc = (3.0e-17) * (3.0e-17);
+    
+    double Pn(double f) const {
+        return 4.0 * (P_oms + P_acc / std::pow(2.0 * M_PI * f, 4)) / (L * L);
+    }
 
-        double a1   = 2.39e-27, a2 = -0.142, a3 = -3.0;
-        double b1   = 0.349,    b2 = 1.76,   b3 = -2.0;
-        double c1   = 1.76e-48, c2 = 5.0;
-
-        double S_low  = a1 * std::pow(f, a2) + a3;
-        double S_mid  = b1 * std::pow(f, b2) + b3;
-        double S_high = c1 * std::pow(f, c2);
-
-        return S_low * S_low + S_mid * S_mid + S_high;
+    // TO DO: add response function
+    double R(double f) const {
+        return 0.0 * f;
     }
 };
 

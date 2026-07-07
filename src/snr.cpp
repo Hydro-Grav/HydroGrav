@@ -69,11 +69,9 @@ std::vector<SNRResult> calculate_all_snrs
 std::vector<SNRResult> get_SNR(const std::vector<double>& freqVals, const std::vector<double>& ampVals, double Tyear) 
 {
     static const LISA lisa;
-    static const BBO bbo;
     static const DECIGO decigo;
-    static const EinsteinTelescope et;
 
-    const std::vector<const Detector*> detectors = { &lisa, &bbo, &decigo, &et };
+    const std::vector<const Detector*> detectors = { &lisa, &decigo };
 
     return calculate_all_snrs(freqVals, ampVals, detectors, Tyear);
 }
@@ -84,20 +82,14 @@ double LISA_snr(const std::vector<double>& freqVals, const std::vector<double>& 
     return calculate_snr(freqVals, ampVals, lisa, Tyear);
 }
 
-double BBO_snr(const std::vector<double>& freqVals, const std::vector<double>& ampVals, double Tyear) 
-{
-    static const BBO bbo;
-    return calculate_snr(freqVals, ampVals, bbo, Tyear);
-}
-
 double DECIGO_snr(const std::vector<double>& freqVals, const std::vector<double>& ampVals, double Tyear) 
 {
     static const DECIGO decigo;
     return calculate_snr(freqVals, ampVals, decigo, Tyear);
 }
 
-double ET_snr(const std::vector<double>& freqVals, const std::vector<double>& ampVals, double Tyear) 
-{
-    static const EinsteinTelescope et;
-    return calculate_snr(freqVals, ampVals, et, Tyear);
-}
+// double BBO_snr(const std::vector<double>& freqVals, const std::vector<double>& ampVals, double Tyear) 
+// {
+//     static const BBO bbo;
+//     return calculate_snr(freqVals, ampVals, bbo, Tyear);
+// }
