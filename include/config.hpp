@@ -1,6 +1,7 @@
 /**
  * @file config.hpp
- * @brief Global numerical configuration parameters used in the sound shell model implementation.
+ * @brief Global numerical configuration parameters used in the fluid profile 
+ *        construction and sound shell model implementation.
  *
  * All tunable constants that control quadrature accuracy, spline grid
  * bounds and integration limits are collected here.  Modify these values
@@ -19,6 +20,42 @@
  * @brief Compile-time numerical configuration constants.
  */
 namespace config {
+
+    /**
+     * @brief Default number of steps used in rk4 integrator.
+     */
+    const static double rk4_steps = 1000;
+
+    /**
+     * @brief Default convergence tolerance for 2D bounded Newton solver.
+     */
+    const static double newton_solver_tol = 1e-8;
+
+    /**
+     * @brief Default max. number of iterations for 2D bounded Newton solver.
+     */
+    const static double newton_solver_max_its = 100;
+
+    /**
+     * @brief Default convergence tolerance for golden section minimisation method.
+     */
+    const static double golden_sec_tol = 1e-8;
+
+     /**
+     * @brief Default max. number of iterations for golden section minimisation method.
+     */
+    const static double golden_sec_max_its = 100;
+
+    /**
+     * @brief Default convergence tolerance for Nelder-Mead minimisation method.
+     */
+    const static double nelder_mead_tol = 1e-8;
+
+    /**
+     * @brief Default max. number of iterations for Nelder-Mead minimisation method.
+     */
+    const static double nelder_mead_max_its = 10000;
+
     /**
      * @brief Tolerance for residual functions in FluidProfile class.
      *
@@ -26,6 +63,21 @@ namespace config {
      * to at least O(1e+10). Not used for bag/mu-nu model.
      */
     const static double minimiser_tol = 1e-9;
+
+    /**
+     * @brief Tolerance for shock finding fallback in FluidProfile class.
+     */
+    const static double sh_fallback_tol = 1e-2;
+
+    /**
+     * @brief Tolerance for shock matching in FluidProfile class.
+     */
+    const static double sh_resi_tol = 1e-5;
+
+    /**
+     * @brief Number of fluid profile integration steps.
+     */
+    const static double fp_steps = 5000;
     
     /**
      * @brief Momentum threshold χ above which Filon quadrature replaces

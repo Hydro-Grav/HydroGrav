@@ -303,7 +303,7 @@ class FluidProfile {
      * @param tol       Shock-finding convergence tolerance.
      * @return Tuple {v_solution, y_solution, shock_found_flag}.
      */
-    std::tuple<std::vector<double>, std::vector<state_type>, bool> deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi=false, const size_t n=1000, const double tol=1e-5) const;
+    std::tuple<std::vector<double>, std::vector<state_type>, bool> deflagration_profile(const deriv_func& dydv, double vpUF, const bool test_resi=false, const size_t n=1000) const;
 
     /**
      * @brief Compute the \f$\alpha_N\f$ residual for a deflagration given trial initial conditions.
@@ -489,10 +489,9 @@ class FluidProfile {
      *
      * @param v_sol Integrated velocity values.
      * @param y_sol Integrated state vectors.
-     * @param tol   Relaxed convergence tolerance (default: 1e-2).
      * @return @c true if the shock satisfies the fallback criterion.
      */
-    bool check_shock_convergence_fallback(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const double tol=1e-2) const;
+    bool check_shock_convergence_fallback(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
 
     /** @brief Developer diagnostic: print the Veff velocity residual over a scan of \f$T_-/T_N\f$. */
     void test_residual_veff(const deriv_func& dydv, const size_t n) const;

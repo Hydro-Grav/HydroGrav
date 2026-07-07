@@ -495,7 +495,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     //           << ", pRs_tolerance=" << config::pRs_tolerance 
     //           << ", z_tolerance=" << config::z_tolerance << "\n";
 
-    const Hydrodynamics::FluidProfile profile(params);
+    const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
 
     std::cout << "Calculating gravitational wave power spectrum...\n";
 

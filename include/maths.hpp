@@ -21,7 +21,7 @@
 #include <stdexcept>
 #include <iostream>
 
-// #include <gsl/gsl_multimin.h>
+#include "config.hpp"
 #include <gsl/gsl_vector.h>
 #include "interpolation.h"
 #include "ap.h"
@@ -144,7 +144,7 @@ double simpson_integrate(const std::vector<double>& x, const std::vector<double>
  * @param max_iter Maximum number of iterations.
  * @return Approximate minimiser.
  */
-double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol = 1e-8, int max_iter = 100);
+double golden_section_minimize(std::function<double(double)> f, double a, double b, double tol = config::golden_sec_tol, int max_iter = config::golden_sec_max_its);
 
 /**
  * @brief Find a bracketing interval [a', b'] ⊆ [a, b] in which @p residual_func changes sign.
@@ -177,7 +177,7 @@ std::array<double, 2> find_bracket(const std::function<double(double)>& residual
  * @return Pair of {x_values, y_values} over the integration range.
  */
 template <typename T, typename State, typename Func>
-std::pair<std::vector<T>, std::vector<State>> rk4_solver(const Func& dydx, T x0, T xf, const State& y0, size_t n=1000);
+std::pair<std::vector<T>, std::vector<State>> rk4_solver(const Func& dydx, T x0, T xf, const State& y0, size_t n=config::rk4_steps);
 
 /**
  * @brief Bounded two-dimensional Newton–Raphson root finder.
@@ -205,8 +205,8 @@ std::array<T,2> newton_solve_2d_bounded(
     std::array<T,2> x0,
     std::array<T,2> x_min,  // Lower bounds
     std::array<T,2> x_max,  // Upper bounds
-    T tol = 1e-8,
-    int max_iter = 100,
+    T tol = config::newton_solver_tol,
+    int max_iter = config::newton_solver_max_its,
     T h = 1e-8,
     T bound_margin = 1e-6,  // Stay this far from boundaries
     bool dev = false
@@ -322,7 +322,7 @@ std::array<double, 2> nelder_mead_minimise_2d(
     double x1,
     double step0 = 0.1,
     double step1 = 0.01,
-    double tol = 1e-8,
-    int max_iter = 10000);
+    double tol = config::nelder_mead_tol,
+    int max_iter = config::nelder_mead_max_its);
 
 #endif // INCLUDE_MATHS_HPP_H

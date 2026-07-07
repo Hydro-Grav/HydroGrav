@@ -480,7 +480,7 @@ double FluidProfile::find_vpUF(const deriv_func& dydv, const size_t n) const {
     return vpUF;
 }
 
-std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile(const deriv_func& dydv, double vpUF, const bool final_prof, const size_t n, const double tol) const {
+std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::deflagration_profile(const deriv_func& dydv, double vpUF, const bool final_prof, const size_t n) const {
     // construct profile using IC {vpUF,wpwN,TpTN}={vpUF,1,1}
     auto [v_sol, y_sol, shock_flag] = deflagration_profile_internal(dydv, vpUF, 1.0, 1.0, final_prof, n);
     const auto w_end_val = y_sol.back()[1];
@@ -506,8 +506,8 @@ std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::def
         const auto r1 = abs(mu(xi_sh, v_sol.back()) * xi_sh - cpsq_);
         const auto r2 = abs(xi_sh/mu(xi_sh, v_sol.back()) - (T1TN*T1TN*T1TN*T1TN + cpsq_) / (cpsq_ * T1TN*T1TN*T1TN*T1TN + 1.0));
 
-        if (r1 > tol || r2 > tol) {
-            std::cerr << "Warning in deflagration_profile: Shock residual above tolerance (" << tol << "). R1=" << r1 << ", R2=" << r2 << "\n";
+        if (r1 > config::sh_resi_tol || r2 > config::sh_resi_tol) {
+            std::cerr << "Warning in deflagration_profile: Shock residual above tolerance (" << config::sh_resi_tol << "). R1=" << r1 << ", R2=" << r2 << "\n";
         }
     }
 
@@ -1062,7 +1062,7 @@ bool FluidProfile::check_shock_convergence(const std::vector<double>& v_sol, con
     return true;
 }
 
-bool FluidProfile::check_shock_convergence_fallback(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const double tol) const {
+bool FluidProfile::check_shock_convergence_fallback(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const {
     const auto xi_sh = y_sol.back()[0];
     const auto v1 = mu(y_sol.back()[0], v_sol.back());
     const auto T1TN = y_sol.back()[2];
@@ -1074,7 +1074,7 @@ bool FluidProfile::check_shock_convergence_fallback(const std::vector<double>& v
     const std::array<double, 2> resi = {v1 * xi_sh - cpsq, v1 - xi_sh * (cpsq * T1TN4 + 1.0) / (T1TN4 + cpsq)};
 
     // check shock matching condition for final profile
-    if (abs(resi[0]) > tol || abs(resi[1]) > tol) return false;
+    if (abs(resi[0]) > config::sh_fallback_tol || abs(resi[1]) > config::sh_fallback_tol) return false;
     return true;
 }
 
