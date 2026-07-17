@@ -98,8 +98,8 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
       }
 
       // check valid alN
-      if (alN_ <= 0.0) {
-        throw std::invalid_argument("Unphysical strength parameter passed into PTParams. Must have alN > 0.");
+      if (alN_ == 0.0) {
+        throw std::invalid_argument("Unphysical strength parameter passed into PTParams. Must have alN != 0.");
       }
 
       // check valid TN
