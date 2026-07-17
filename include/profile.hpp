@@ -89,26 +89,6 @@ double dxidT(double xi, double v, double T, const double csq);
 state_type dydv_vec(double v, const state_type& y, double vw, double cmsq, double cpsq);
 
 /**
- * @brief Write velocity streamplot data to file for a given set of PT parameters.
- *
- * Samples the fluid velocity field on a 2D grid of \f$(\xi, v)\f$ values
- * and writes the result to @p filename in CSV format.
- *
- * @param params   Phase transition parameters.
- * @param xi_pts   Number of grid points in the \f$\xi\f$ direction.
- * @param y_pts    Number of grid points in the \f$v\f$ direction.
- * @param filename Output filename.
- */
-void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pts, int y_pts, const std::string& filename);
-
-/**
- * @brief Write velocity streamplot data to file using default grid dimensions.
- *
- * @param params Phase transition parameters.
- */
-void generate_streamplot_data(const PhaseTransition::PTParams& params);
-
-/**
  * @class FluidProfile
  * @brief Represents the hydrodynamic profile of a bubble wall in a first-order phase transition.
  *
