@@ -102,7 +102,10 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         std::vector<prof_type> profiles;
 
         // define hydrodynamic mode for bag model
-        const auto mode_bag = get_mode_bag(vw_, cmsq_, alN_);
+        const auto mode_bag = get_mode_bag(vw_, cmsq_, cpsq_, alN_);
+
+        // std::cout << "mode=" << mode_bag << "\n";
+        // std::abort();
 
         // check alN large enough for shock (deflag/hybrid only)
         if (mode_ == 0 || mode_ == 1) {
@@ -235,12 +238,29 @@ void FluidProfile::plot(const std::string& filename, double xi_min, double xi_ma
 // Private functions
 
 /**************************************** Bag EoS ****************************************/
-int FluidProfile::get_mode_bag(double vw, double cmsq, double alN) const {
-    const auto vwsq = vw * vw;
+// TO DO: Add inv hybrids and check bounds for inv def/hyb
+// bounds might be slightly different for inv def/hyb since we use alN != alp
+// depending on if alp > or < alN, some valid solutions might be missed?
+int FluidProfile::get_mode_bag(double vw, double cmsq, double cpsq, double alN) const {
+    if (alN > 0.0) { // direct PT
+        if (vw < std::sqrt(cmsq)) return 0;              // deflagration
+        if (vw < vJ_det(alN)) return 1;                  // hybrid
+        return 2;                                        // detonation
+    } else if (alN < 0.0) { // inverse PT
+        if (vw > std::sqrt(cpsq)) return 3;              // inv. deflagration
+        // if (vw < std::sqrt(cpsq) && vw > cmsq) return 4; // inv. hybrid
+        if (vw < vJ_inv_det(alN)) return 5;              // inv. detonation
+        throw std::runtime_error("Inverse transition is neither a deflagration or detonation. Aborting."); // temporary - update this for inv hybrids
+    } else {
+        // alN=0 already checked in PTParams ctor. Needed here?
+        throw std::invalid_argument("Unphysical strength parameter passed into PTParams. Must have alN != 0.");
+    }
+    
+}
 
-    if (vwsq < cmsq) return 0; // deflagration
-    if (vw < vJ_det(alN)) return 1; // hybrid
-    return 2; // detonation
+// TO DO: Update vm_from_matching to use negative root here
+double FluidProfile::vJ_inv_det(double alp) const {
+    return vm_from_matching2(std::sqrt(cpsq_), alp, -1.0); // vJ(alp)
 }
 
 double FluidProfile::vJ_det(double alp) const {
@@ -282,6 +302,11 @@ double FluidProfile::vm_from_matching(double vp, double alp) const { // inverse 
     const auto sgn = (abs(vp) < std::sqrt(cmsq_)) ? 1.0 : -1.0;
     const auto fac = vp + cmsq_ * (1.0 - 3.0 * alp * (1.0 - vp * vp)) / vp;
 
+    return 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 * cmsq_)); // mu nu
+}
+
+double FluidProfile::vm_from_matching2(double vp, double alp, double sgn) const { // inverse of vp(vm,alp)
+    const auto fac = vp + cmsq_ * (1.0 - 3.0 * alp * (1.0 - vp * vp)) / vp;
     return 0.5 * (fac + sgn * std::sqrt(fac * fac - 4.0 * cmsq_)); // mu nu
 }
 
@@ -550,6 +575,9 @@ void FluidProfile::test_shock_bag(const std::vector<double>& v_sol, const std::v
 
     std::cout << "Test complete. Shock residual saved to 'shock_resi_bag.png'\n";
 }
+
+// inverse deflagrations
+
 
 // detonations
 std::pair<double, state_type> FluidProfile::get_IC_detonation() const {

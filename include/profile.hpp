@@ -192,7 +192,7 @@ class FluidProfile {
      * @param alN  Phase transition strength parameter.
      * @return Integer mode code: 0 = deflagration, 1 = hybrid, 2 = detonation.
      */
-    int get_mode_bag(double vw, double cmsq, double alN) const;
+    int get_mode_bag(double vw, double cmsq, double cpsq, double alN) const;
 
     /**
      * @brief Compute the Jouguet detonation velocity for a given \f$\alpha_+\f$.
@@ -201,6 +201,8 @@ class FluidProfile {
      * @return Jouguet velocity \f$v_J(\alpha_+)\f$.
      */
     double vJ_det(double alp) const;
+
+    double vJ_inv_det(double alp) const;
 
     /**
      * @brief Compute the physically allowed range of \f$\alpha_+\f$ for a given wall velocity.
@@ -227,19 +229,21 @@ class FluidProfile {
      * @brief Compute \f$v_+\f$ from \f$v_-\f$ and \f$\alpha_+\f$ via the bag matching conditions.
      *
      * @param vm      Fluid velocity behind the wall (wall frame).
-     * @param alpha_p Strength parameter \f$\alpha_+\f$.
+     * @param alp Strength parameter \f$\alpha_+\f$.
      * @return \f$v_+\f$.
      */
-    double vp_from_matching(double vm, double alpha_p) const;
+    double vp_from_matching(double vm, double alp) const;
 
     /**
      * @brief Compute \f$v_-\f$ from \f$v_+\f$ and \f$\alpha_+\f$ via the bag matching conditions.
      *
      * @param vp      Fluid velocity ahead of the wall (wall frame).
-     * @param alpha_p Strength parameter \f$\alpha_+\f$.
+     * @param alp Strength parameter \f$\alpha_+\f$.
      * @return \f$v_-\f$.
      */
-    double vm_from_matching(double vp, double alpha_p) const;
+    double vm_from_matching(double vp, double alp) const;
+
+    double vm_from_matching2(double vp, double alp, double sgn) const;
 
     /**
      * @brief Compute the temperature ratio \f$T_-/T_N\f$ from the enthalpy ratio \f$w_-/w_N\f$.
