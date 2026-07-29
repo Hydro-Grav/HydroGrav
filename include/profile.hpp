@@ -232,7 +232,7 @@ class FluidProfile {
      * @param alp Strength parameter \f$\alpha_+\f$.
      * @return \f$v_+\f$.
      */
-    double vp_from_matching(double vm, double alp) const;
+    double vp_from_matching(double vm, double alp, int sgn) const;
 
     /**
      * @brief Compute \f$v_-\f$ from \f$v_+\f$ and \f$\alpha_+\f$ via the bag matching conditions.
@@ -241,9 +241,7 @@ class FluidProfile {
      * @param alp Strength parameter \f$\alpha_+\f$.
      * @return \f$v_-\f$.
      */
-    double vm_from_matching(double vp, double alp) const;
-
-    double vm_from_matching2(double vp, double alp, double sgn) const;
+    double vm_from_matching(double vp, double alp, int sgn) const;
 
     /**
      * @brief Compute the temperature ratio \f$T_-/T_N\f$ from the enthalpy ratio \f$w_-/w_N\f$.
@@ -251,7 +249,8 @@ class FluidProfile {
      * @param wmwN Ratio of enthalpy density behind the wall to the nucleation value.
      * @return \f$T_-/T_N\f$.
      */
-    double get_TmTN(double wmwN) const;
+    double TmTN_from_matching(double wmwN) const;
+    double TTN_from_matching2(double w1wN, double w2wN, double T2TN) const;
 
     /**
      * @brief Compute the enthalpy ratio and temperature immediately behind shock.
@@ -328,11 +327,13 @@ class FluidProfile {
      * @return Index of the shock in @p v_sol / @p y_sol.
      */
     size_t find_shock_idx(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol, const bool test_resi=false) const;
+    size_t find_shock_idx_inv(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
 
     /** @brief Developer diagnostic: print the \f$\alpha_N\f$ residual over a range of \f$v_+^{\rm UF}\f$ values. */
     void test_alN_residual(const deriv_func& dydv, double vm, const size_t n) const;
     /** @brief Developer diagnostic: verify that the bag-model shock conditions are satisfied. */
     void test_shock_bag(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
+    void test_shock_bag_inv(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const;
 
     /**
      * @brief Compute the initial conditions for a bag/mu-nu model detonation profile.
@@ -542,6 +543,8 @@ class FluidProfile {
      * @return Vector of profile arrays {xi, v, w, T, lambda}.
      */
     std::vector<prof_type> solve_profile_veff(int n=5000);
+
+    std::vector<prof_type> solve_inverse_profile(int n=5000);
 };
 
 #ifdef ENABLE_MATPLOTLIB

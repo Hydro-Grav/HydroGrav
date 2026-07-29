@@ -16,8 +16,8 @@ int main(int argc, char* argv[]) {
     //     vw = PhaseTransition::dflt_PTParams::vw;
     // }
 
-    double alN = -0.1;
-    double vw = 0.8;
+    double alN = -0.12015;
+    double vw = 0.75;
     double cpsq = 1.0 / 3.0;
     double cmsq = cpsq;
     
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     // profile.write("fluid_profile.csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    profile.plot("fluid_profile.png");
+    profile.plot("fluid_profile.png", 0.5, 0.8);
     #endif
     
 
