@@ -1,32 +1,33 @@
 <h1 align="center">
-DeepPhase
+HydroGrav
 </h1>
 
 <div align="center">
-<i>Precision gravitational waves from phase transitions.</i>
+<i>Precise hydrodynamics for gravitational waves from phase transitions.</i>
 </div>
 
-**DeepPhase** is a C++17 software package for calculating gravitational wave spectra from a first-order phase transition using either the Bag model or a via a direct calculation of thermodynamics from the effective potential.
+**HydroGrav** is a C++17 software package for calculating fluid profiles and gravitational wave spectra from a first-order electroweak phase transition using either a simplified equation of state (bag or $\mu\nu$ models) or a via a direct calculation of thermodynamics from the effective potential. Documentation for the code can be found [here](https://hydro-grav.github.io/HydroGrav/).
 
 ## Dependencies
 
 You need a C++17 compliant compiler, git, and the following dependencies:
 * CMake, version 3.11 or higher
-* OpenMP, version 3.0 or higher
-* GSL, version 2.0 or higher
-* ALGLIB, version 3.17 or higher
+* OpenMP, version 4.5 or higher
+* Boost, version 1.83 or higher
+* ALGLIB, version 4.0 or higher
+* GSL, version 2.7.1 or higher
 
-On *Ubuntu/Debian*-based distributions, `ALGLIB` and `GSL` can be installed by running:
+On *Ubuntu/Debian*-based distributions, `Boost`, `ALGLIB` and `GSL` can be installed by running:
 
-    sudo apt install libalglib-dev libgsl-dev
+    sudo apt install libalglib-dev libgsl-dev libboost-all-dev
 
 On *Fedora*-based distributions, instead use:
 
-    sudo dnf install alglib-devel gsl-devel
+    sudo dnf install alglib-devel gsl-devel boost-devel
 
-Finally on *Mac*:
+Finally, on *Mac*:
 
-    brew install gsl alglib
+    brew install gsl alglib boost
 
 
 **Note:**
@@ -34,10 +35,10 @@ Finally on *Mac*:
 
 
 ## Building
-To build the shared library and examples, use: ***URL subject to change***
+To build the shared library and examples, use:
 
-    git clone https://github.com/William-Searle/DeepPhase
-    cd DeepPhase
+    git clone https://github.com/Hydro-Grav/HydroGrav.git
+    cd HydroGrav
     mkdir build
     cd build
     cmake ..
@@ -63,13 +64,13 @@ To set an option, pass it to CMake with `-D`, for example:
 <details>
 <summary>Click me</summary>
 
-`DeepPhase` includes optional plotting functionality by utilizing the `matplotlib-cpp` library. To enable these features:
+`HydroGrav` includes optional plotting functionality by utilizing the `matplotlib-cpp` library. To enable these features:
 
 1. Download the [`matplotlibcpp.h`](https://github.com/lava/matplotlib-cpp/blob/master/matplotlibcpp.h) header file from the [matplotlib-cpp repository](https://github.com/lava/matplotlib-cpp).
-2. Place it in the `DeepPhase/include/` directory, so the file structure is:
+2. Place it in the `HydroGrav/include/` directory, so the file structure is:
 
    ```
-   DeepPhase/include/matplotlibcpp.h
+   HydroGrav/include/matplotlibcpp.h
    ```
 
 3. Run `cmake ..` in your `build` directory. During the build process, you should see the message:
@@ -93,16 +94,15 @@ Or by using (recommended):
     source venv/bin/activate
     pip install 'numpy<2.0.0' matplotlib
 
+`HydroGrav` has been tested with `numpy` `1.26.4`.
+
 </details>
 
 ## Running
-If the library and examples were successfully built, the examples and tests are available to run using the following executables: ***subject to change***
+If the library and examples were successfully built, the examples and tests are available to run using the following executables:
 
     ./bin/run_fluid_profile
     ./bin/run_kinetic_spectrum
     ./bin/run_gw_spectrum
+    ./bin/run_eos_gw_spectrum
     ./bin/unit_tests
-
-## Bugs
-* Bugs still present in GW calculation (not ready for use)
-* Fluid profile & kinetic power spectrum working well!

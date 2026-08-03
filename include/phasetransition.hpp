@@ -7,8 +7,6 @@
  * default-parameter structs and EOS data structures used throughout the
  * gravitational-wave calculations.
  */
-
-// PhaseTransition.hpp
 #ifndef INCLUDE_PHASETRANSITION_HPP_H
 #define INCLUDE_PHASETRANSITION_HPP_H
 
@@ -23,12 +21,10 @@
 
 #include "physics.hpp"
 
-/*
-TO DO:
-- remove alN from PTParams base class and move to PTParams_Bag (need to change how get_mode() works in FluidProfile first)
-- TN only used for mu nu and Veff (not bag) - write ctor without TN for bag?
-*/
-
+/**
+ * @namespace PhaseTransition
+ * @brief Contains classes that store phase transition parameters
+ */
 namespace PhaseTransition {
 
 // DO NOT CHANGE DEFAULT VALS
@@ -209,8 +205,8 @@ units:
  */
 class PTParams {
   public:
-    // ctor
-    PTParams(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un);
+    PTParams(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un); // ctor
+    virtual ~PTParams() = default; // dtor
 
     enum class ModelType { Bag, Veff }; // equation of state model
     virtual ModelType eos() const = 0;
@@ -235,7 +231,6 @@ class PTParams {
     double betaHs() const { return beta_ / un_.Hs(); } // beta/Hs
     double Rs() const { return Rs_; } // characteristic length scale R_*
     double tau_s() const { return tau_s_; } // start time of PT
-    double tau_fin() const { return tau_fin_; } // end time of PT
     const std::string nuc_type() const { return nuc_type_; } // bubble nucleation type
 
     // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
@@ -249,7 +244,7 @@ class PTParams {
 
   protected:
     const Universe un_;
-    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_, tau_fin_;
+    double vw_, alN_, TN_, wNeN_rat_, beta_, Rs_, tau_s_;
     std::string nuc_type_;
     std::optional<LifetimeDistribution> lt_dist_;
 
@@ -342,6 +337,8 @@ struct EquationOfState
    */
   bool is_valid() const;
   size_t size() const { return T_vals.size(); }
+
+  void write(const std::string& filename="thermo.csv") const;
 
 private:
   void validate() const;

@@ -18,7 +18,7 @@ namespace plt = matplotlibcpp;
 #endif
 
 #include "phasetransition.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 /*
 TO DO:
@@ -46,11 +46,11 @@ Universe::Universe(double T0, double Ts, double g0, double gs, double H0, double
 std::ostream& operator<<(std::ostream& os, const Universe& un) {
     os << "************** Universe parameters **************\n"
        << std::left
-       << std::setw(20) << " " << std::setw(13) << "Today" << "Start of PT\n"
-       << std::setw(20) << " " << std::setw(13) << "-----" << "-----------\n"
-       << std::setw(20) << "Temperature:" << "T0=" << std::setw(10) << un.T0() << "Ts=" << un.Ts() << "\n"
-       << std::setw(20) << "Hubble constant:" << "H0=" << std::setw(10) << un.H0() << "Hs=" << un.Hs() << "\n"
-       << std::setw(20) << "Number of DoF:" << "g0=" << std::setw(10) << un.g0() << "gs=" << un.gs() << "\n"
+       << std::setw(20) << " " << std::setw(15) << "Today" << "Start of PT\n"
+       << std::setw(20) << " " << std::setw(15) << "-----" << "-----------\n"
+       << std::setw(20) << "Temperature:" << "T0=" << std::setw(12) << un.T0() << "Ts=" << un.Ts() << "\n"
+       << std::setw(20) << "Hubble constant:" << "H0=" << std::setw(12) << un.H0() << "Hs=" << un.Hs() << "\n"
+       << std::setw(20) << "Number of DoF:" << "g0=" << std::setw(12) << un.g0() << "gs=" << un.gs() << "\n"
        << "*************************************************\n";
        
     return os;
@@ -91,7 +91,7 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
 
       // check valid vw
       if (vw_ < 0.0 ) {
-        std::cout << "Warning: vw < 0. Taking |vw| as input instead.";
+        std::cerr << "Warning: vw < 0. Taking |vw| as input instead.";
         vw_ = std::abs(vw);
       } else if (vw == 0.0 || vw >= 1.0) {
         throw std::invalid_argument("Unphysical wall velocity passed into PTParams. Must have 0 < vw < 1.");
@@ -115,7 +115,7 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
       // check valid bubble nucleation type
       const std::vector<std::string> allowed_nuc = {"exp", "sim"};
       if (!is_valid_model(nuc_type, allowed_nuc)) {
-          std::cout << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
+          std::cerr << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
           nuc_type_ = dflt_PTParams::nuc_type;
       }
     }
@@ -146,7 +146,7 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
       cpsq_(cpsq),
       cmsq_(cmsq) {
 
-      std::cout << "Storing phase transition parameters. Note that alN definition differs between bag and mu-nu models!\n\n";
+      std::cout << "Storing phase transition parameters. Note that alN definition differs between bag and mu-nu models!\n";
 
       // check valid speed of sound
       if (!is_valid_csq(cpsq_)) {
@@ -266,6 +266,22 @@ bool EquationOfState::is_valid() const
   }
 }
 
+void EquationOfState::write(const std::string& filename) const {
+    std::cout << "Writing equation of state to disk... ";
+
+    std::ofstream file(filename);
+    file << "T,ps,pb,es,eb\n";
+
+    for (size_t i = 0; i < T_vals.size(); ++i) {
+        file << T_vals[i] << "," << ps_vals[i] << "," << pb_vals[i] << "," << es_vals[i] << "," << eb_vals[i] << "\n";
+    }
+    file.close();
+
+    std::cout << "Saved to " << filename << "!\n";
+
+    return;
+}
+
 /********************************** PTParams_Veff *********************************/
 // NOTE: PTParams_Veff only uses alN to check if hydrodynamic mode agrees with Bag model!
 
@@ -276,7 +292,7 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfS
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, const EquationOfState& eos_data)
     : PTParams(vw, alN, TN, beta, Rs, nuc_type, un) {
     
-    std::cout << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model!\n\n";
+    std::cout << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model to identify if hydrodynamic mode differs to simplified EoS!!\n";
     initialize_from_eos_data(eos_data);
 }
 
@@ -351,8 +367,6 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
     throw std::invalid_argument("Unphysical nucleation enthalpy. Must have wN > 0.");
   }
 
-  wNeN_rat_ = wN_ / eN_;
-
   // Calculate sound speeds
   double s_unused, dps, des, dpb, deb, dps2_unused, des2_unused, dpb2_unused, deb2_unused;
   cpsq_vals_.reserve(n);
@@ -380,6 +394,16 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   cmsq_array.setcontent(n, cmsq_vals_.data());
   // alglib::spline1dfit(veff_TTN_array, cmsq_array, basis_size, smooth_fac, cmsq_fit_, rep);
   alglib::spline1dbuildcubic(veff_TTN_array, cmsq_array, cmsq_fit_);
+
+  wNeN_rat_ = wN_ / eN_;
+
+  // check for normalisation issue in eos (adjust tolerance as needed)
+  // impacts prefactor for gw spectrum - only changes max amplitude of spectrum
+  if (wNeN_rat_ > 2.0) {
+    std::cerr << "Warning: Equation of state normalisation issue. wN/eN=" << wNeN_rat_ << " is abnormally large! "
+              << "Using wN/eN = 1 + cpsq approximation instead!\n";
+    wNeN_rat_ = 1.0 + alglib::spline1dcalc(cpsq_fit_, 1.0); // munu approx
+  }
 
   // calculate alN_bag and alN_munu
   // const auto theta_s_bag = es_val(1.0) - 3.0 * ps_val(1.0);
@@ -444,7 +468,7 @@ void PTParams_Veff::plot_thermo2(const std::string& filename) const {
     const auto ps_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
     const auto pb_TN = alglib::spline1dcalc(veff_es_interp_, 1.0);
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
       const auto TTN = veff_TTN_vals_[i];
 
       es_spline_vals[i] = alglib::spline1dcalc(veff_es_interp_, TTN) / es_TN;
@@ -535,7 +559,7 @@ void PTParams_Veff::plot_thermo2(const std::string& filename) const {
 void PTParams_Veff::plot_csq(const std::string& filename) const {
   const auto n = veff_TTN_vals_.size();
   std::vector<double> cpsq_spline_vals(n), cmsq_spline_vals(n);
-  for (int i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++) {
     const auto TTN = veff_TTN_vals_[i];
     cpsq_spline_vals[i] = alglib::spline1dcalc(cpsq_fit_, TTN);
     cmsq_spline_vals[i] = alglib::spline1dcalc(cmsq_fit_, TTN);

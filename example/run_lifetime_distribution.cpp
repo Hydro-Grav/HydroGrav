@@ -1,4 +1,4 @@
-#include "deepphase.hpp"
+#include "hydrograv.hpp"
 
 int main(int argc, char* argv[]) {
     // Defaults

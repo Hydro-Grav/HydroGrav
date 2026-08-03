@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 
-project(DeepPhase VERSION 1.0.0 LANGUAGES CXX)
+project(HydroGrav VERSION 1.0.0 LANGUAGES CXX)
 
 # --------------------------
 # Output directories
@@ -43,9 +43,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(ENABLE_COMPILER_WARNINGS "Enable compiler warnings" ON)
 if(ENABLE_COMPILER_WARNINGS)
   include(CompilerWarnings)
-  set(_deepphase_warning_flags "${WARNING_FLAGS_TO_ADD}")
+  set(_hydrograv_warning_flags "${WARNING_FLAGS_TO_ADD}")
   # Propagate warning flags to subdirectories
-  set(_deepphase_warning_flags "${_deepphase_warning_flags}" CACHE INTERNAL "DeepPhase compiler warning flags")
+  set(_hydrograv_warning_flags "${_hydrograv_warning_flags}" CACHE INTERNAL "HydroGrav compiler warning flags")
 endif()
 
 # --------------------------
@@ -69,9 +69,8 @@ find_package(Boost REQUIRED)
 file(GLOB SOURCES "src/*.cpp")
 set(HEADERS 
   include/constants.hpp
-  include/CubicSpline.tpp
-  include/deepphase.hpp
-  include/maths_ops.hpp
+  include/hydrograv.hpp
+  include/maths.hpp
   include/phasetransition.hpp
   include/physics.hpp
   include/profile.hpp
@@ -79,6 +78,8 @@ set(HEADERS
   include/sici.hpp
   include/sici_arrays.hpp
   include/solvers.tpp
+  include/snr.hpp
+  include/detectors.hpp
 )
 
 # --------------------------
@@ -97,23 +98,23 @@ endif()
 # Library target
 # --------------------------
 
-add_library(DeepPhaseLib STATIC ${SOURCES} ${HEADERS})
-add_library(DeepPhase::DeepPhaseLib ALIAS DeepPhaseLib)
+add_library(HydroGravLib STATIC ${SOURCES} ${HEADERS})
+add_library(HydroGrav::HydroGravLib ALIAS HydroGravLib)
 
-if(ENABLE_COMPILER_WARNINGS AND _deepphase_warning_flags)
-  target_compile_options(DeepPhaseLib PRIVATE ${_deepphase_warning_flags})
+if(ENABLE_COMPILER_WARNINGS AND _hydrograv_warning_flags)
+  target_compile_options(HydroGravLib PRIVATE ${_hydrograv_warning_flags})
 endif()
 
-target_include_directories(DeepPhaseLib
+target_include_directories(HydroGravLib
   PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/DeepPhase>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/HydroGrav>
   ${ALGLIB_INCLUDES}
   ${GSL_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
 )
 
-target_link_libraries(DeepPhaseLib
+target_link_libraries(HydroGravLib
   PUBLIC
   OpenMP::OpenMP_CXX
   ${ALGLIB_LIBRARIES}
@@ -133,18 +134,18 @@ if(ENABLE_MATPLOTLIB)
   )
   message(STATUS "Found NumPy include directory: ${NumPy_INCLUDE_DIR}")
 
-  target_include_directories(DeepPhaseLib
+  target_include_directories(HydroGravLib
     PUBLIC
       ${Python3_INCLUDE_DIRS}
       ${NumPy_INCLUDE_DIR}
   )
 
-  target_link_libraries(DeepPhaseLib
+  target_link_libraries(HydroGravLib
     PUBLIC
       Python3::Python
   )
 
-  target_compile_definitions(DeepPhaseLib PUBLIC ENABLE_MATPLOTLIB)
+  target_compile_definitions(HydroGravLib PUBLIC ENABLE_MATPLOTLIB)
 endif()
 
 # --------------------------
@@ -152,7 +153,7 @@ endif()
 # --------------------------
 find_library(PROFILER_LIB profiler)
 if(PROFILER_LIB)
-  target_link_libraries(DeepPhaseLib PUBLIC ${PROFILER_LIB})
+  target_link_libraries(HydroGravLib PUBLIC ${PROFILER_LIB})
 else()
   message(WARNING "Profiler library not found; skipping.")
 endif()
@@ -160,20 +161,20 @@ endif()
 # --------------------------
 # Installation rules
 # --------------------------
-install(TARGETS DeepPhaseLib
-  EXPORT DeepPhaseTargets
+install(TARGETS HydroGravLib
+  EXPORT HydroGravTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/DeepPhase)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/HydroGrav)
 
-install(EXPORT DeepPhaseTargets
-  FILE DeepPhaseTargets.cmake
-  NAMESPACE DeepPhase::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DeepPhase
+install(EXPORT HydroGravTargets
+  FILE HydroGravTargets.cmake
+  NAMESPACE HydroGrav::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HydroGrav
 )
 
 # --------------------------
@@ -182,21 +183,21 @@ install(EXPORT DeepPhaseTargets
 include(CMakePackageConfigHelpers)
 
 write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/DeepPhaseConfigVersion.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/HydroGravConfigVersion.cmake"
   VERSION ${PROJECT_VERSION}
   COMPATIBILITY AnyNewerVersion
 )
 
 configure_package_config_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/DeepPhaseConfig.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/DeepPhaseConfig.cmake"
-  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DeepPhase
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/HydroGravConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/HydroGravConfig.cmake"
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HydroGrav
 )
 
 install(FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/DeepPhaseConfig.cmake"
-  "${CMAKE_CURRENT_BINARY_DIR}/DeepPhaseConfigVersion.cmake"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/DeepPhase
+  "${CMAKE_CURRENT_BINARY_DIR}/HydroGravConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/HydroGravConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HydroGrav
 )
 
 # --------------------------

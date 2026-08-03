@@ -11,7 +11,7 @@
 
 #include "phasetransition.hpp"
 #include "profile.hpp"
-#include "maths_ops.hpp"
+#include "maths.hpp"
 
 namespace Hydrodynamics {
 
@@ -47,6 +47,10 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
 
 } // namespace Hydrodynamics
 
+/**
+ * @namespace Spectrum
+ * @brief Sound shell model implementation of gravitational wave spectra
+ */
 namespace Spectrum {
 
 /**
@@ -84,7 +88,7 @@ class PowerSpec {
     const PhaseTransition::PTParams* params() const { return params_; };
 
     /// Sound‑wave duration parameter.
-    const double dtau() const { return dtau_; };
+    double dtau() const { return dtau_; };
 
     /**
      * @brief Return peak frequency and amplitude of the spectrum.
@@ -108,9 +112,6 @@ class PowerSpec {
      */
     void plot(const std::string& filename="spectrum.png") const;
     #endif
-
-    /// Cubic spline interpolation over the stored (K,P) data.
-    CubicSpline<double> interpolate() const;
 
     // Scalar arithmetic operators ------------------------------------------------
     friend PowerSpec operator*(const PowerSpec &spec, double scalar);
@@ -143,10 +144,19 @@ inline double ptilde(double k, double p, double z) {
 double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>& p_vals);
 
 /**
- * @brief Auxiliary function used in analytic expressions.
+ * @brief Computes the sound-shell model time-correlation function \f$\Delta_{\rm SSM}\f$.
+ *
+ * Evaluates the double-time integral of the velocity–velocity correlator
+ * that enters the GW power spectrum integrand.
+ *
+ * @param k       Wavenumber of emitted GW.
+ * @param p       Intermediate momentum.
+ * @param pt      Transferred momentum \f$|\mathbf{k}-\mathbf{p}|\f$.
+ * @param cs      Background speed of sound.
+ * @param tau_s   Conformal time at the start of the phase transition.
+ * @param tau_fin Conformal time at the end of the sound-wave period.
+ * @return Value of \f$\Delta(k,p,\tilde p)\f$.
  */
-double ff(double tau_m, double kcs);
-
 double dlt_SSM(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin);
 
 /**
@@ -173,7 +183,7 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PT
 /**
  * @brief Calculates gravitational wave spectrum.
  */
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, const bool calc_dtau=false);
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau=0.0);
 
 /**
  * @brief Builds spline interpolating functions for kinetic spectrum
@@ -186,7 +196,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
 
 /// Approximation used for dtau in arXiv:2308.12943.
-double dtau_approx(const PhaseTransition::PTParams& params);
+// double dtau_approx(const PhaseTransition::PTParams& params);
 
 /**
  * @brief Prefactor for gravitational-wave spectrum (Eq. 93 in arXiv:2308.12943).
