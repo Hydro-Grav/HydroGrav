@@ -159,7 +159,8 @@ class FluidProfile {
     #endif
 
   private:
-    const PhaseTransition::PTParams* params_;       ///< Pointer to the phase transition parameters.
+    const size_t n_;                                              ///< Number of points used to construct profile
+    const PhaseTransition::PTParams* params_;                     ///< Pointer to the phase transition parameters.
     const PhaseTransition::PTParams_Bag* bag_params_ = nullptr;   ///< Downcast pointer for bag EoS (null if Veff).
     const PhaseTransition::PTParams_Veff* veff_params_ = nullptr; ///< Downcast pointer for Veff EoS (null if bag).
 
@@ -223,7 +224,7 @@ class FluidProfile {
      * @param vm Fluid velocity in the broken phase just behind the wall (wall frame).
      * @return \f$\alpha_+\f$.
      */
-    double get_alp_wall(double vp, double vm) const;
+    double alp_from_matching(double vp, double vm) const;
 
     /**
      * @brief Compute \f$v_+\f$ from \f$v_-\f$ and \f$\alpha_+\f$ via the bag matching conditions.
@@ -250,7 +251,7 @@ class FluidProfile {
      * @return \f$T_-/T_N\f$.
      */
     double TmTN_from_matching(double wmwN) const;
-    double TTN_from_matching2(double w1wN, double w2wN, double T2TN) const;
+    double T1TN_from_matching(double w1wN, double w2wN, double T2TN) const;
 
     /**
      * @brief Compute the enthalpy ratio and temperature immediately behind shock.
@@ -527,6 +528,15 @@ class FluidProfile {
      * @return Enthalpy density behind the wall.
      */
     double w_from_matching(double wp, double vp, double vm) const;
+
+    double find_vp_inv_det(const deriv_func& dydv) const;
+    double inv_det_residual(const deriv_func& dydv, const double vpUF) const;
+    void test_inv_det_residual(const deriv_func& dydv, const size_t n) const;
+    double wpwN_from_alp(const double alp) const;
+
+    std::vector<prof_type> clean_profiles(const prof_type& v_sol_tmp, const std::vector<state_type>& y_sol_tmp,
+                                          const double w_start_val, const double w_end_val,
+                                          const double T_start_val, const double T_end_val) const;
 
     /**
      * @brief Solve for the full bag/mu-nu model fluid profile and return all profile arrays.

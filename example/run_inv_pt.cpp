@@ -16,8 +16,15 @@ int main(int argc, char* argv[]) {
     //     vw = PhaseTransition::dflt_PTParams::vw;
     // }
 
-    double alN = -0.12015;
-    double vw = 0.75;
+    // BPs from Fig. 8 arXiv:2406.01596
+    // deflagration
+    // double alN = -0.12015;
+    // double vw = 0.75;
+
+    // detonation
+    double alN = -0.164931; // approx
+    double vw = 0.25;
+
     double cpsq = 1.0 / 3.0;
     double cmsq = cpsq;
     
@@ -30,11 +37,12 @@ int main(int argc, char* argv[]) {
     params.print();
 
     const Hydrodynamics::FluidProfile profile(params, 5000, true);
+    profile.write();
 
     // profile.write("fluid_profile.csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    profile.plot("fluid_profile.png", 0.5, 0.8);
+    profile.plot("fluid_profile.png", 0.0, 0.8);
     #endif
     
 
