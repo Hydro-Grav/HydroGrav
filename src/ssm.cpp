@@ -18,6 +18,7 @@
 #include "ap.h"
 #include "interpolation.h"
 
+#include <boost/math/quadrature/gauss.hpp>
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 
 #include "config.hpp"
@@ -108,7 +109,9 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
     FilonQuadrature levin(config::filon_polynomial_order); // for highly oscillatory part of integrals
     boost::math::quadrature::gauss<double, config::fd_l_gauss_legendre_samples> integrator;
 
-    #pragma omp parallel for
+    // Cost grows linearly with chi (the Filon branch subdivides once per few oscillations),
+    // and chi_vals spans seven decades, so a static split gives one thread nearly all the work.
+    #pragma omp parallel for schedule(dynamic, 16)
     for (size_t j = 0; j < M; ++j) {
         const double chi = chi_vals[j];
         const double inv_chi = 1.0 / chi;
@@ -260,6 +263,17 @@ std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfil
     // ofs.close();
 
     return Apsq;
+}
+
+ApsqSpline::ApsqSpline(const FluidProfile& prof) {
+    const auto chi_vals = logspace(log10(config::chi_min), log10(config::chi_max), config::chi_points);
+    const auto Apsq = Ap_sq(chi_vals, prof);
+
+    alglib::real_1d_array chi_arr, Apsq_arr;
+    chi_arr.setcontent(chi_vals.size(), chi_vals.data());
+    Apsq_arr.setcontent(Apsq.size(), Apsq.data());
+
+    alglib::spline1dbuildcubic(chi_arr, Apsq_arr, spline_);
 }
 
 } // namespace Hydrodynamics
@@ -443,9 +457,15 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
     return min_pt;
 }
 
-void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline) 
+void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline)
 {
-    const auto kinetic_spectrum = zetaKin(kRs_vals, profile);
+    build_kinetic_spectrum_spline(kRs_vals, profile, Hydrodynamics::ApsqSpline(profile), log_zk_spline);
+}
+
+void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile,
+                                   const Hydrodynamics::ApsqSpline& apsq, alglib::spline1dinterpolant& log_zk_spline)
+{
+    const auto kinetic_spectrum = zetaKin(kRs_vals, profile, apsq);
 
     // kinetic_spectrum.write("zetakin_debug.csv");
 
@@ -484,6 +504,78 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
     }
 }
 
+LogGridInterpolant kinetic_spectrum_interpolant(const std::vector<double>& kRs_vals,
+                                                const Hydrodynamics::FluidProfile& profile,
+                                                const Hydrodynamics::ApsqSpline& apsq)
+{
+    const auto kinetic_spectrum = zetaKin(kRs_vals, profile, apsq);
+
+    std::vector<double> zk_vals;
+    zk_vals.reserve(kinetic_spectrum.P().size());
+    for (const auto P_val : kinetic_spectrum.P()) {
+        // norm_spec() has already rejected a non-finite peak; individual points can still be
+        // non-positive at the far tails, where the spectrum contributes nothing.
+        zk_vals.push_back((P_val > 0.0 && std::isfinite(P_val)) ? P_val : 0.0);
+    }
+
+    return LogGridInterpolant(kinetic_spectrum.K(), zk_vals);
+}
+
+namespace {
+
+/**
+ * @brief Panel edges for the \f$\tilde p\f$ integral of the GW spectrum.
+ *
+ * The integrand is a sinc^2-like peak of half-width @p hw centred on @p centre, with
+ * \f$1/(\tilde p-\tilde p_*)^2\f$ tails.  Panels of width @c pt_panel_inner_width * @p hw
+ * sit either side of the centre and grow geometrically outwards, so the peak is always
+ * resolved and the tails cost only logarithmically many panels.  When the resonance lies
+ * outside [@p lo, @p hi] the centre is clamped to the nearer end, where the integrand is
+ * largest.
+ *
+ * @param[out] edges Strictly increasing panel boundaries spanning [@p lo, @p hi].
+ */
+void resonance_panels(double lo, double hi, double centre, double hw, std::vector<double>& edges)
+{
+    edges.clear();
+    if (!(hi > lo)) return;
+
+    const double c = std::min(std::max(centre, lo), hi);
+    const double w0 = config::pt_panel_inner_width * hw;
+
+    // Degenerate widths (dtau -> infinity) would spin the loops below; fall back to one panel.
+    if (!(w0 > 0.0) || !std::isfinite(w0)) {
+        edges = {lo, hi};
+        return;
+    }
+
+    edges.push_back(lo);
+
+    // Left of the centre: emitted descending, then reversed in place.
+    const size_t first_left = edges.size();
+    double x = c;
+    double d = w0;
+    for (int i = 0; i < config::pt_max_panels; ++i, d *= config::pt_panel_growth) {
+        x -= d;
+        if (x <= lo) break;
+        edges.push_back(x);
+    }
+    std::reverse(edges.begin() + first_left, edges.end());
+
+    if (c > lo && c < hi) edges.push_back(c);
+
+    d = w0;
+    for (int i = 0; i < config::pt_max_panels; ++i, d *= config::pt_panel_growth) {
+        const double xr = edges.back() + d;
+        if (xr >= hi) break;
+        edges.push_back(xr);
+    }
+
+    edges.push_back(hi);
+}
+
+} // namespace
+
 /*** GW power spectrum ***/
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau) {
 
@@ -499,9 +591,14 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
+    // |A+|^2(chi) is needed by every Ekin() evaluation below (the non-linear timescale, the
+    // zetaKin spline and the prefactor). Building it is the dominant setup cost, so build it
+    // once here and hand it to each of them.
+    const Hydrodynamics::ApsqSpline apsq(profile);
+
     if (dtau == 0) {
         std::cout << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!\n";
-        dtau = get_nl_timescale(profile);
+        dtau = get_nl_timescale(profile, apsq);
     }
 
     const auto cs = std::sqrt(params.cpsq());
@@ -519,57 +616,105 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const auto kinetic_spectrum_K_values = logspace(log10(kinetic_spectrum_spline_lower_bound), log10(kinetic_spectrum_spline_upper_bound), config::kinetic_spectrum_spline_points);
 
-    alglib::spline1dinterpolant log_zk_spline;
-    build_kinetic_spectrum_spline(kinetic_spectrum_K_values, profile, log_zk_spline);
+    const auto zk = kinetic_spectrum_interpolant(kinetic_spectrum_K_values, profile, apsq);
 
-    const auto prefac = gw_prefac(kRs_vals, profile);
+    const auto prefac = gw_prefac(kRs_vals, profile, apsq);
+
+    const SoundShellKernel kernel(tau_s, tau_fin);
+
+    // Half-width at half maximum of the resonance in ptRs, from Delta ~ sinc^2(w) with
+    // w = (cs*(p + pt) - k)*dtau/2.
+    const double pt_hwhm = 2.0 * config::sinc_sq_hwhm / (cs * dtau * Rs_inv);
+
+    const double log_pRs_min = std::log(config::pRs_minimum);
+    const double log_pRs_max = std::log(config::pRs_maximum);
+
+    const boost::math::quadrature::gauss<double, config::pt_gauss_legendre_samples> pt_integrator;
 
     std::vector<double> GW_P_vals(nk);
     
-    #pragma omp parallel 
+    // The cost per k varies by more than an order of magnitude (the adaptive quadrature
+    // refines much harder at large kRs), so a static split leaves most threads idle.
+    #pragma omp parallel
     {
-        #pragma omp for schedule(static)
-        for (size_t kk = 0; kk < nk; kk++ ) 
+        #pragma omp for schedule(dynamic, 1)
+        for (size_t kk = 0; kk < nk; kk++ )
         {
             const auto kRs = kRs_vals[kk];
             const auto k = kRs * Rs_inv;
-            const auto kRs3 = kRs * kRs * kRs;
+            const auto kRs_sq = kRs * kRs;
+            const auto kRs3 = kRs_sq * kRs;
+
+            const double wk = k * kernel.half_dtau();
+            const double sin_wk = std::sin(wk), cos_wk = std::cos(wk);
+
+            // Reused across every p node so the panel list is not reallocated per call.
+            std::vector<double> edges;
 
             auto pRs_integrand = [&](double log_pRs) -> double
             {
                 const auto pRs = exp(log_pRs);
                 const auto p = pRs * Rs_inv;
                 const auto pRs_sq = pRs*pRs;
-                const auto zk_pRs_val = std::exp(alglib::spline1dcalc(log_zk_spline, pRs));
-                const auto zk_pRs_fac = zk_pRs_val * pRs_sq;
+                const auto zk_pRs_fac = zk.at_log(log_pRs) * pRs_sq;   // log_pRs is already to hand
 
-                auto z_integrand = [&](double z) -> double 
+                if (zk_pRs_fac == 0.0) return 0.0;
+
+                // Integrating over ptRs instead of the angle z: with
+                // ptRs^2 = kRs^2 - 2 kRs pRs z + pRs^2, dz = -ptRs dptRs / (kRs pRs).
+                auto pt_integrand = [&](double ptRs) -> double
                 {
-                    const auto ptRs = ptilde(kRs, pRs, z);
+                    // zk() returns 0 outside its sampled range, which is where the
+                    // kinetic spectrum is negligible anyway.
+                    const double zk_ptRs_val = zk(ptRs);
+                    if (ptRs <= 0.0 || zk_ptRs_val == 0.0) return 0.0;
 
-                    if (ptRs == 0.0 
-                        || ptRs < kinetic_spectrum_spline_lower_bound 
-                        || ptRs > kinetic_spectrum_spline_upper_bound) 
-                    {
-                        return 0.0;
-                    }
-                
-                    const auto dlt = dlt_SSM(k, p, ptRs * Rs_inv, cs, tau_s, tau_fin);      
-                    double zk_ptRs_val = std::exp(alglib::spline1dcalc(log_zk_spline, ptRs));
+                    const auto dlt = dlt_SSM(k, p, ptRs * Rs_inv, cs, kernel, sin_wk, cos_wk);
+
+                    // z is +-1 at the endpoints; rounding can push it a hair outside.
+                    double z = (kRs_sq + pRs_sq - ptRs * ptRs) / (2.0 * kRs * pRs);
+                    z = std::min(1.0, std::max(-1.0, z));
 
                     const auto z_fac = 1.0 - z*z;
                     const auto z_fac2 = z_fac * z_fac;
-                    const auto ptRs4_inv = 1.0 / (ptRs * ptRs * ptRs * ptRs);
+                    const auto ptRs3_inv = 1.0 / (ptRs * ptRs * ptRs);
 
-                    return z_fac2 * ptRs4_inv * zk_ptRs_val * dlt;
+                    return z_fac2 * ptRs3_inv * zk_ptRs_val * dlt;
                 };
 
-                const double z_result = boost::math::quadrature::gauss_kronrod<double, config::z_samples>::integrate(z_integrand, -1.0, 1.0, config::z_max_refinements, config::z_tolerance);
+                const double pt_lo = std::abs(kRs - pRs);
+                const double pt_hi = kRs + pRs;
 
-                return pRs * zk_pRs_fac * z_result;
+                // The one resonance inside the kinematic range sits at cs*(p + pt) = k.
+                resonance_panels(pt_lo, pt_hi, kRs / cs - pRs, pt_hwhm, edges);
+
+                double pt_result = 0.0;
+                for (size_t i = 0; i + 1 < edges.size(); ++i)
+                    pt_result += pt_integrator.integrate(pt_integrand, edges[i], edges[i + 1]);
+
+                // Jacobian of the z -> ptRs change of variables.
+                pt_result /= (kRs * pRs);
+
+                return pRs * zk_pRs_fac * pt_result;
             };
 
-            double pRs_result = boost::math::quadrature::gauss_kronrod<double, config::pRs_samples>::integrate(pRs_integrand, log(config::pRs_minimum), log(config::pRs_maximum), config::pRs_max_refinements, config::pRs_tolerance);
+            // The resonance only exists for kRs(1/cs - 1)/2 <= pRs <= kRs(1/cs + 1)/2, so
+            // split the p range there rather than asking the adaptive rule to find it.
+            const double band_lo = 0.5 * kRs * (1.0 / cs - 1.0);
+            const double band_hi = 0.5 * kRs * (1.0 / cs + 1.0);
+
+            double log_edges[4] = {log_pRs_min,
+                                   std::min(std::max(std::log(band_lo), log_pRs_min), log_pRs_max),
+                                   std::min(std::max(std::log(band_hi), log_pRs_min), log_pRs_max),
+                                   log_pRs_max};
+
+            double pRs_result = 0.0;
+            for (int i = 0; i < 3; ++i) {
+                if (log_edges[i + 1] <= log_edges[i]) continue;
+                pRs_result += boost::math::quadrature::gauss_kronrod<double, config::pRs_samples>::integrate(
+                    pRs_integrand, log_edges[i], log_edges[i + 1],
+                    config::pRs_max_refinements, config::pRs_tolerance);
+            }
             GW_P_vals[kk] = prefac * kRs3 * pRs_result;
         }
     }
@@ -587,28 +732,36 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 /***************************/
 
 double dlt_SSM(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin) {
-    const auto ptcs = pt * cs;
-    const auto pcs = p * cs;
+    const SoundShellKernel kernel(tau_s, tau_fin);
+    const double wk = k * kernel.half_dtau();
+    return dlt_SSM(k, p, pt, cs, kernel, std::sin(wk), std::cos(wk));
+}
 
-    auto dlt = 0.0;
-    for (int m = -1; m < 2; m+=2) { // m = {-1,1}
-        const auto pmn_1 = pcs + m * ptcs;
-        for (int n = -1; n < 2; n+=2) { // n = {-1,1}
-            const auto pmn = pmn_1 + n * k; // pmn = (p + m*pt)*cs + n*k
+double dlt_SSM(double k, double p, double pt, const double cs,
+               const SoundShellKernel& kernel, double sin_wk, double cos_wk) {
+    // Delta = sum_{m,n in +-1} G( cs*(p + m*pt) + n*k ), and G depends on its argument only
+    // through w = x*dtau/2.  The two m-branches therefore need one sine/cosine pair each,
+    // and the n = +-1 pair follows from angle addition against the (per-k, precomputed)
+    // sin/cos of w_k -- four G evaluations for two calls to sin/cos.
+    const double hd = kernel.half_dtau();
+    const double wk = k * hd;
 
-            const auto x1 = pmn * tau_fin;
-            const auto x2 = pmn * tau_s;
+    if (kernel.uses_exact()) {
+        double dlt = 0.0;
+        for (int m = -1; m < 2; m += 2)
+            for (int n = -1; n < 2; n += 2)
+                dlt += kernel(cs * (p + m * pt) + n * k);
+        return dlt;
+    }
 
-            double Si_x1, Ci_x1, Si_x2, Ci_x2;
+    double dlt = 0.0;
+    for (int m = -1; m < 2; m += 2) { // m = {-1,1}
+        const double wm = cs * (p + m * pt) * hd;
+        const double sm = std::sin(wm), cm = std::cos(wm);
 
-            alglib::sinecosineintegrals(x1, Si_x1, Ci_x1);
-            alglib::sinecosineintegrals(x2, Si_x2, Ci_x2);
-
-            const auto dSi = Si_x1 - Si_x2;
-            const auto dCi = Ci_x1 - Ci_x2;
-
-            dlt += 0.25 * (dCi * dCi + dSi * dSi);
-        }
+        // w = wm + n*wk for n = {-1,1}
+        dlt += kernel.from_w(wm + wk, sm * cos_wk + cm * sin_wk, cm * cos_wk - sm * sin_wk);
+        dlt += kernel.from_w(wm - wk, sm * cos_wk - cm * sin_wk, cm * cos_wk + sm * sin_wk);
     }
     return dlt;
 }
@@ -619,6 +772,11 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const PhaseTransition::PTPar
 }
 
 PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof) {
+    return Ekin(kRs_vals, prof, Hydrodynamics::ApsqSpline(prof));
+}
+
+PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof,
+               const Hydrodynamics::ApsqSpline& apsq) {
     const auto beta = prof.params()->beta();
     const auto Rs = prof.params()->Rs();
     const auto nuc_type = prof.params()->nuc_type();
@@ -638,18 +796,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
     const auto nk = kRs_vals.size();
     std::vector<double> P_vals(nk);
 
-    const auto chi_vals = logspace(log10(config::chi_min), log10(config::chi_max), config::chi_points);
-    const auto n = chi_vals.size();
-
-    const auto Apsq = Hydrodynamics::Ap_sq(chi_vals, prof);
-
     const auto fac1 = beta * Rs * Rs / (2.0 * M_PI * M_PI);
-
-    alglib::real_1d_array chi_arr, Apsq_arr;
-    chi_arr.setcontent(n, chi_vals.data());
-    Apsq_arr.setcontent(n, Apsq.data());
-    alglib::spline1dinterpolant Apsq_spline;
-    alglib::spline1dbuildcubic(chi_arr, Apsq_arr, Apsq_spline);
 
     #pragma omp parallel for
     for (size_t kk = 0; kk < nk; kk++) {
@@ -662,7 +809,7 @@ PowerSpec Ekin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidPr
         auto integrand = [&](double log_chi) -> double 
         {
             const double chi = std::exp(log_chi);
-            const double Apsq_val = alglib::spline1dcalc(Apsq_spline, chi);
+            const double Apsq_val = apsq(chi);
             const double T_tilde = fac3*chi;
             return lt_dist(T_tilde) * power(chi, 7) * Apsq_val; // extra factor of chi from jacobian dlog(chi)=dchi/chi
         };
@@ -704,17 +851,27 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
     const auto Ek = Ekin(kRs_vals, prof);
     return norm_spec(Ek);
 }
+
+PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof,
+                  const Hydrodynamics::ApsqSpline& apsq) {
+    const auto Ek = Ekin(kRs_vals, prof, apsq);
+    return norm_spec(Ek);
+}
 /***************************/
 
 // computes timescale for non-linearities to appear in fluid (used as sound wave duration)
 double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
+    return get_nl_timescale(prof, Hydrodynamics::ApsqSpline(prof));
+}
+
+double get_nl_timescale(const Hydrodynamics::FluidProfile& prof, const Hydrodynamics::ApsqSpline& apsq) {
     // tau_nl ~ Rs / sqrt(Omega_K)
     // Omega_K = avg kinetic energy of sound waves
     const auto Rs = prof.params()->Rs();
     const auto kRs_vals = logspace(log10(config::kRs_minimum), log10(config::kRs_maximum), config::n_kRs);
 
-    const auto Ek = Ekin(kRs_vals, prof);
-    const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());    
+    const auto Ek = Ekin(kRs_vals, prof, apsq);
+    const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());
 
     return std::sqrt(Rs * Rs * Rs / Ek_int);
 }
@@ -738,10 +895,15 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
 }
 
 double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile) {
+    return gw_prefac(kRs_vals, profile, Hydrodynamics::ApsqSpline(profile));
+}
+
+double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile,
+                 const Hydrodynamics::ApsqSpline& apsq) {
     const auto params = profile.params();
     const auto un = params->un();
 
-    const auto Ek = Ekin(kRs_vals, profile);
+    const auto Ek = Ekin(kRs_vals, profile, apsq);
 
     return gw_prefac(Ek.peak_vals().second, params->Rs(), params->wNeN_rat(), un.T0(), un.Ts(), un.H0(), un.Hs(), un.g0(), un.gs());
 }

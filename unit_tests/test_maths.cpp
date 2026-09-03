@@ -291,3 +291,74 @@ TEST_CASE("ALGLIB spline regression", "[alglib]") {
         CHECK(alglib::spline1dcalc(spline, xi) == Approx(f(xi)).epsilon(1e-4));
     }
 }
+
+// ============================================================
+// LogGridInterpolant
+// ============================================================
+TEST_CASE("LogGridInterpolant", "[loggrid]") {
+    // A power law with curvature in log-log, i.e. the shape of a kinetic spectrum.
+    auto f = [](double x) { return 3.0 * std::pow(x, 2.5) / (1.0 + std::pow(x, 6.0)); };
+
+    const auto x = logspace(-3.0, 3.0, 600);
+    std::vector<double> y;
+    y.reserve(x.size());
+    for (double xi : x) y.push_back(f(xi));
+
+    const LogGridInterpolant interp(x, y);
+
+    SECTION("reproduces the sampled values at the knots") {
+        for (size_t i = 2; i + 2 < x.size(); i += 37)
+            CHECK(interp(x[i]) == Approx(y[i]).epsilon(1e-12));
+    }
+    SECTION("interpolates accurately between knots") {
+        std::mt19937 gen(4242);
+        std::uniform_real_distribution<double> dis(-2.9, 2.9);
+        for (int i = 0; i < 200; ++i) {
+            const double xi = std::pow(10.0, dis(gen));
+            CHECK(interp(xi) == Approx(f(xi)).epsilon(1e-4));
+        }
+    }
+    SECTION("converges at third order in the grid spacing") {
+        // Catmull-Rom is third-order accurate, so halving the spacing should cut the error by
+        // roughly a factor of eight.
+        auto worst_error = [&](size_t n) {
+            const auto xs = logspace(-3.0, 3.0, n);
+            std::vector<double> ys;
+            ys.reserve(n);
+            for (double xi : xs) ys.push_back(f(xi));
+            const LogGridInterpolant in(xs, ys);
+
+            double worst = 0.0;
+            for (int i = 0; i < 2000; ++i) {
+                const double xi = std::pow(10.0, -2.9 + 5.8 * i / 1999.0);
+                worst = std::max(worst, std::abs(in(xi) - f(xi)) / std::max(f(xi), 1e-12));
+            }
+            return worst;
+        };
+
+        const double e300 = worst_error(300);
+        const double e600 = worst_error(600);
+        const double e1200 = worst_error(1200);
+
+        CHECK(e600 < e300 / 5.0);
+        CHECK(e1200 < e600 / 5.0);
+        // The production grid (config::kinetic_spectrum_spline_points) is of this density.
+        CHECK(e1200 < 1e-5);
+    }
+    SECTION("at_log() agrees with operator()") {
+        for (double lx = -2.5; lx < 2.5; lx += 0.37)
+            CHECK(interp.at_log(lx) == Approx(interp(std::exp(lx))).epsilon(1e-12));
+    }
+    SECTION("returns zero outside the sampled range") {
+        CHECK(interp(0.5 * interp.x_min()) == 0.0);
+        CHECK(interp(2.0 * interp.x_max()) == 0.0);
+        CHECK(interp.at_log(std::log(interp.x_max()) + 1.0) == 0.0);
+    }
+    SECTION("rejects malformed input") {
+        CHECK_THROWS_AS(LogGridInterpolant(x, std::vector<double>(x.size() - 1)),
+                        std::invalid_argument);
+        CHECK_THROWS_AS(LogGridInterpolant({1.0, 2.0}, {1.0, 2.0}), std::invalid_argument);
+        CHECK_THROWS_AS(LogGridInterpolant({0.0, 1.0, 2.0, 3.0}, {1.0, 2.0, 3.0, 4.0}),
+                        std::invalid_argument);
+    }
+}

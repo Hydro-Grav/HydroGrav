@@ -61,21 +61,19 @@ private:
     int n_points_;
     
     /**
-     * @brief Integrate a single subinterval using Filon-type quadrature.
-     * @param f_vals Function values at quadrature points
-     * @param x_vals Quadrature point locations
+     * @brief Composite Filon-type quadrature of f(x)*sin(omega*x) or f(x)*cos(omega*x).
+     * @param f Function to integrate
      * @param omega Oscillatory frequency
      * @param a Lower limit
      * @param b Upper limit
      * @param use_sin True for sin integral, false for cos integral
      */
-    double filon_integrate_interval(
-        const std::vector<double>& f_vals,
-        const std::vector<double>& x_vals,
+    double filon_subdivided(
+        const std::function<double(double)>& f,
         double omega,
         double a,
         double b,
-        bool use_sin);
+        bool use_sin) const;
 };
 
 /**
@@ -103,13 +101,76 @@ std::vector<double> linspace(double start, double end, std::size_t num=100);
 std::vector<double> logspace(double log_start, double log_end, std::size_t num=100);
 
 /**
+ * @class LogGridInterpolant
+ * @brief O(1) cubic interpolation of data sampled on a logarithmically spaced grid.
+ *
+ * Serves the same purpose as an ALGLIB cubic spline built over a @c logspace() grid, but
+ * because the grid is uniform in \f$\ln x\f$ the knot lookup is index arithmetic rather than
+ * a binary search, and no per-call ALGLIB state is constructed.  That matters in the
+ * innermost loop of @c Spectrum::GWSpec, which evaluates the kinetic spectrum twice per
+ * quadrature node.
+ *
+ * Interpolation is Catmull-Rom in \f$\ln x\f$ on the stored values.  Queries outside the
+ * sampled range return 0, matching the convention used by the sound-shell model integrand.
+ */
+class LogGridInterpolant {
+  public:
+    LogGridInterpolant() = default;
+
+    /**
+     * @param x Strictly increasing, logarithmically spaced abscissae (see @c logspace()).
+     * @param y Values at those abscissae.
+     *
+     * Throws std::invalid_argument if the sizes differ or fewer than four points are given.
+     */
+    LogGridInterpolant(const std::vector<double>& x, const std::vector<double>& y);
+
+    /// Interpolated value at @p x; 0 outside the sampled range.
+    double operator()(double x) const {
+        if (!(x > x_min_ && x < x_max_)) return 0.0;
+        return at_log(std::log(x));
+    }
+
+    /// As @c operator(), for a caller that already holds \f$\ln x\f$.
+    double at_log(double log_x) const {
+        if (!(log_x > log_x_min_ && log_x < log_x_max_)) return 0.0;
+
+        const double t = (log_x - log_x_min_) * inv_dlog_;
+        const int i1 = std::min(std::max(static_cast<int>(t), 1),
+                                static_cast<int>(y_.size()) - 3);
+        const double f = t - i1;
+        const double f2 = f * f;
+        const double f3 = f2 * f;
+
+        const double c0 = -0.5 * f3 + f2 - 0.5 * f;
+        const double c1 = 1.5 * f3 - 2.5 * f2 + 1.0;
+        const double c2 = -1.5 * f3 + 2.0 * f2 + 0.5 * f;
+        const double c3 = 0.5 * f3 - 0.5 * f2;
+
+        return c0 * y_[i1 - 1] + c1 * y_[i1] + c2 * y_[i1 + 1] + c3 * y_[i1 + 2];
+    }
+
+    /// Lower end of the sampled range.
+    double x_min() const { return x_min_; }
+    /// Upper end of the sampled range.
+    double x_max() const { return x_max_; }
+    /// True if the interpolant holds no data.
+    bool empty() const { return y_.empty(); }
+
+  private:
+    double x_min_ = 0.0, x_max_ = 0.0;
+    double log_x_min_ = 0.0, log_x_max_ = 0.0, inv_dlog_ = 0.0;
+    std::vector<double> y_;
+};
+
+/**
  * @brief Computes x raised to an integer exponent.
- * 
+ *
  * @param x Base value.
  * @param exp Integer exponent.
- * 
+ *
  * @return double Result of x^exp.
- * 
+ *
  */
 double power(double x, int exp);
 

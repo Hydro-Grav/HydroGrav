@@ -27,11 +27,38 @@ endif()
 include(GNUInstallDirs)
 
 # --------------------------
+# Build type
+# --------------------------
+# Without this a plain `cmake ..` produces an unoptimised (-O0) build, which is
+# roughly an order of magnitude slower for the quadrature-heavy code in src/ssm.cpp.
+get_property(_hydrograv_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT _hydrograv_multi_config AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    Debug Release RelWithDebInfo MinSizeRel)
+  message(STATUS "CMAKE_BUILD_TYPE not set - defaulting to Release")
+endif()
+
+# --------------------------
 # C++ standard and compile options
 # --------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Opt-in architecture tuning. -ffast-math is deliberately NOT used: the code relies on
+# well-defined NaN/Inf behaviour (e.g. the guards in Spectrum::ptilde and
+# Spectrum::build_kinetic_spectrum_spline).
+option(HYDROGRAV_NATIVE_ARCH "Tune the build for the host CPU (-march=native)" OFF)
+if(HYDROGRAV_NATIVE_ARCH)
+  include(CheckCXXCompilerFlag)
+  check_cxx_compiler_flag("-march=native" HYDROGRAV_HAS_MARCH_NATIVE)
+  if(HYDROGRAV_HAS_MARCH_NATIVE)
+    add_compile_options(-march=native -ffp-contract=fast)
+  else()
+    message(WARNING "HYDROGRAV_NATIVE_ARCH requested but -march=native is unsupported")
+  endif()
+endif()
 
 # For gpu offloading
 # set(CMAKE_C_COMPILER clang-18)

@@ -156,27 +156,54 @@ namespace config {
     constexpr int kinetic_spectrum_spline_points = 2 * n_pRs; // default = 2 * n_pRs
 
     /**
-     * @name Gauss–Kronrod parameters for the z integral in GWSpec
+     * @name Resonance-aligned quadrature for the inner momentum integral in GWSpec
+     *
+     * The inner integral runs over \f$\tilde p\f$ (rather than the angle \f$z\f$) so that it
+     * shares a coordinate with the one resonance of the integrand.  Only the branch
+     * \f$c_s(p+\tilde p) = k\f$ has a solution inside the kinematic range
+     * \f$|k-p| \le \tilde p \le k+p\f$, at
+     *
+     *   \f$\tilde p_* = k/c_s - p\f$,
+     *
+     * around which \f$\Delta_{\rm SSM}\f$ is a \f$\mathrm{sinc}^2\f$ of half-width at half
+     * maximum \f$2.783/(c_s\Delta\tau)\f$ and falls off as \f$1/(\tilde p - \tilde p_*)^2\f$.
+     * The integration range is therefore split into fixed-order Gauss–Legendre panels whose
+     * widths grow geometrically away from \f$\tilde p_*\f$: the peak is resolved regardless of
+     * how small it is compared with the range, and the power-law tails need only
+     * logarithmically many panels.
      * @{
      */
-    /// Number of Gauss–Kronrod points for the z (angle) integral in GWSpec.
-    constexpr int z_samples = 31; // default = 31, safe = 31
-    /// Maximum adaptive refinements for the z integral.
-    constexpr int z_max_refinements = 5; // default = 6, safe = 5
-    /// Convergence tolerance for the z integral.
-    constexpr double z_tolerance = 1e-6; // default = 1e-8, safe = 1e-6
+    /// Gauss–Legendre points per panel of the \f$\tilde p\f$ integral.
+    constexpr int pt_gauss_legendre_samples = 15; // default = 15
+    /// Width of the panels adjacent to the resonance, in units of its half-width.
+    constexpr double pt_panel_inner_width = 2.0; // default = 2.0
+    /// Geometric growth factor of the panel widths away from the resonance.
+    constexpr double pt_panel_growth = 3.0; // default = 3.0
+    /// Cap on the number of panels on each side of the resonance.
+    constexpr int pt_max_panels = 32; // default = 32
+    /// Half-width at half maximum of sinc^2, used to size the innermost panels.
+    constexpr double sinc_sq_hwhm = 1.39155737825151;
     /** @} */
 
     /**
      * @name Gauss–Kronrod parameters for the pRs integral in GWSpec
+     *
+     * The resonance of the inner integral only exists for
+     * \f$k(1/c_s-1)/2 \le p \le k(1/c_s+1)/2\f$, so the p range is split at those two points
+     * and each piece integrated separately -- otherwise the adaptive rule has to discover a
+     * band covering under a tenth of the (logarithmic) range on its own.
      * @{
      */
     /// Number of Gauss–Kronrod points for the p·R_* integral in GWSpec.
     constexpr int pRs_samples = 15; // default = 31, safe = 15
     /// Maximum adaptive refinements for the p·R_* integral.
-    constexpr int pRs_max_refinements = 5; // default = 6, safe = 5
+    ///
+    /// Splitting the range at the band edges above, and making the inner integral
+    /// deterministic, means this rule converges quickly; the residual error of the spectrum is
+    /// set by the panel resolution of the inner integral rather than by this.
+    constexpr int pRs_max_refinements = 4; // default = 4
     /// Convergence tolerance for the p·R_* integral.
-    constexpr double pRs_tolerance = 1e-6; // default = 1e-8, safe = 1e-6
+    constexpr double pRs_tolerance = 1e-5; // default = 1e-5
     /** @} */
 
 }

@@ -29,9 +29,9 @@ int main(int argc, char* argv[]) {
 
     PhaseTransition::LifetimeDistribution ld_dist(Ttilde_values, nu_values);
 
-    PhaseTransition::Universe un;
-    PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-    params.set_lifetime_distribution(ld_dist);
+    PhaseTransition::Universe un(42.9425, 107.75, 3.11917e-15);
+    PhaseTransition::PTParams_Bag params(0.81184, 0.414202, 51.8903, 4.06877e-14, 3.70789e+13, nuc_type, un);
+    // params.set_lifetime_distribution(ld_dist);
     if(argc == 5) {
         params.print();
     }

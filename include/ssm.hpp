@@ -12,6 +12,7 @@
 #include "phasetransition.hpp"
 #include "profile.hpp"
 #include "maths.hpp"
+#include "ssm_kernel.hpp"
 
 namespace Hydrodynamics {
 
@@ -44,6 +45,26 @@ fluid_profile_integrals(const std::vector<double>& chi_vals, const FluidProfile&
  * @c fluid_profile_integrals().
  */
 std::vector<double> Ap_sq(const std::vector<double>& chi_vals, const FluidProfile& prof);
+
+/**
+ * @class ApsqSpline
+ * @brief Cubic spline of \f$|A_+|^2(\chi)\f$ over the @c config chi grid.
+ *
+ * Building it evaluates the oscillatory fluid-profile integrals at every grid point, which
+ * dominates the cost of @c Spectrum::Ekin().  A single @c GWSpec() call needs @c Ekin() for
+ * three different momentum grids of the same profile, so it builds one of these up front and
+ * passes it to each, instead of repeating the profile integrals.
+ */
+class ApsqSpline {
+  public:
+    explicit ApsqSpline(const FluidProfile& prof);
+
+    /// Interpolated \f$|A_+|^2\f$ at momentum @p chi.
+    double operator()(double chi) const { return alglib::spline1dcalc(spline_, chi); }
+
+  private:
+    alglib::spline1dinterpolant spline_;
+};
 
 } // namespace Hydrodynamics
 
@@ -83,7 +104,7 @@ class PowerSpec {
     const std::vector<double>& P() const { return P_vals_; };
 
     /// Fluid profile used to compute this spectrum.
-    const Hydrodynamics::FluidProfile profile() const { return profile_; };
+    const Hydrodynamics::FluidProfile& profile() const { return profile_; };
     /// Phase transition parameters pointer (owned externally).
     const PhaseTransition::PTParams* params() const { return params_; };
 
@@ -160,12 +181,25 @@ double find_min_pt(const std::vector<double>& k_vals, const std::vector<double>&
 double dlt_SSM(double k, double p, double pt, const double cs, const double tau_s, const double tau_fin);
 
 /**
+ * @brief Hot-loop overload of @c dlt_SSM taking a prebuilt @c SoundShellKernel.
+ *
+ * @param kernel  Kernel built once from (tau_s, tau_fin).
+ * @param sin_wk  sin(k * kernel.half_dtau()), precomputed per k.
+ * @param cos_wk  cos(k * kernel.half_dtau()), precomputed per k.
+ */
+double dlt_SSM(double k, double p, double pt, const double cs,
+               const SoundShellKernel& kernel, double sin_wk, double cos_wk);
+
+/**
  * @brief Calculates kinetic (velocity) power spectrum.
  *
  * Overloaded versions accept either a @c FluidProfile or a @c PTParams object
  */
 PowerSpec Ekin(const std::vector<double>& k_vec, const Hydrodynamics::FluidProfile& prof);
 PowerSpec Ekin(const std::vector<double>& k_vec, const PhaseTransition::PTParams& params);
+/// Overload reusing a prebuilt \f$|A_+|^2\f$ spline; see @c Hydrodynamics::ApsqSpline.
+PowerSpec Ekin(const std::vector<double>& k_vec, const Hydrodynamics::FluidProfile& prof,
+               const Hydrodynamics::ApsqSpline& apsq);
 
 /**
  * @brief Normalise a kinetic spectrum to unit integral.
@@ -179,6 +213,9 @@ PowerSpec norm_spec(const PowerSpec& spec);
  */
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof);
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
+/// Overload reusing a prebuilt \f$|A_+|^2\f$ spline; see @c Hydrodynamics::ApsqSpline.
+PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& prof,
+                  const Hydrodynamics::ApsqSpline& apsq);
 
 /**
  * @brief Calculates gravitational wave spectrum.
@@ -189,11 +226,27 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
  * @brief Builds spline interpolating functions for kinetic spectrum
  */
 void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, alglib::spline1dinterpolant& log_zk_spline);
+/// Overload reusing a prebuilt \f$|A_+|^2\f$ spline; see @c Hydrodynamics::ApsqSpline.
+void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile,
+                                   const Hydrodynamics::ApsqSpline& apsq, alglib::spline1dinterpolant& log_zk_spline);
+
+/**
+ * @brief Builds an O(1) interpolant of the normalised kinetic spectrum.
+ *
+ * @p kRs_vals must be logarithmically spaced.  Unlike the ALGLIB overloads this stores
+ * \f$\zeta_{\rm kin}\f$ itself rather than its logarithm, so evaluation costs one @c log and
+ * no @c exp -- the form @c GWSpec needs in its innermost loop.
+ */
+LogGridInterpolant kinetic_spectrum_interpolant(const std::vector<double>& kRs_vals,
+                                                const Hydrodynamics::FluidProfile& profile,
+                                                const Hydrodynamics::ApsqSpline& apsq);
 
 /**
  * @brief Calculates the non-linear timescale of the phase transition using the time for the plasma to develop turbulence
  */
 double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
+/// Overload reusing a prebuilt \f$|A_+|^2\f$ spline; see @c Hydrodynamics::ApsqSpline.
+double get_nl_timescale(const Hydrodynamics::FluidProfile& prof, const Hydrodynamics::ApsqSpline& apsq);
 
 /// Approximation used for dtau in arXiv:2308.12943.
 // double dtau_approx(const PhaseTransition::PTParams& params);
@@ -209,6 +262,9 @@ double gw_prefac(double Ekin_max, double Rs, double wNeN_rat, double T0, double 
  * @brief Prefactor for gravitational-wave spectrum using a profile.
  */
 double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile);
+/// Overload reusing a prebuilt \f$|A_+|^2\f$ spline; see @c Hydrodynamics::ApsqSpline.
+double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile,
+                 const Hydrodynamics::ApsqSpline& apsq);
 
 #ifdef ENABLE_MATPLOTLIB
 /**
