@@ -16,17 +16,32 @@ int main(int argc, char* argv[]) {
     //     vw = PhaseTransition::dflt_PTParams::vw;
     // }
 
-    // BPs from Fig. 8 arXiv:2406.01596
-    // deflagration
-    // double alN = -0.12015;
-    // double vw = 0.75;
-
-    // detonation
-    double alN = -0.164931; // approx
-    double vw = 0.25;
-
     double cpsq = 1.0 / 3.0;
     double cmsq = cpsq;
+
+    /********** BPs from Fig. 8 arXiv:2406.01596 **********/
+    // Note: they use slightly different value for ap/am in detonation/hybrid profiles
+
+    // detonation (vp=0.5, vm=0.25, alp=-0.277778)
+    // double alN = -0.164931; // approx - they only give alp
+    // double vw = 0.25;
+
+    // hybrid (vp=0.55, vm=0.9, alp=-0.100173)
+    // double alN = 
+    // double vw = 
+
+    // deflagration (vp=0.75, vm=0.89, alp=-0.12015)
+    // double alN = -0.12015;
+    // double vw = 0.75;
+    /******************************************************/
+    /**************** BPs from Xiao's code ****************/
+    double alN = -0.1;
+    // double vw = 0.3; // detonation
+    double vw = 0.5; // hybrid
+    // double vw = 0.8; // deflagration
+    /******************************************************/
+
+    
     
     auto beta = PhaseTransition::dflt_PTParams::beta;
     auto Rs = PhaseTransition::dflt_PTParams::Rs;
@@ -42,7 +57,7 @@ int main(int argc, char* argv[]) {
     // profile.write("fluid_profile.csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    profile.plot("fluid_profile.png", 0.0, 0.8);
+    profile.plot("fp.png", 0.0, 1.0);
     #endif
     
 
