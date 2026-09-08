@@ -733,3 +733,21 @@ std::array<double, 2> nelder_mead_minimise_2d(
 
     return {x0_sol, x1_sol};
 }
+
+std::pair<double, double> get_mean_sd(std::vector<double>& vec) {
+    double sum = 0.0, mean, sd = 0.0;
+
+    const size_t size = vec.size();
+
+    for (size_t i = 0; i < size; ++i) {
+        sum += vec[i];
+    }
+
+    mean = sum / size;
+
+    for (size_t i = 0; i < size; ++i) {
+        sd += pow(vec[i] - mean, 2);
+    }
+
+    return {mean, sqrt(sd / size)};
+}

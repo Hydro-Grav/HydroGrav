@@ -179,9 +179,17 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
 PowerSpec zetaKin(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params);
 
 /**
+ * @brief Computes & samples the relevant timescales in the SSM to compute the GW spectrum
+ * 
+ * @param sample    Sampled value X~LogNormal(0,1).
+ */
+PowerSpec sample_GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double sample);
+
+/**
  * @brief Calculates gravitational wave spectrum.
  */
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau=0.0);
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau=0.0); // Legacy calls to GWSpec
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, double dtau);
 
 /**
  * @brief Builds spline interpolating functions for kinetic spectrum

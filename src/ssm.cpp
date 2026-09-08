@@ -484,8 +484,46 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
     }
 }
 
-/*** GW power spectrum ***/
+// TO DO:
+// - add calculation of shock and correlation timescales
+// - update to sample directly from LogNormal(mu,sd) rather than rescaling X~LogNormal(0,1)? Nuisance parameter would be physical then (i.e. dtau rather than X)
+double sample_sw_timescale(double sample, const Hydrodynamics::FluidProfile& profile) {
+    // calculate the different sound wave timescales in the SSM
+    const auto dtau_nl = get_nl_timescale(profile); // non-linearity timescale (eddy turnover time)
+    const auto dtau_sh = dtau_nl;
+    const auto dtau_cor = dtau_nl;
+
+    std::vector<double> dtau_list = {dtau_nl, dtau_sh, dtau_cor};
+
+    // calculate mean/variance for timescales
+    const auto [mu, sd] = get_mean_sd(dtau_list);
+
+    // rescale X~LogNormal(0,1) sample to get dtau from Y~LogNormal(mu,sd)
+    // Y = aX+b
+    return sd * sample + mu;
+}
+
+PowerSpec sample_GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double sample) {
+    const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
+    const auto dtau = sample_sw_timescale(sample, profile);
+
+    return GWSpec(kRs_vals, profile, dtau);
+}
+
+// Legacy calls to GWSpec
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau) {
+    const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
+
+    if (dtau == 0) {
+        std::cout << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!\n";
+        dtau = get_nl_timescale(profile);
+    } 
+
+    return GWSpec(kRs_vals, profile, dtau);
+}
+
+/*** GW power spectrum ***/
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, double dtau) {
 
     const auto ti = std::chrono::high_resolution_clock::now();
 
@@ -495,19 +533,14 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     //           << ", pRs_tolerance=" << config::pRs_tolerance 
     //           << ", z_tolerance=" << config::z_tolerance << "\n";
 
-    const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
+    const auto params = profile.params();
 
     std::cout << "Calculating gravitational wave power spectrum...\n";
 
-    if (dtau == 0) {
-        std::cout << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!\n";
-        dtau = get_nl_timescale(profile);
-    }
+    const auto cs = std::sqrt(params->cpsq());
+    const auto Rs_inv = 1.0 / params->Rs();
 
-    const auto cs = std::sqrt(params.cpsq());
-    const auto Rs_inv = 1.0 / params.Rs();
-
-    const auto tau_s = params.tau_s();
+    const auto tau_s = params->tau_s();
     const auto tau_fin = tau_s + dtau;
 
     const auto nk = kRs_vals.size();

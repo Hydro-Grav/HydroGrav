@@ -325,4 +325,6 @@ std::array<double, 2> nelder_mead_minimise_2d(
     double tol = config::nelder_mead_tol,
     int max_iter = config::nelder_mead_max_its);
 
+std::pair<double, double> get_mean_sd(std::vector<double>& vec);
+
 #endif // INCLUDE_MATHS_HPP_H
