@@ -201,6 +201,8 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
  */
 double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
 
+double get_decorrelation_timescale(const double Ls, const double cs);
+
 /// Approximation used for dtau in arXiv:2308.12943.
 // double dtau_approx(const PhaseTransition::PTParams& params);
 

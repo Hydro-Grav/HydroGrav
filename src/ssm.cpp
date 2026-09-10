@@ -487,11 +487,12 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 // TO DO:
 // - add calculation of shock and correlation timescales
 // - update to sample directly from LogNormal(mu,sd) rather than rescaling X~LogNormal(0,1)? Nuisance parameter would be physical then (i.e. dtau rather than X)
+// - sample over length scales too? Currently uses mean bubble separation Rs
 double sample_sw_timescale(double sample, const Hydrodynamics::FluidProfile& profile) {
     // calculate the different sound wave timescales in the SSM
     const auto dtau_nl = get_nl_timescale(profile); // non-linearity timescale (eddy turnover time)
     const auto dtau_sh = dtau_nl;
-    const auto dtau_cor = dtau_nl;
+    const auto dtau_cor = get_decorrelation_timescale(profile.params().Rs(), std::sqrt(profile.params().cpsq()));
 
     std::vector<double> dtau_list = {dtau_nl, dtau_sh, dtau_cor};
 
@@ -740,6 +741,10 @@ double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
     const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());    
 
     return std::sqrt(Rs * Rs * Rs / Ek_int);
+}
+
+double get_decorrelation_timescale(const double Ls, const double cs) {
+    return Ls / cs;
 }
 
 // approximation used for dtau in arXiv:2308.12943
