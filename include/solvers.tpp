@@ -9,6 +9,8 @@
 #include <functional>
 #include <cassert>
 #include <cmath>
+#include <optional>
+#include "logger.hpp"
 
 template <typename T, typename Func>
 std::array<T,2> newton_solve_2d_bounded(
@@ -22,9 +24,11 @@ std::array<T,2> newton_solve_2d_bounded(
     T bound_margin,
     bool dev
 ) {
+    std::optional<logging::ScopedVerbosity> dev_verbosity;
     if (dev) {
-        std::cout << "Running newton_solve_2d_bounded() in dev mode!\n";
+        dev_verbosity.emplace(logging::Level::Trace);
     }
+    HG_LOG(Debug) << "Running newton_solve_2d_bounded() with diagnostics enabled";
 
     static_assert(std::is_floating_point<T>::value,
                   "newton_solve_2d_bounded requires floating-point T");
@@ -39,7 +43,7 @@ std::array<T,2> newton_solve_2d_bounded(
 
     // Clamp initial guess to valid range
     if (x0[0] < x_min[0] || x0[0] > x_max[0] || x0[1] < x_min[1] || x0[1] > x_max[1]) {
-        std::cout << "WARNING: Initial guess x0 outside bounds of [x_min, x_max] in newton_solve_2d()! Clamping x0 to bounded interval.\n";
+        HG_LOG(Warn) << "Initial guess x0 outside bounds of [x_min, x_max] in newton_solve_2d()! Clamping x0 to bounded interval.";
     }
     for (int j = 0; j < 2; ++j) {
         x0[j] = std::clamp(x0[j], x_min[j] + bound_margin, x_max[j] - bound_margin);
@@ -65,9 +69,7 @@ std::array<T,2> newton_solve_2d_bounded(
 
         T norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
         if (norm < tol) {
-            if (dev) {
-                std::cout << "norm < tol achieved for x0=(" << x0[0] << "," << x0[1] << "), terminating newton_solve_2d_bounded()!\n";
-            }
+            HG_LOG(Debug) << "norm < tol achieved for x0=(" << x0[0] << "," << x0[1] << "), terminating newton_solve_2d_bounded()!";
             return x0;
         }
 
@@ -116,9 +118,7 @@ std::array<T,2> newton_solve_2d_bounded(
             dx = solve_linear_2x2(J, minus_fx);
         } catch (const std::runtime_error&) {
             // Singular Jacobian - try gradient descent step instead
-            if (dev) {
-                std::cout << "Warning: Singular Jacobian for x=(" << x0[0] << ", " << x0[1] << ")\n";
-            }
+            HG_LOG(Debug) << "Singular Jacobian for x=(" << x0[0] << ", " << x0[1] << ")";
             T grad_norm = std::sqrt(fx[0]*fx[0] + fx[1]*fx[1]);
             if (grad_norm < tol) return x0;
             
@@ -148,16 +148,13 @@ std::array<T,2> newton_solve_2d_bounded(
             }
         }
 
-        if (dev) {
-            auto det_J = J[0][0] * J[1][1] - J[0][1] * J[1][0];
-            std::cout << "iteration=" << iter << "\n"
+        HG_LOG(Trace) << "iteration=" << iter << "\n"
                       << "x0=(" << x0[0] << "," << x0[1] << ")\n"
-                      << "|J|=" << det_J << "\n"
+                      << "|J|=" << (J[0][0] * J[1][1] - J[0][1] * J[1][0]) << "\n"
                       << "dx=(" << dx[0] << "," << dx[1] << ")\n"
                       << "f(x0)=(" << fx[0] << "," << fx[1] << ")\n"
                       << "norm=" << norm << "\n"
-                      << "alpha=" << alpha << "\n\n";
-        }
+                      << "alpha=" << alpha << "\n";
 
         if (alpha < 1e-12) {
             throw std::runtime_error("newton_solve_2d_bounded failed (stuck at boundary)!");
@@ -175,10 +172,8 @@ std::array<T,2> newton_solve_2d_bounded(
         // Check convergence
         T step_norm = std::sqrt(dx[0]*dx[0] + dx[1]*dx[1]) * alpha;
         if (step_norm < tol) {
-            if (dev) {
-                std::cout <<"dx[0]=" << dx[0] << ", dx[1]=" << dx[1] << ", alpha=" << alpha << "\n";
-                std::cout << "step_norm=" << step_norm << " < tol=" << tol << " achieved, terminating newton_solve_2d_bounded()!\n";
-            }
+            HG_LOG(Trace) << "dx[0]=" << dx[0] << ", dx[1]=" << dx[1] << ", alpha=" << alpha;
+            HG_LOG(Debug) << "step_norm=" << step_norm << " < tol=" << tol << " achieved, terminating newton_solve_2d_bounded()!";
             return x0;
         }
     }

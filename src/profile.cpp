@@ -15,6 +15,7 @@
 #include "interpolation.h"
 
 #include "profile.hpp"
+#include "logger.hpp"
 #include "phasetransition.hpp"
 #include "physics.hpp"
 #include "maths.hpp"
@@ -83,7 +84,6 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pt
         return 2.0 * v * csq * (1-v*v) * (1 - xi*v);
     };
     
-    std::cout << "Generating v(xi) streamplot data for fluid profile... ";
     
     std::ofstream file(filename);
     file << "xi,v,dxidtau,dvdtau\n";
@@ -113,7 +113,7 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pt
     }
 
     file.close();
-    std::cout << "Streamplot data saved to " << filename << "\n";
+    HG_LOG(Info) << "Wrote streamplot data to " << filename;
     
     return;
 }
@@ -212,6 +212,11 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
       shock_flag_(true),
       dev_log_(dev_log)
     {
+        std::optional<logging::ScopedVerbosity> dev_verbosity;
+        if (dev_log_) {
+            dev_verbosity.emplace(logging::Level::Debug);
+        }
+
         std::vector<prof_type> profiles;
 
         // define hydrodynamic mode for bag model
@@ -231,9 +236,9 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         switch (params.eos()) {
             case PhaseTransition::PTParams::ModelType::Bag:
                 if (cpsq_ == 1.0 / 3.0 && cmsq_ == cpsq_) { // bag
-                    std::cout << "Constructing fluid profile using bag equation of state (cp=cm=1/sqrt(3))...\n";
+                    HG_LOG(Info) << "Constructing fluid profile using bag equation of state (cp=cm=1/sqrt(3))...";
                 } else { // mu nu
-                    std::cout << "Constructing fluid profile using mu-nu (modified bag) equation of state (cp=" << std::sqrt(cpsq_) << ", cm=" << std::sqrt(cmsq_) << ")...\n";
+                    HG_LOG(Info) << "Constructing fluid profile using mu-nu (modified bag) equation of state (cp=" << std::sqrt(cpsq_) << ", cm=" << std::sqrt(cmsq_) << ")...";
                 }
 
                 bag_params_ = &dynamic_cast<const PhaseTransition::PTParams_Bag&>(params);
@@ -241,22 +246,21 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
                 profiles = solve_profile(n);
                 break;
             case PhaseTransition::PTParams::ModelType::Veff:
-                std::cout << "Constructing fluid profile using generic equation of state from Veff...\n";
+                HG_LOG(Info) << "Constructing fluid profile using generic equation of state from Veff...";
 
                 veff_params_ = &dynamic_cast<const PhaseTransition::PTParams_Veff&>(params);
                 // mode_ = get_mode_veff(vw_, cmsq_);
-                std::cout << "Determining hydrodynamic mode from EoS... ";
                 try {
                     mode_ = get_mode_veff(vw_, cmsq_);
-                    std::cout << "Hydrodynamic mode determined successfully!\n";
+                    HG_LOG(Info) << "Determined hydrodynamic mode from EoS successfully!";
                 } catch (std::exception& e) {
-                    std::cerr << "WARNING: " << e.what() << " Using get_mode_bag() to estimate hydrodynamic mode instead!\n";
+                    HG_LOG(Warn) << e.what() << " Using get_mode_bag() to estimate hydrodynamic mode instead!";
                     mode_ = mode_bag;
                 }
 
                 // check if hydrodynamic modes agree between bag and veff
                 if (mode_ != mode_bag) {
-                    std::cerr << "WARNING: hydrodynamic modes do not agree between mu-nu (mode=" << mode_bag << ") and Veff (mode=" << mode_ << ") EoS! Using hydrodynamic mode from Veff.\n";
+                    HG_LOG(Warn) << "hydrodynamic modes do not agree between mu-nu (mode=" << mode_bag << ") and Veff (mode=" << mode_ << ") EoS! Using hydrodynamic mode from Veff.";
                 }
 
                 profiles = solve_profile_veff(n);
@@ -271,7 +275,7 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
         T_vals_ = profiles[3];
         la_vals_ = profiles[4];
 
-        std::cout << "Fluid profile constructed!\n";
+        HG_LOG(Info) << "Fluid profile constructed!";
     }
 
 // Public functions
@@ -283,8 +287,6 @@ std::string FluidProfile::mode_str() const {
 }
 
 void FluidProfile::write(const std::string& filename) const {
-    std::cout << "Writing fluid profile to disk... ";
-
     std::ofstream file(filename);
     file << "xi,v,w,T,la\n";
 
@@ -293,14 +295,13 @@ void FluidProfile::write(const std::string& filename) const {
     }
     file.close();
 
-    std::cout << "Saved to " << filename << "!\n";
+    HG_LOG(Info) << "Wrote fluid profile to " << filename;
 
     return;
 }
 
 #ifdef ENABLE_MATPLOTLIB
 void FluidProfile::plot(const std::string& filename, double xi_min, double xi_max) const {
-    std::cout << "Generating fluid profile plot... ";
 
     plt::figure_size(2400, 800);
 
@@ -339,7 +340,7 @@ void FluidProfile::plot(const std::string& filename, double xi_min, double xi_ma
     plt::suptitle("vw = " + to_string_with_precision(vw_) + ", alpha = " + to_string_with_precision(alN_));
     plt::save(filename);
 
-    std::cout << "Saved to '" << filename << "'." << std::endl;
+    HG_LOG(Info) << "Wrote fluid profile plot to '" << filename << "'.";
 
     return;
 }
@@ -507,7 +508,7 @@ std::tuple<std::vector<double>, std::vector<state_type>, bool> FluidProfile::def
         const auto r2 = abs(xi_sh/mu(xi_sh, v_sol.back()) - (T1TN*T1TN*T1TN*T1TN + cpsq_) / (cpsq_ * T1TN*T1TN*T1TN*T1TN + 1.0));
 
         if (r1 > config::sh_resi_tol || r2 > config::sh_resi_tol) {
-            std::cerr << "Warning in deflagration_profile: Shock residual above tolerance (" << config::sh_resi_tol << "). R1=" << r1 << ", R2=" << r2 << "\n";
+            HG_LOG(Warn) << "in deflagration_profile: Shock residual above tolerance (" << config::sh_resi_tol << "). R1=" << r1 << ", R2=" << r2;
         }
     }
 
@@ -590,7 +591,7 @@ size_t FluidProfile::find_shock_idx(const std::vector<double>& v_sol, const std:
 
 // dev
 void FluidProfile::test_alN_residual(const deriv_func& dydv, double vm, const size_t n) const {
-    std::cout << "Running test for alN residual...\n";
+    HG_LOG(Debug) << "Running test for alN residual...";
 
     const auto vpUF_vals = linspace(1e-4, 0.2, n);
     std::vector<double> resi_vals(n);
@@ -608,7 +609,7 @@ void FluidProfile::test_alN_residual(const deriv_func& dydv, double vm, const si
 
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
-    std::cout << "test_alN_residual: vpUF=" << vpUF_vals[idx] << ", min_resi=" << resi_vals[idx] << "\n";
+    HG_LOG(Debug) << "test_alN_residual: vpUF=" << vpUF_vals[idx] << ", min_resi=" << resi_vals[idx];
     
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(800, 800);
@@ -621,11 +622,11 @@ void FluidProfile::test_alN_residual(const deriv_func& dydv, double vm, const si
     plt::save("alN_resi.png");
     #endif
 
-    std::cout << "Test complete. alN residual saved to 'alN_resi.png'\n";
+    HG_LOG(Debug) << "Test complete. alN residual saved to 'alN_resi.png'";
 }
 
 void FluidProfile::test_shock_bag(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const {
-    std::cout << "Running test for shock residual...\n";
+    HG_LOG(Debug) << "Running test for shock residual...";
 
     std::vector<double> xi_vals, resi_vals, r1_vals, r2_vals;
     for (size_t i = 0; i < v_sol.size(); i++) {
@@ -649,7 +650,7 @@ void FluidProfile::test_shock_bag(const std::vector<double>& v_sol, const std::v
 
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
-    std::cout << "test_shock: xi_sh=" << xi_vals[idx] << ", R1=" << r1_vals[idx] << ", R2=" << r2_vals[idx] << ", min_resi=" << resi_vals[idx] << "\n";
+    HG_LOG(Debug) << "test_shock: xi_sh=" << xi_vals[idx] << ", R1=" << r1_vals[idx] << ", R2=" << r2_vals[idx] << ", min_resi=" << resi_vals[idx];
 
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(800, 800);
@@ -661,7 +662,7 @@ void FluidProfile::test_shock_bag(const std::vector<double>& v_sol, const std::v
     plt::save("shock_resi_bag.png");
     #endif
 
-    std::cout << "Test complete. Shock residual saved to 'shock_resi_bag.png'\n";
+    HG_LOG(Debug) << "Test complete. Shock residual saved to 'shock_resi_bag.png'";
 }
 
 // detonations
@@ -741,8 +742,7 @@ int FluidProfile::get_mode_veff(double vw, double cmsq) const {
     try { // solve using bounded newton's method
         sol = newton_solve_2d_bounded(matching_helper, vp_TmTN_guess, bounds_min, bounds_max, 1e-12, 100, 1e-12);
     } catch (std::exception& e) { // nelder-mead minimisation method fallback
-        std::cerr << "WARNING: " << e.what()
-                  << " Solving matching eqs by minimising residuals instead!\n";
+        HG_LOG(Warn) << e.what() << " Solving matching eqs by minimising residuals instead!";
         
         auto matching_helper2 = [this, vm, TpTN](const std::array<double, 2>& vp_TmTN) {
             const auto resi = matching_eqs_wall(vp_TmTN[0], TpTN, vm, vp_TmTN[1]);
@@ -829,7 +829,7 @@ std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, do
 
 // dev
 void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) const {
-    std::cout << "Running test for T2/TN residual...\n";
+    HG_LOG(Debug) << "Running test for T2/TN residual...";
 
     const auto TmTN_vals = linspace(veff_params_->TTN_min(), veff_params_->TTN_max(), n);
     // const auto TmTN_vals = linspace(1.03597, 1.03615, n);
@@ -847,13 +847,13 @@ void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) co
     }
 
     if (resi_vals.size() == 0) {
-        std::cout << "Warning: test_residual veff failed (resi_vals.size()=0)\n";
+        HG_LOG(Warn) << "test_residual veff failed (resi_vals.size()=0)";
     }
 
     // index where residual is minimised
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
-    std::cout << "test_residual_veff: TmTN=" << TmTN_vals_pass[idx] << ", min_resi=" << resi_vals[idx] << "\n";
+    HG_LOG(Debug) << "test_residual_veff: TmTN=" << TmTN_vals_pass[idx] << ", min_resi=" << resi_vals[idx];
     
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(800, 800);
@@ -865,11 +865,11 @@ void FluidProfile::test_residual_veff(const deriv_func& dydv, const size_t n) co
     plt::save("T2_resi.png");
     #endif
 
-    std::cout << "Test complete. T2/TN residual saved to 'T2_resi.png'\n";
+    HG_LOG(Debug) << "Test complete. T2/TN residual saved to 'T2_resi.png'";
 }
 
 void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::vector<state_type>& y_sol) const {
-    std::cout << "Running test for shock residual...\n";
+    HG_LOG(Debug) << "Running test for shock residual...";
 
     std::vector<double> xi_vals, resi_vals;
     for (size_t i = 0; i < v_sol.size(); i++) {
@@ -891,7 +891,7 @@ void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::
     // index where residual is minimised
     const auto it = std::min_element(resi_vals.begin(), resi_vals.end());
     const auto idx = std::distance(resi_vals.begin(), it);
-    std::cout << "test_shock_veff: xi_sh=" << xi_vals[idx] << ", min_resi=" << resi_vals[idx] << "\n";
+    HG_LOG(Debug) << "test_shock_veff: xi_sh=" << xi_vals[idx] << ", min_resi=" << resi_vals[idx];
 
     #ifdef ENABLE_MATPLOTLIB
     plt::figure_size(800, 800);
@@ -902,7 +902,7 @@ void FluidProfile::test_shock_veff(const std::vector<double>& v_sol, const std::
     plt::save("shock_resi_veff.png");
     #endif
 
-    std::cout << "Test complete. Shock residual saved to 'shock_resi_veff.png'\n";
+    HG_LOG(Debug) << "Test complete. Shock residual saved to 'shock_resi_veff.png'";
 }
 
 double FluidProfile::find_TmTN_veff(const deriv_func& dydv, const bool fallback) const {
@@ -930,9 +930,7 @@ double FluidProfile::find_TmTN_veff(const deriv_func& dydv, const bool fallback)
     const auto TmTN = golden_section_minimize(safe_residual, bracket[0], bracket[1]);
     if (TmTN < 0.0) throw std::runtime_error("find_TmTN_veff failed (TmTN < 0)!");
 
-    if (dev_log_) {
-        std::cout << "find_TmTN_veff: TmTN=" << TmTN << ", resi=" << safe_residual(TmTN) << "\n";
-    }
+    HG_LOG(Debug) << "find_TmTN_veff: TmTN=" << TmTN << ", resi=" << safe_residual(TmTN) ;
 
     return TmTN;
 }
@@ -1153,9 +1151,8 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff(const double 
     try { // solve using bounded newton's method
         sol = newton_solve_2d_bounded(matching_helper, vm_TmTN_guess, bounds_min, bounds_max, 1e-12, 100, 1e-12);
     } catch (std::exception& e) { // nelder-mead minimisation method fallback
-        std::cerr << "WARNING: " << e.what()
-                  << " Solving matching eqs by minimising residuals instead!\n";
-        
+        HG_LOG(Warn) << e.what() << " Solving matching eqs by minimising residuals instead!";
+
         auto matching_helper2 = [this, vp, TpTN] (std::array<double, 2> vm_TmTN) {
             const auto resi = matching_eqs_wall(vp, TpTN, vm_TmTN[0], vm_TmTN[1]);
             return std::array<double, 2>{resi[0] * resi[0], resi[1] * resi[1]};
@@ -1183,7 +1180,7 @@ std::pair<double, state_type> FluidProfile::get_IC_detonation_veff(const double 
     if (wmwN <= wpwN) throw std::runtime_error("wm/wN must be > wp/wN for detonation");
 
     const auto resi = matching_eqs_wall(vp, TpTN, vm, TmTN);
-    std::cout << "get_IC_detonation_veff: vm=" << vm << ", TmTN=" << TmTN << ", resi[0]=" << resi[0] << ", resi[1]=" << resi[1] << "\n";
+    HG_LOG(Debug) << "get_IC_detonation_veff: vm=" << vm << ", TmTN=" << TmTN << ", resi[0]=" << resi[0] << ", resi[1]=" << resi[1];
 
     const state_type y0 = {xi0, wmwN, TmTN};
     return {vmUF, y0};
@@ -1203,15 +1200,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             throw std::runtime_error("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
     }
 
-    std::cout << "Solving fluid profile for hydrodynamic mode=";
-    if (mode_ == 0) {
-        std::cout << "deflagration...";
-    } else if (mode_ == 1) {
-        std::cout << "hybrid...";
-    } else {
-        std::cout << "detonation...";
-    }
-    std::cout << "\n";
+    HG_LOG(Info) << "Solving fluid profile for hydrodynamic mode=" << mode_str() << "...";
 
     auto dydv = [this] (double vUF, const state_type& y) -> state_type {
         return dydv_vec(vUF, y, vw_, cmsq_, cpsq_);
@@ -1293,8 +1282,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = get_TmTN(w_end_val);
             la_end_val = lambda_b(w_end_val);
 
-            if (dev_log_) {
-                std::clog << "Deflagration profile:\n"
+            HG_LOG(Debug) << "Deflagration profile:\n"
                           << "  vm = " << vm << ", vmUF = " << mu(vw_, abs(vm)) << "\n"
                           << "  wmwN = " << w_end_val << ", TmTN = " << T_end_val << "\n"
                           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
@@ -1302,8 +1290,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
                           << "  alp = " << alp << "\n"
                           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
                           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-                          << "  xi_sh = " << xi_sh << "\n";
-            }
+                          << "  xi_sh = " << xi_sh;
                       
 
         } else { // hybrid
@@ -1349,8 +1336,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            if (dev_log_) {
-                std::clog << "Hybrid profile:\n"
+            HG_LOG(Debug) << "Hybrid profile:\n"
                           << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
                           << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
                           << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
@@ -1358,8 +1344,7 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
                           << "  alp = " << alp << "\n"
                           << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
                           << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-                          << "  xi_sh = " << xi_sh << "\n";
-            }
+                          << "  xi_sh = " << xi_sh;
         }
 
     } else { // detonation
@@ -1396,12 +1381,10 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
         T_end_val = T_sol_tmp.back();
         la_end_val = la_sol_tmp.back();
 
-        if (dev_log_) {
-            std::clog << "Detonation profile:\n"
+        HG_LOG(Debug) << "Detonation profile:\n"
                       << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
                       << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n"
-                      << "  w_end = " << w_end_val << ", T_end = " << T_end_val << "\n";
-        }
+                      << "  w_end = " << w_end_val << ", T_end = " << T_end_val;
     }
 
     // update final point manually where dxidv is singular
@@ -1478,17 +1461,10 @@ std::vector<prof_type> FluidProfile::solve_profile(int n) {
 }
 
 std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
-    std::cout << "Solving fluid profile for hydrodynamic mode=";
-    if (mode_ == 0) {
-        std::cout << "deflagration...";
-    } else if (mode_ == 1) {
-        std::cout << "hybrid...";
-    } else if (mode_ == 2){
-        std::cout << "detonation...";
-    } else {
+    if (!(mode_ == 0 || mode_ == 1 || mode_ == 2)) {
         throw std::runtime_error("Hydrodynamic mode must be: 0 (deflagration), 1 (hybrid) or 2 (detonation)");
     }
-    std::cout << "\n";
+    HG_LOG(Info) << "Solving fluid profile for hydrodynamic mode=" << mode_str() << "...";
 
     // wrapper for hydrodynamic equation of motion
     auto dydv = [this] (double vUF, const state_type& y) -> state_type {
@@ -1520,7 +1496,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         // check convergence of profile
         const bool pass = check_shock_convergence(prof_tmp.first, prof_tmp.second);
         if (!pass) { // fallback method
-            std::cerr << "Warning: Shock residual above tolerance. Using mu-nu fallback method for shock finding!\n";
+            HG_LOG(Warn) << "Shock residual above tolerance. Using mu-nu fallback method for shock finding!";
             TmTN = find_TmTN_veff(dydv, true);
             vm = (mode_ == 0) ? vw_ : std::sqrt(veff_params_->csq_b(TmTN));
             wmwN = veff_params_->wb_val(TmTN) / veff_params_->wN();
@@ -1575,8 +1551,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             T_end_val = TmTN;
             la_end_val = lambda_b_veff(T_end_val, eN, wN_inv); // lambda just behind wall (broken phase)
 
-            if (dev_log_) {
-                std::clog << "Deflagration profile:\n"
+            HG_LOG(Debug) << "Deflagration profile:\n"
                           << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
                           << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
                           << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
@@ -1584,8 +1559,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
                           << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
                           << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
                           << "  xi_sh = " << xi0 << "\n"
-                          << "  cp = " << std::sqrt(veff_params_->csq_s(T_sol_tmp.back())) << ", cm = " << std::sqrt(veff_params_->csq_b(TmTN)) << "\n";
-            }
+                          << "  cp = " << std::sqrt(veff_params_->csq_s(T_sol_tmp.back())) << ", cm = " << std::sqrt(veff_params_->csq_b(TmTN));
         } else { // hybrid
             // initial conditions for rarefaction wave
             const auto xi0_rf = vw_;
@@ -1619,8 +1593,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
             T_end_val = T_sol_tmp.back();
             la_end_val = la_sol_tmp.back();
 
-            if (dev_log_) {
-                std::clog << "Hybrid profile (veff):\n"
+            HG_LOG(Debug) << "Hybrid profile (veff):\n"
                           << "  vm = " << vm << ", vmUF=" << vmUF << "\n"
                           << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
                           << "  vp = " << mu(vw_, abs(vpUF)) << ", vpUF = " << vpUF << "\n"
@@ -1628,8 +1601,7 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
                           << "  v1 = " << mu(xi0, abs(v_sol_tmp.front())) << ", v1UF = " << v_sol_tmp.front() << "\n"
                           << "  w1wN = " << w_sol_tmp.front() << ", T1TN = " << T_sol_tmp.front() << "\n"
                           << "  xi_sh = " << xi0 << "\n"
-                          << "  cp = " << std::sqrt(veff_params_->csq_s(TpTN)) << ", cm = " << std::sqrt(veff_params_->csq_b(TmTN)) << "\n";
-            }
+                          << "  cp = " << std::sqrt(veff_params_->csq_s(TpTN)) << ", cm = " << std::sqrt(veff_params_->csq_b(TmTN));
         }
 
     } else { // detonation
@@ -1679,11 +1651,9 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         // update sound speed values (cp doesn't change since Tp=TN for detonations)
         cmsq_ = veff_params_->csq_b(y0[2]);
 
-        if (dev_log_) {
-            std::cout << "Detonation profile:\n"
+        HG_LOG(Debug) << "Detonation profile:\n"
                       << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"
-                      << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] << "\n";
-        }
+                      << "  wmwN = " << y0[1] << ", TmTN = " << y0[2] ;
     }
 
     // update final point manually where dxidv is singular
@@ -1840,7 +1810,7 @@ void plot_profiles(const FluidProfile& fp_bag, const FluidProfile& fp_munu, cons
     // plt::suptitle("vw = " + to_string_with_precision(vw) + ", alpha = " + to_string_with_precision(alN));
 
     plt::save(filename);
-    std::cout << "Fluid profile saved to " << filename << "\n";
+    HG_LOG(Info) << "Wrote fluid profile to " << filename;
 }
 #endif
 

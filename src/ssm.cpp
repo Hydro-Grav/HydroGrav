@@ -22,6 +22,7 @@
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 
 #include "config.hpp"
+#include "logger.hpp"
 #include "maths.hpp"
 #include "phasetransition.hpp"
 #include "profile.hpp"
@@ -310,14 +311,12 @@ std::pair<double, double> PowerSpec::peak_vals() const {
 void PowerSpec::write(const std::string& filename, const bool write_header) const {
     namespace fs = std::filesystem;
 
-    std::cout << "Writing power spectrum to disk... ";
-
     // check directory exists
     fs::path filepath(filename);
     fs::path dir = filepath.parent_path();
     if (!dir.empty() && !fs::exists(dir)) {
         if (!fs::create_directories(dir)) {
-            std::cerr << "Failed to create directory: " << dir << "\n";
+            HG_LOG(Error) << "Failed to create directory: " << dir;
             return;
         }
     }
@@ -364,15 +363,13 @@ void PowerSpec::write(const std::string& filename, const bool write_header) cons
         file << freq_vals_[i] << "," << K_vals_[i] << "," << P_vals_[i] << "\n";
     }
     file.close();
-    std::cout << "Saved to " << filename << "!\n";
+    HG_LOG(Info) << "Wrote power spectrum to " << filename;
 
     return;
 }
 
 #ifdef ENABLE_MATPLOTLIB
 void PowerSpec::plot(const std::string& filename) const {
-    std::cout << "Generating power spectrum plot... ";
-
     plt::figure_size(800, 600);
     plt::loglog(K(), P(), "k-");
     plt::suptitle("vw = " + to_string_with_precision(params_->vw()) + ", alN = " + to_string_with_precision(params_->alN()));
@@ -382,7 +379,7 @@ void PowerSpec::plot(const std::string& filename) const {
     plt::grid(true);
     plt::save(filename);
 
-    std::cout << "Saved to '" << filename << "'" << std::endl;
+    HG_LOG(Info) << "Wrote power spectrum plot to '" << filename << "'";
 
     return;
 }
@@ -491,15 +488,15 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
         alglib::spline1dbuildcubic(x_arr, y_arr, log_zk_spline);
     } catch (const alglib::ap_error& e) 
     {
-        std::cerr << "ALGLIB error building spline for zetaKin(ptRs): " << e.msg << std::endl;
+        HG_LOG(Error) << "ALGLIB error building spline for zetaKin(ptRs): " << e.msg;
         throw;
     } catch (const std::exception& e) 
     {
-        std::cerr << "Error building spline for zetaKin(ptRs): " << e.what() << std::endl;
+        HG_LOG(Error) << "Error building spline for zetaKin(ptRs): " << e.what();
         throw;
     } catch (...) 
     {
-        std::cerr << "Unknown error building spline for zetaKin(ptRs)" << std::endl;
+        HG_LOG(Error) << "Unknown error building spline for zetaKin(ptRs)";
         throw;
     }
 }
@@ -589,7 +586,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
 
-    std::cout << "Calculating gravitational wave power spectrum...\n";
+    HG_LOG(Info) << "Calculating gravitational wave power spectrum...";
 
     // |A+|^2(chi) is needed by every Ekin() evaluation below (the non-linear timescale, the
     // zetaKin spline and the prefactor). Building it is the dominant setup cost, so build it
@@ -597,7 +594,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     const Hydrodynamics::ApsqSpline apsq(profile);
 
     if (dtau == 0) {
-        std::cout << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!\n";
+        HG_LOG(Info) << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!";
         dtau = get_nl_timescale(profile, apsq);
     }
 
@@ -719,12 +716,12 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
         }
     }
 
-    std::cout << "Gravitational power spectrum constructed!\n";
+    HG_LOG(Info) << "Gravitational power spectrum constructed!";
 
     /***************************** CLOCK ******************************/
     const auto tf = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = tf - ti;
-    std::cout << "GWSpec Timer: " << duration.count() << " s" << std::endl;
+    HG_LOG(Debug) << "GWSpec Timer: " << duration.count() << " s";
     /******************************************************************/
 
     return PowerSpec(kRs_vals, GW_P_vals, profile, dtau);
@@ -910,8 +907,6 @@ double gw_prefac(const std::vector<double>& kRs_vals, const Hydrodynamics::Fluid
 
 #ifdef ENABLE_MATPLOTLIB
 void plot_spectra(const PowerSpec& gw_spec_bag, const PowerSpec& gw_spec_munu, const PowerSpec& gw_spec_veff, const std::string& filename, const double f_min, const double f_max) {
-    std::cout << "Generating power spectra plot for bag, mu-nu and Veff EoS... ";
-
     const auto freq_bag = gw_spec_bag.freq();
     const auto P_bag = gw_spec_bag.P();
 
@@ -950,7 +945,7 @@ void plot_spectra(const PowerSpec& gw_spec_bag, const PowerSpec& gw_spec_munu, c
     plt::legend();    
 
     plt::save(filename);
-    std::cout << "GW spectrum saved to " << filename << "\n";
+    HG_LOG(Info) << "Wrote GW spectrum plot to " << filename;
 }
 #endif
 

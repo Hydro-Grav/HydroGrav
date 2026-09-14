@@ -97,6 +97,7 @@ file(GLOB SOURCES "src/*.cpp")
 set(HEADERS 
   include/constants.hpp
   include/hydrograv.hpp
+  include/logger.hpp
   include/maths.hpp
   include/phasetransition.hpp
   include/physics.hpp

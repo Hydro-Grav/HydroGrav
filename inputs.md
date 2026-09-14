@@ -13,3 +13,7 @@
 * `Ts` : Temperature of the universe during the phase transition in GeV, taken to be either the nucleation or percolation temperatures of the transition. The default value `Ts = 100.0` corresponds to the EW scale.
 * `Hs` : Hubble rate at the time of the phase transition. The default value of `Hs = 1.41e-14` is given by $H_s^2 = 8 \pi G \rho_s /3 = 8 \pi^3 G g_s T_s^4/90$.
 * `gs` : Relativistic degrees of freedom during the phase transition. The default value of `gs = 106.75` corresponds to the SM at `Ts`.
+# Logging Inputs
+* `logging::set_level(Level)` : The severity threshold for reported output, with the default value `Level::Info`. Accepts `Trace`, `Debug`, `Info`, `Warn`, `Error` and `Off`; records below the threshold are neither formatted nor emitted. See the Logging section of `README.md`.
+* `logging::set_sink(Sink)` : The destination for reported output, defaulting to a sink that writes warnings and errors to `std::cerr` and everything else to `std::cout`. Pass a callable taking `(Level, const std::string&)` to capture records instead, or `nullptr` to restore the default.
+* `dev_log` : *Deprecated.* Argument of `FluidProfile` that emits the same diagnostics as a `Debug` threshold while set. Prefer `logging::set_level(logging::Level::Debug)`.

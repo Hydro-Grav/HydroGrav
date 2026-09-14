@@ -9,6 +9,7 @@
 #define INCLUDE_HYDROGRAV_HPP_H
 
 #include "constants.hpp"
+#include "logger.hpp"
 #include "phasetransition.hpp"
 #include "profile.hpp"
 #include "ssm.hpp"

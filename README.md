@@ -106,3 +106,29 @@ If the library and examples were successfully built, the examples and tests are 
     ./bin/run_gw_spectrum
     ./bin/run_eos_gw_spectrum
     ./bin/unit_tests
+
+## Logging
+
+`HydroGrav` reports progress, warnings and diagnostics through a severity-filtered
+logger declared in `include/logger.hpp`. The logger can be included and set as follows.
+
+```cpp
+#include "logger.hpp"
+
+logging::set_level(logging::Level::Off);    // silence the library
+logging::set_level(logging::Level::Warn);   // warnings and errors only
+logging::set_level(logging::Level::Info);   // default: progress messages
+logging::set_level(logging::Level::Debug);  // add solver diagnostics and timings
+logging::set_level(logging::Level::Trace);  // add per-iteration solver detail
+```
+
+An application with its own logging framework can capture the records instead of
+having them written to the terminal, by installing a sink:
+
+```cpp
+logging::set_sink([](logging::Level level, const std::string& msg) {
+    my_logger(to_my_severity(level)) << msg;
+});
+```
+
+When HydroGrav is used as a module for PhaseTracer, the above code is used to bind HydroGrav's logging output to PhaseTracer's logger settings.

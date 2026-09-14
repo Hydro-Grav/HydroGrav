@@ -233,9 +233,13 @@ class PTParams {
     double tau_s() const { return tau_s_; } // start time of PT
     const std::string nuc_type() const { return nuc_type_; } // bubble nucleation type
 
-    // friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
-    // void print() const;
-    
+    /** @brief Write the parameters to @p os, including those of the derived model. */
+    friend std::ostream& operator<<(std::ostream& os, const PTParams& p);
+
+    /** @brief Log the parameters as a single record at Info level. */
+    void print() const;
+
+
     virtual double cpsq() const = 0; // speed of sound squared (symmetric phase)
     virtual double cmsq() const = 0; // speed of sound squared (broken phase)
 
@@ -248,8 +252,11 @@ class PTParams {
     std::string nuc_type_;
     std::optional<LifetimeDistribution> lt_dist_;
 
-    virtual void print() const;
-  
+    /**
+     * @brief Stream the parameter block.
+     */
+    virtual void write_params(std::ostream& os) const;
+
   private:
     bool is_valid_model(const std::string& model, const std::vector<std::string>& allowed_models) const;
 };
@@ -280,7 +287,8 @@ class PTParams_Bag : public PTParams {
     double cpsq() const override { return cpsq_; }
     double cmsq() const override { return cmsq_; }
 
-    void print() const override;
+  protected:
+    void write_params(std::ostream& os) const override;
 
   private:
     const double cpsq_, cmsq_;
@@ -409,7 +417,8 @@ public:
   void plot_csq(const std::string& filename="csq_veff.png") const; // Plots cs^2(T)
   #endif
 
-  void print() const override;
+protected:
+  void write_params(std::ostream& os) const override;
 
 private:
   std::vector<double> veff_TTN_vals_, veff_ps_vals_, veff_pb_vals_, veff_es_vals_, veff_eb_vals_, veff_ws_vals_, veff_wb_vals_;

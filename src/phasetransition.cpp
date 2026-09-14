@@ -18,6 +18,7 @@ namespace plt = matplotlibcpp;
 #endif
 
 #include "phasetransition.hpp"
+#include "logger.hpp"
 #include "maths.hpp"
 
 /*
@@ -56,9 +57,10 @@ std::ostream& operator<<(std::ostream& os, const Universe& un) {
     return os;
 }
 
-// some way to combine this with PTParams print()?
 void Universe::print() const {
-    std::cout << *this;
+    std::ostringstream os;
+    os << *this;
+    HG_LOG(Info) << logging::trim_trailing_newline(os.str());
 }
 
 const Universe& default_universe() {
@@ -91,7 +93,7 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
 
       // check valid vw
       if (vw_ < 0.0 ) {
-        std::cerr << "Warning: vw < 0. Taking |vw| as input instead.";
+        HG_LOG(Warn) << "vw < 0. Taking |vw| as input instead.";
         vw_ = std::abs(vw);
       } else if (vw == 0.0 || vw >= 1.0) {
         throw std::invalid_argument("Unphysical wall velocity passed into PTParams. Must have 0 < vw < 1.");
@@ -115,21 +117,33 @@ PTParams::PTParams(double vw, double alN, double TN, double beta, double Rs, con
       // check valid bubble nucleation type
       const std::vector<std::string> allowed_nuc = {"exp", "sim"};
       if (!is_valid_model(nuc_type, allowed_nuc)) {
-          std::cerr << "Warning: Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")\n";
+          HG_LOG(Warn) << "Invalid model '" << nuc_type << "' for bubble nucleation. Using default nucleation type (" << dflt_PTParams::nuc_type << ")";
           nuc_type_ = dflt_PTParams::nuc_type;
       }
     }
 
-// Protected:
+// Public:
 void PTParams::print() const {
-  std::cout << "********** Phase Transition parameters **********\n"
-            << std::left
-            //  << std::setw(35) << "Equation of state:" << params.model_ << "\n"
-            << std::setw(35) << "Nucleation type:" << nuc_type_ << "\n"
-            << std::setw(35) << "Wall velocity:" << "vw=" << vw_ << "\n"
-            << std::setw(35) << "PT strength parameter:" << "alN=" << alN_ << "\n"
-            << std::setw(35) << "Transition rate parameter:" << "beta=" << beta_ << "\n"
-            << std::setw(35) << "Mean bubble separation:" << "Rs=" << Rs_ << "\n";
+  std::ostringstream os;
+  write_params(os);
+  HG_LOG(Info) << logging::trim_trailing_newline(os.str());
+}
+
+std::ostream& operator<<(std::ostream& os, const PTParams& p) {
+  p.write_params(os);
+  return os;
+}
+
+// Protected:
+void PTParams::write_params(std::ostream& os) const {
+  os << "********** Phase Transition parameters **********\n"
+     << std::left
+     //  << std::setw(35) << "Equation of state:" << params.model_ << "\n"
+     << std::setw(35) << "Nucleation type:" << nuc_type_ << "\n"
+     << std::setw(35) << "Wall velocity:" << "vw=" << vw_ << "\n"
+     << std::setw(35) << "PT strength parameter:" << "alN=" << alN_ << "\n"
+     << std::setw(35) << "Transition rate parameter:" << "beta=" << beta_ << "\n"
+     << std::setw(35) << "Mean bubble separation:" << "Rs=" << Rs_ << "\n";
 }
 
 // Private:
@@ -146,7 +160,7 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
       cpsq_(cpsq),
       cmsq_(cmsq) {
 
-      std::cout << "Storing phase transition parameters. Note that alN definition differs between bag and mu-nu models!\n";
+      HG_LOG(Info) << "Storing phase transition parameters. Note that alN definition differs between bag and mu-nu models!";
 
       // check valid speed of sound
       if (!is_valid_csq(cpsq_)) {
@@ -160,12 +174,12 @@ PTParams_Bag::PTParams_Bag(double vw, double alN, double TN, double beta, double
       wNeN_rat_ = 1.0 + cpsq_; // wN/eN = 1 + pN/eN = 1 + 1/3 for bag model
     }
 
-// Public:
-void PTParams_Bag::print() const {
-  PTParams::print();
-  std::cout << std::setw(35) << "Speed of sound (symmetric phase):" << "cpsq=" << cpsq_ << "\n"
-            << std::setw(35) << "Speed of sound (broken phase):" << "cmsq=" << cmsq_ << "\n"
-            << "*************************************************\n";
+// Protected:
+void PTParams_Bag::write_params(std::ostream& os) const {
+  PTParams::write_params(os);
+  os << std::setw(35) << "Speed of sound (symmetric phase):" << "cpsq=" << cpsq_ << "\n"
+     << std::setw(35) << "Speed of sound (broken phase):" << "cmsq=" << cmsq_ << "\n"
+     << "*************************************************\n";
 }
 
 // Private:
@@ -191,8 +205,8 @@ EquationOfState EquationOfState::from_file(const std::string& filename)
     throw std::invalid_argument("Equation of state filename cannot be empty");
   }
 
-  std::cout << "Reading equation of state from file: " << filename << "\n"
-            << "Note: File must be formatted as T, ps, pb, es, eb (comma separated) with header line\n";
+  HG_LOG(Info) << "Reading equation of state from file: " << filename << "\n"
+               << "Note: File must be formatted as T, ps, pb, es, eb (comma separated) with header line";
   
   std::ifstream file(filename);
   if (!file) 
@@ -227,7 +241,7 @@ EquationOfState EquationOfState::from_file(const std::string& filename)
     eb_vals.push_back(values[4]);
   }
 
-  std::cout << "Equation of state read successfully! (" << T_vals.size() << " data points)\n";
+  HG_LOG(Info) << "Equation of state read successfully! (" << T_vals.size() << " data points)";
   
   return EquationOfState(T_vals, ps_vals, pb_vals, es_vals, eb_vals);
 }
@@ -267,8 +281,6 @@ bool EquationOfState::is_valid() const
 }
 
 void EquationOfState::write(const std::string& filename) const {
-    std::cout << "Writing equation of state to disk... ";
-
     std::ofstream file(filename);
     file << "T,ps,pb,es,eb\n";
 
@@ -277,7 +289,7 @@ void EquationOfState::write(const std::string& filename) const {
     }
     file.close();
 
-    std::cout << "Saved to " << filename << "!\n";
+    HG_LOG(Info) << "Wrote equation of state to " << filename;
 
     return;
 }
@@ -292,7 +304,7 @@ PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, const EquationOfS
 PTParams_Veff::PTParams_Veff(double vw, double alN, double TN, double beta, double Rs, const std::string nuc_type, const Universe& un, const EquationOfState& eos_data)
     : PTParams(vw, alN, TN, beta, Rs, nuc_type, un) {
     
-    std::cout << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model to identify if hydrodynamic mode differs to simplified EoS!!\n";
+    HG_LOG(Info) << "Storing phase transition parameters. Note that PTParams_Veff must be given alN defined for mu-nu model to identify if hydrodynamic mode differs to simplified EoS!!";
     initialize_from_eos_data(eos_data);
 }
 
@@ -400,8 +412,8 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   // check for normalisation issue in eos (adjust tolerance as needed)
   // impacts prefactor for gw spectrum - only changes max amplitude of spectrum
   if (wNeN_rat_ > 2.0) {
-    std::cerr << "Warning: Equation of state normalisation issue. wN/eN=" << wNeN_rat_ << " is abnormally large! "
-              << "Using wN/eN = 1 + cpsq approximation instead!\n";
+    HG_LOG(Warn) << "Equation of state normalisation issue. wN/eN=" << wNeN_rat_ << " is abnormally large! "
+                 << "Using wN/eN = 1 + cpsq approximation instead!";
     wNeN_rat_ = 1.0 + alglib::spline1dcalc(cpsq_fit_, 1.0); // munu approx
   }
 
@@ -593,9 +605,9 @@ void PTParams_Veff::plot_csq(const std::string& filename) const {
 }
 #endif
 
-void PTParams_Veff::print() const {
-  PTParams::print();
-  std::cout << "*************************************************\n";
+void PTParams_Veff::write_params(std::ostream& os) const {
+  PTParams::write_params(os);
+  os << "*************************************************\n";
 }
 
 
