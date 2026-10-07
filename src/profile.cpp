@@ -252,7 +252,7 @@ void FluidProfile::plot(const std::string& filename, double xi_min, double xi_ma
 // Private functions
 
 /**************************************** Bag EoS ****************************************/
-// TO DO: Add inv hybrids and check bounds for inv def/hyb
+// TO DO: Check solution space for inv hybrids carefully!!
 // bounds might be slightly different for inv def/hyb since we use alN != alp
 // depending on if alp > or < alN, some valid solutions might be missed?
 int FluidProfile::get_mode_bag(double vw, double cmsq, double cpsq, double alN) const {
@@ -262,7 +262,7 @@ int FluidProfile::get_mode_bag(double vw, double cmsq, double cpsq, double alN) 
         return 2;                                        // detonation
     } else if (alN < 0.0) { // inverse PT
         if (vw > std::sqrt(cpsq)) return 3;              // inv. deflagration
-        // if (vw < std::sqrt(cpsq) && vw > cmsq) return 4; // inv. hybrid
+        if (vw < std::sqrt(cpsq) && vw > cmsq) return 4; // inv. hybrid
         if (vw < vJ_inv_det(alN)) return 5;              // inv. detonation
         
         throw std::runtime_error("Cannot identify inverse PT mode. Aborting."); // temporary
@@ -1936,11 +1936,12 @@ std::vector<prof_type> FluidProfile::solve_inverse_profile(int n) {
 
     // TO DO: update vp for hybrids
     if (mode_ < 5) { // inv deflagrations/hybrids
-        if (mode_ == 4) {
-            throw std::runtime_error("inv. hybrids not yet implemented!");
-        }
+        // if (mode_ == 4) {
+        //     throw std::runtime_error("inv. hybrids not yet implemented!");
+        // }
 
-        const auto vp = vw_;
+        // vp = vw (inv def.), vp = cp (inv hyb.)
+        const auto vp = (mode_ == 3) ? vw_ : std::sqrt(cpsq_);
 
         const auto vm = vm_from_matching(vp, alN_, 1); // check if sgn=1 or -1 for hyb
         const auto vmUF = mu(vw_, vm);
@@ -1970,7 +1971,7 @@ std::vector<prof_type> FluidProfile::solve_inverse_profile(int n) {
 
         // re-integrate for final profile
         // avoids insufficient no. points for integrating profile when shock is close to vw
-        std::tie(v_sol_tmp, y_sol_tmp) = rk4_solver(dydv, vmUF, v_sol_tmp[sh_idx], y0, n_); // integrates from vmUF->v2UF  
+        std::tie(v_sol_tmp, y_sol_tmp) = rk4_solver(dydv, vmUF, v_sol_tmp[sh_idx], y0, n_); // integrates from vmUF->v2UF
 
         // reverse solution for xi ascending
         std::reverse(v_sol_tmp.begin(), v_sol_tmp.end());
@@ -1984,23 +1985,89 @@ std::vector<prof_type> FluidProfile::solve_inverse_profile(int n) {
         const auto w1wN = w_from_matching(w2wN, v2, xi_sh); // v1=xi_sh
         const auto T1TN = T1TN_from_matching(w1wN, w2wN, T2TN);
 
-        w_start_val = w1wN; // w1/wN
-        w_end_val = 1.0;    // wp=wN
+        if (mode_ == 3) { // inv def
 
-        T_start_val = T1TN; // T1/TN
-        T_end_val = 1.0;    // Tp=TN
+            w_start_val = w1wN; // w1/wN
+            w_end_val = 1.0;    // wp=wN
 
-        // start/end points of profile for integration
-        xi_min_integrate_ = xi_sh;
-        xi_max_integrate_ = vw_;
+            T_start_val = T1TN; // T1/TN
+            T_end_val = 1.0;    // Tp=TN
 
-        if (dev_log_) {
-            std::clog << "Inv. deflagration profile:\n"
-                      << "  vm = " << vm << ", vmUF = " << vmUF << "\n"
-                      << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
-                      << "  v2 = " << v2 << ", v2UF = " << mu(xi_sh, v2) << "\n"
-                      << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
-                      << "  xi_sh = " << xi_sh << "\n";
+            // start/end points of profile for integration
+            xi_min_integrate_ = xi_sh;
+            xi_max_integrate_ = vw_;
+
+            if (dev_log_) {
+                std::clog << "Inv. deflagration profile:\n"
+                        << "  vm = " << vm << ", vmUF = " << vmUF << "\n"
+                        << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
+                        << "  v2 = " << v2 << ", v2UF = " << mu(xi_sh, v2) << "\n"
+                        << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+                        << "  xi_sh = " << xi_sh << "\n";
+            }
+        } else { // inv hyb
+            // calculate alp from vp, vm (inv. detonation: -inf < alp < 0)
+            // const auto alp = alp_from_matching(vp, vm);
+            // if (alp >= 0.0) throw std::runtime_error("Unphysical value of alp for inverse transition (alp >= 0)!");
+
+            // // calculate enthalpy/temperature in front of wall
+            // const auto wpwN = wpwN_from_alp(alp);
+            // const auto TpTN = std::pow(wpwN, 0.25);
+
+            // // integrate profile
+            // const state_type y0 = {vw_, wpwN, TpTN}; // {xi0, w0, T0}
+            // std::tie(v_sol_rf_tmp, y_sol_rf_tmp) = rk4_solver(dydv, vpUF, -1e-10, y0, n_);
+
+            // // remove any numerical errors in final point (xi<0 or xi>1)
+            // if (!y_sol_rf_tmp.empty() && (y_sol_rf_tmp.back()[0] < 0.0 || y_sol_rf_tmp.back()[0] > 1.0)) {
+            //     v_sol_rf_tmp.pop_back();
+            //     y_sol_rf_tmp.pop_back();
+            // }
+
+            // combine rarefaction wave with shockwave part of solution
+            // for (size_t i = 0; i < v_sol_rf_tmp.size(); i++) {
+            //     v_sol_tmp.push_back(v_sol_rf_tmp[i]);
+            //     xi_sol_tmp.push_back(y_sol_rf_tmp[i][0]);
+            //     w_sol_tmp.push_back(y_sol_rf_tmp[i][1]);
+            //     T_sol_tmp.push_back(y_sol_rf_tmp[i][2]);
+
+            //     la_sol_tmp.push_back(lambda_b(y_sol_rf_tmp[i][1]));
+            // }
+
+            // xif = xif_rf; // update xif value to behind rarefaction wave
+            // w_end_val = w_sol_tmp.back();
+            // T_end_val = T_sol_tmp.back();
+            // la_end_val = la_sol_tmp.back();
+
+            // if (dev_log_) {
+            //     std::clog << "Hybrid profile:\n"
+            //               << "  vm = " << vm << ", vmUF=" << mu(vw_, abs(vm)) << "\n"
+            //               << "  wmwN = " << w_end_val << ", TmTN = " << TmTN << "\n"
+            //               << "  vp = " << vp << ", vpUF = " << vpUF << "\n"
+            //               << "  wpwN = " << wpwN << ", TpTN = " << TpTN << "\n"
+            //               << "  alp = " << alp << "\n"
+            //               << "  v1 = " << mu(xi_sh, abs(v1UF)) << ", v1UF = " << v1UF << "\n"
+            //               << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+            //               << "  xi_sh = " << xi_sh << "\n";
+            // }
+            w_start_val = w1wN; // w1/wN
+            w_end_val = 1.0;    // wp=wN
+
+            T_start_val = T1TN; // T1/TN
+            T_end_val = 1.0;    // Tp=TN
+
+            // start/end points of profile for integration
+            xi_min_integrate_ = xi_sh;
+            xi_max_integrate_ = vw_;
+
+            if (dev_log_) {
+                std::clog << "Inv. hybrid profile:\n"
+                        << "  vm = " << vm << ", vmUF = " << vmUF << "\n"
+                        << "  wmwN = " << wmwN << ", TmTN = " << TmTN << "\n"
+                        << "  v2 = " << v2 << ", v2UF = " << mu(xi_sh, v2) << "\n"
+                        << "  w1wN = " << w1wN << ", T1TN = " << T1TN << "\n"
+                        << "  xi_sh = " << xi_sh << "\n";
+            }
         }
     } else { // inv. detonations
         const auto vm = vw_;
