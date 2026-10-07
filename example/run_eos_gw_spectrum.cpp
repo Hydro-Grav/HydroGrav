@@ -18,6 +18,7 @@ int main() {
     const auto TN = PhaseTransition::dflt_PTParams::TN;
     const auto beta = PhaseTransition::dflt_PTParams::beta;
     const auto Rs = PhaseTransition::dflt_PTParams::Rs;
+    auto Rbar = PhaseTransition::dflt_PTParams::Rbar;
     const auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
     /*
@@ -65,7 +66,7 @@ int main() {
     /* 
         Secondly, we construct the PTParams object
     */
-    PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, Rs, nuc_type, un, eos_data);
+    PhaseTransition::PTParams_Veff params(vw, alN, TN, beta, Rs, Rbar, nuc_type, un, eos_data);
 
     /*
         Lastly, we use this to compute the gravitational wave spectrum.
@@ -110,7 +111,7 @@ int main() {
         This can then be passed to PTParams_Veff. Additionally, PTParams_Veff itself can be 
         initialised from the file path
     */
-    PhaseTransition::PTParams_Veff params_from_path(vw, alN, TN, beta, Rs, nuc_type, un, eos_path);
+    PhaseTransition::PTParams_Veff params_from_path(vw, alN, TN, beta, Rs, Rbar, nuc_type, un, eos_path);
 
     Spectrum::PowerSpec OmegaGW_from_path = Spectrum::GWSpec(kRs_vals, params_from_path, dtau);
 

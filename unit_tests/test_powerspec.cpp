@@ -12,6 +12,7 @@ static Hydrodynamics::FluidProfile make_profile() {
             PhaseTransition::dflt_PTParams::TN,
             PhaseTransition::dflt_PTParams::beta,
             PhaseTransition::dflt_PTParams::Rs,
+            PhaseTransition::dflt_PTParams::Rbar,
             PhaseTransition::dflt_PTParams::nuc_type,
             PhaseTransition::default_universe()
             );

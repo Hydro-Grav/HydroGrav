@@ -18,9 +18,9 @@ namespace plt = matplotlibcpp;
 class benchmark_point {
     public:
         benchmark_point(double vw, double Ts, double alN_bag, double alN_munu, double betaHs, double Hs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& id, const std::string& dir)
-        : benchmark_point(vw, Ts, alN_bag, alN_munu, betaHs, Hs, PhaseTransition::Rs_approx(vw, betaHs * Hs), cpsq, cmsq, gs,nuc_type, id, dir) {}
-        benchmark_point(double vw, double Ts, double alN_bag, double alN_munu, double betaHs, double Hs, double Rs, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& id, const std::string& dir)
-        : vw_(vw), Ts_(Ts), alN_bag_(alN_bag), alN_munu_(alN_munu), betaHs_(betaHs), Hs_(Hs), Rs_(Rs), cpsq_(cpsq), cmsq_(cmsq), gs_(gs), nuc_type_(nuc_type), id_(id), dir_(dir) {
+        : benchmark_point(vw, Ts, alN_bag, alN_munu, betaHs, Hs, PhaseTransition::Rs_approx(vw, betaHs * Hs), PhaseTransition::Rbar_approx(vw, betaHs * Hs), cpsq, cmsq, gs,nuc_type, id, dir) {}
+        benchmark_point(double vw, double Ts, double alN_bag, double alN_munu, double betaHs, double Hs, double Rs, double Rbar, double cpsq, double cmsq, double gs, const char* nuc_type, const std::string& id, const std::string& dir)
+        : vw_(vw), Ts_(Ts), alN_bag_(alN_bag), alN_munu_(alN_munu), betaHs_(betaHs), Hs_(Hs), Rs_(Rs), Rbar_(Rbar), cpsq_(cpsq), cmsq_(cmsq), gs_(gs), nuc_type_(nuc_type), id_(id), dir_(dir) {
             beta_ = betaHs_ * Hs_;
         }
         
@@ -35,6 +35,7 @@ class benchmark_point {
         double cmsq() const { return cmsq_; }
         double gs() const { return gs_; }
         double Rs() const { return Rs_;}
+        double Rbar() const { return Rbar_;}
         const char* nuc_type() const { return nuc_type_; }
         std::string name() const { return id_; }
         std::string dir() const { return dir_; }
@@ -53,6 +54,7 @@ class benchmark_point {
                       << std::setw(35) << "cmsq ="      << cmsq_      << "\n"
                       << std::setw(35) << "gs ="        << gs_        << "\n"
                       << std::setw(35) << "Rs ="        << Rs_        << "\n"
+                      << std::setw(35) << "Rbar ="      << Rbar_      << "\n"
                       << std::setw(35) << "nuc_type ="  << nuc_type_  << "\n"
                       << std::setw(35) << "dir ="       << dir_       << "\n"
                       << "*************************************************\n";
@@ -60,21 +62,21 @@ class benchmark_point {
 
         std::unique_ptr<PhaseTransition::PTParams> get_PTParams_Bag() const {
             const PhaseTransition::Universe un(Ts_, gs_, Hs_);
-            return std::make_unique<PhaseTransition::PTParams_Bag>(vw_, alN_bag_, Ts_, beta_, Rs_, nuc_type_, un);
+            return std::make_unique<PhaseTransition::PTParams_Bag>(vw_, alN_bag_, Ts_, beta_, Rs_, Rbar_, nuc_type_, un);
         }
 
         std::unique_ptr<PhaseTransition::PTParams> get_PTParams_munu() const {
             const PhaseTransition::Universe un(Ts_, gs_, Hs_);
-            return std::make_unique<PhaseTransition::PTParams_Bag>(vw_, alN_munu_, Ts_, beta_, Rs_, nuc_type_, un, cpsq_, cmsq_);
+            return std::make_unique<PhaseTransition::PTParams_Bag>(vw_, alN_munu_, Ts_, beta_, Rs_, Rbar_, nuc_type_, un, cpsq_, cmsq_);
         }
 
         std::unique_ptr<PhaseTransition::PTParams> get_PTParams_Veff() const {
             const PhaseTransition::Universe un(Ts_, gs_, Hs_);
-            return std::make_unique<PhaseTransition::PTParams_Veff>(vw_, alN_munu_, Ts_, beta_, Rs_, nuc_type_, un, dir_ + "eos.csv");
+            return std::make_unique<PhaseTransition::PTParams_Veff>(vw_, alN_munu_, Ts_, beta_, Rs_, Rbar_, nuc_type_, un, dir_ + "eos.csv");
         }
 
     private:
-        const double vw_, Ts_, alN_bag_, alN_munu_, betaHs_, Hs_, Rs_, cpsq_, cmsq_, gs_;
+        const double vw_, Ts_, alN_bag_, alN_munu_, betaHs_, Hs_, Rs_, Rbar_, cpsq_, cmsq_, gs_;
         const char* nuc_type_;
         const std::string id_, dir_;
         double beta_;
@@ -151,24 +153,25 @@ int main() {
     const auto beta = bp.beta();
     const auto Hs = bp.Hs();
     const auto Rs = bp.Rs();
+    const auto Rbar = bp.Rbar();
     const auto cpsq = bp.cpsq();
     const auto cmsq = bp.cmsq();
 
     const PhaseTransition::Universe un(Ts, gs, Hs);
     const auto kRs_vals = logspace(-3.0, 3.0, 100);
 
-    const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
+    const PhaseTransition::PTParams_Bag params_bag(vw, alN_bag, TN, beta, Rs, Rbar, nuc_type, un, 1.0 / 3.0, 1.0 / 3.0);
     const auto OmegaGW_bag = Spectrum::GWSpec(kRs_vals, params_bag);
     OmegaGW_bag.write("gw_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
     OmegaGW_bag.profile().write("profile_bag_" + OmegaGW_bag.profile().mode_str() + ".csv");
 
 
-    const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Bag params_munu(vw, alN_munu, TN, beta, Rs, Rbar, nuc_type, un, cpsq, cmsq);
     const auto OmegaGW_munu = Spectrum::GWSpec(kRs_vals, params_munu);
     OmegaGW_munu.write("gw_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
     OmegaGW_munu.profile().write("profile_munu_" + OmegaGW_munu.profile().mode_str() + ".csv");
 
-    const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, nuc_type, un, veff_file);
+    const PhaseTransition::PTParams_Veff params_veff(vw, alN_munu, TN, beta, Rs, Rbar, nuc_type, un, veff_file);
     const auto OmegaGW_veff = Spectrum::GWSpec(kRs_vals, params_veff);
     OmegaGW_veff.write("gw_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
     OmegaGW_veff.profile().write("profile_veff_" + OmegaGW_veff.profile().mode_str() + ".csv");
