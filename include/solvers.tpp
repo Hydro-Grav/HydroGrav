@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cmath>
 #include <optional>
+#include <algorithm>
 #include "logger.hpp"
 
 template <typename T, typename Func>
