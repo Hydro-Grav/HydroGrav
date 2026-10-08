@@ -484,20 +484,20 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
     }
 }
 
-// TO DO:
-// - add calculation of shock and correlation timescales
-// - update to sample directly from LogNormal(mu,sd) rather than rescaling X~LogNormal(0,1)? Nuisance parameter would be physical then (i.e. dtau rather than X)
-// - sample over length scales too? Currently uses mean bubble separation Rs
+// Takes a sample X~LogNormal(0,1) and calculates the different timescales in the SSM to rescale the distribution
 double sample_sw_timescale(double sample, const Hydrodynamics::FluidProfile& profile) {
     // calculate the different sound wave timescales in the SSM
-    const auto dtau_nl = get_nl_timescale(profile); // non-linearity timescale (eddy turnover time)
-    const auto dtau_sh = dtau_nl;
-    const auto dtau_cor = get_decorrelation_timescale(profile.params().Rs(), std::sqrt(profile.params().cpsq()));
+    const auto dtau_from_Rs = get_nl_timescale(profile.params()->Rs(), profile); // Ls = mean bubble separation
+    const auto dtau_from_Rbar = get_nl_timescale(profile.params()->Rbar(), profile); // Ls = mean bubble radius
+    const auto dtau_from_Rsound = get_nl_timescale(profile.params()->Rsound(), profile); // Ls = mean sound shell radius
 
-    std::vector<double> dtau_list = {dtau_nl, dtau_sh, dtau_cor};
+    std::vector<double> dtau_list = {dtau_from_Rs, dtau_from_Rbar, dtau_from_Rsound};
 
     // calculate mean/variance for timescales
     const auto [mu, sd] = get_mean_sd(dtau_list);
+
+    // const auto dtau_sampled = sd * sample + mu;
+    // std::clog << "sampled dtau/Rs=" << dtau_sampled / profile.params()->Rs() << "\n";
 
     // rescale X~LogNormal(0,1) sample to get dtau from Y~LogNormal(mu,sd)
     // Y = aX+b
@@ -730,9 +730,9 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
 }
 /***************************/
 
-// computes timescale for non-linearities to appear in fluid (used as sound wave duration)
-double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
-    // tau_nl ~ Rs / sqrt(Omega_K)
+// computes shock formation timescale using length scale Ls
+double get_nl_timescale(const double Ls, const Hydrodynamics::FluidProfile& prof) {
+    // tau_nl ~ Ls / sqrt(Omega_K)
     // Omega_K = avg kinetic energy of sound waves
     const auto Rs = prof.params()->Rs();
     const auto kRs_vals = logspace(log10(config::kRs_minimum), log10(config::kRs_maximum), config::n_kRs);
@@ -740,9 +740,16 @@ double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
     const auto Ek = Ekin(kRs_vals, prof);
     const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());    
 
-    return std::sqrt(Rs * Rs * Rs / Ek_int);
+    // return std::sqrt(Rs * Rs * Rs / Ek_int);
+    return Ls / std::sqrt(Ek_int / Rs);
 }
 
+// Uses mean bubble separation by default
+double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
+    return get_nl_timescale(prof.params()->Rs(), prof);
+}
+
+// autocorrelation time in fluid
 double get_decorrelation_timescale(const double Ls, const double cs) {
     return Ls / cs;
 }

@@ -199,6 +199,7 @@ void build_kinetic_spectrum_spline(const std::vector<double>& kRs_vals, const Hy
 /**
  * @brief Calculates the non-linear timescale of the phase transition using the time for the plasma to develop turbulence
  */
+double get_nl_timescale(const double Ls, const Hydrodynamics::FluidProfile& prof);
 double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
 
 double get_decorrelation_timescale(const double Ls, const double cs);
