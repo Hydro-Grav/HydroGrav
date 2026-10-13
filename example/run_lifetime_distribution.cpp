@@ -6,6 +6,7 @@ int main(int argc, char* argv[]) {
     auto alN = PhaseTransition::dflt_PTParams::alN_bag;
     auto beta = PhaseTransition::dflt_PTParams::beta;
     auto Rs = PhaseTransition::dflt_PTParams::Rs;
+    auto Rbar = PhaseTransition::dflt_PTParams::Rbar;
     auto TN = PhaseTransition::dflt_PTParams::TN;
     auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
     auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
@@ -30,7 +31,7 @@ int main(int argc, char* argv[]) {
     PhaseTransition::LifetimeDistribution ld_dist(Ttilde_values, nu_values);
 
     PhaseTransition::Universe un(42.9425, 107.75, 3.11917e-15);
-    PhaseTransition::PTParams_Bag params(0.81184, 0.414202, 51.8903, 4.06877e-14, 3.70789e+13, nuc_type, un);
+    PhaseTransition::PTParams_Bag params(0.81184, 0.414202, 51.8903, 4.06877e-14, 3.70789e+13, Rbar, nuc_type, un);
     // params.set_lifetime_distribution(ld_dist);
     if(argc == 5) {
         params.print();

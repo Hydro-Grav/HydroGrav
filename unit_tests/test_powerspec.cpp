@@ -12,6 +12,7 @@ static Hydrodynamics::FluidProfile make_profile() {
             PhaseTransition::dflt_PTParams::TN,
             PhaseTransition::dflt_PTParams::beta,
             PhaseTransition::dflt_PTParams::Rs,
+            PhaseTransition::dflt_PTParams::Rbar,
             PhaseTransition::dflt_PTParams::nuc_type,
             PhaseTransition::default_universe()
             );
@@ -339,8 +340,8 @@ TEST_CASE("GWSpec regression", "[gwspec]") {
     // the overall amplitude.
     using D = PhaseTransition::dflt_PTParams;
     const PhaseTransition::Universe un;
-    const PhaseTransition::PTParams_Bag params(D::vw, D::alN_bag, D::TN, D::beta, D::Rs,
-                                               D::nuc_type, un, D::cpsq, D::cmsq);
+    const PhaseTransition::PTParams_Bag params(D::vw, D::alN_bag, D::TN, D::beta, D::Rs, 
+                                               D::Rbar, D::nuc_type, un, D::cpsq, D::cmsq);
 
     const auto kRs_vals = logspace(-3.0, 3.0, 100);
     const auto gw = Spectrum::GWSpec(kRs_vals, params, 10.0 * D::Rs);

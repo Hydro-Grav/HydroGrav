@@ -17,12 +17,13 @@ int main(int argc, char* argv[]) {
     }
 
     auto Rs = PhaseTransition::dflt_PTParams::Rs;
+    auto Rbar = PhaseTransition::dflt_PTParams::Rbar;
     auto TN = PhaseTransition::dflt_PTParams::TN;
     auto cpsq = PhaseTransition::dflt_PTParams::cpsq;
     auto cmsq = PhaseTransition::dflt_PTParams::cmsq;
     auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, Rbar, nuc_type, un, cpsq, cmsq);
     
     // Fluid profile
     const Hydrodynamics::FluidProfile profile(params);

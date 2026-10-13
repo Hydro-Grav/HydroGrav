@@ -218,9 +218,17 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
                   const Hydrodynamics::ApsqSpline& apsq);
 
 /**
+ * @brief Computes & samples the relevant timescales in the SSM to compute the GW spectrum
+ * 
+ * @param sample    Sampled value X~LogNormal(0,1).
+ */
+PowerSpec sample_GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double sample);
+
+/**
  * @brief Calculates gravitational wave spectrum.
  */
-PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau=0.0);
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau=0.0); // Legacy calls to GWSpec
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, double dtau);
 
 /**
  * @brief Builds spline interpolating functions for kinetic spectrum
@@ -244,9 +252,11 @@ LogGridInterpolant kinetic_spectrum_interpolant(const std::vector<double>& kRs_v
 /**
  * @brief Calculates the non-linear timescale of the phase transition using the time for the plasma to develop turbulence
  */
-double get_nl_timescale(const Hydrodynamics::FluidProfile& prof);
+double get_nl_timescale(const double Ls, const Hydrodynamics::FluidProfile& prof);
 /// Overload reusing a prebuilt \f$|A_+|^2\f$ spline; see @c Hydrodynamics::ApsqSpline.
-double get_nl_timescale(const Hydrodynamics::FluidProfile& prof, const Hydrodynamics::ApsqSpline& apsq);
+double get_nl_timescale(const double Ls, const Hydrodynamics::FluidProfile& prof, const Hydrodynamics::ApsqSpline& apsq);
+
+double get_decorrelation_timescale(const double Ls, const double cs);
 
 /// Approximation used for dtau in arXiv:2308.12943.
 // double dtau_approx(const PhaseTransition::PTParams& params);

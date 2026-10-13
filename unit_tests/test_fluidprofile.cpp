@@ -10,6 +10,7 @@ static PhaseTransition::PTParams_Bag make_bag_params(double vw = 0.9, double alN
         PhaseTransition::dflt_PTParams::TN,
         PhaseTransition::dflt_PTParams::beta,
         PhaseTransition::dflt_PTParams::Rs,
+        PhaseTransition::dflt_PTParams::Rbar,
         PhaseTransition::dflt_PTParams::nuc_type,
         PhaseTransition::default_universe()
     );
@@ -95,6 +96,7 @@ TEST_CASE("PTParams_Bag with explicit sound speeds", "[ptparams]") {
         PhaseTransition::dflt_PTParams::TN,
         PhaseTransition::dflt_PTParams::beta,
         PhaseTransition::dflt_PTParams::Rs,
+        PhaseTransition::dflt_PTParams::Rbar,
         PhaseTransition::dflt_PTParams::nuc_type,
         PhaseTransition::default_universe(),
         0.4, 0.3
@@ -240,6 +242,7 @@ TEST_CASE("FluidProfile bag benchmark (dflt_PTParams)", "[fluidProfile][benchmar
         PhaseTransition::dflt_PTParams::TN,
         PhaseTransition::dflt_PTParams::beta,
         PhaseTransition::dflt_PTParams::Rs,
+        PhaseTransition::dflt_PTParams::Rbar,
         PhaseTransition::dflt_PTParams::nuc_type,
         PhaseTransition::default_universe()
     );

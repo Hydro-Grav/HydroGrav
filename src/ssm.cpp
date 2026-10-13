@@ -573,8 +573,47 @@ void resonance_panels(double lo, double hi, double centre, double hw, std::vecto
 
 } // namespace
 
-/*** GW power spectrum ***/
+// Takes a sample X~LogNormal(0,1) and calculates the different timescales in the SSM to rescale the distribution
+double sample_sw_timescale(double sample, const Hydrodynamics::FluidProfile& profile) {
+    // calculate the different sound wave timescales in the SSM
+    const auto dtau_from_Rs = get_nl_timescale(profile.params()->Rs(), profile); // Ls = mean bubble separation
+    const auto dtau_from_Rbar = get_nl_timescale(profile.params()->Rbar(), profile); // Ls = mean bubble radius
+    const auto dtau_from_Rsound = get_nl_timescale(profile.params()->Rsound(), profile); // Ls = mean sound shell radius
+
+    std::vector<double> dtau_list = {dtau_from_Rs, dtau_from_Rbar, dtau_from_Rsound};
+
+    // calculate mean/variance for timescales
+    const auto [mu, sd] = get_mean_sd(dtau_list);
+
+    // const auto dtau_sampled = sd * sample + mu;
+    // std::clog << "sampled dtau/Rs=" << dtau_sampled / profile.params()->Rs() << "\n";
+
+    // rescale X~LogNormal(0,1) sample to get dtau from Y~LogNormal(mu,sd)
+    // Y = aX+b
+    return sd * sample + mu;
+}
+
+PowerSpec sample_GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double sample) {
+    const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
+    const auto dtau = sample_sw_timescale(sample, profile);
+
+    return GWSpec(kRs_vals, profile, dtau);
+}
+
+// Legacy calls to GWSpec
 PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTParams& params, double dtau) {
+    const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
+
+    if (dtau == 0) {
+        std::cout << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!\n";
+        dtau = get_nl_timescale(params.Rs(), profile);
+    } 
+
+    return GWSpec(kRs_vals, profile, dtau);
+}
+
+/*** GW power spectrum ***/
+PowerSpec GWSpec(const std::vector<double>& kRs_vals, const Hydrodynamics::FluidProfile& profile, double dtau) {
 
     const auto ti = std::chrono::high_resolution_clock::now();
 
@@ -584,7 +623,7 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
     //           << ", pRs_tolerance=" << config::pRs_tolerance 
     //           << ", z_tolerance=" << config::z_tolerance << "\n";
 
-    const Hydrodynamics::FluidProfile profile(params, config::fp_steps);
+    const auto params = profile.params();
 
     HG_LOG(Info) << "Calculating gravitational wave power spectrum...";
 
@@ -595,13 +634,13 @@ PowerSpec GWSpec(const std::vector<double>& kRs_vals, const PhaseTransition::PTP
 
     if (dtau == 0) {
         HG_LOG(Info) << "dtau not passed into GWSpec. Calculating sound wave duration using non-linear timescale!";
-        dtau = get_nl_timescale(profile, apsq);
+        dtau = get_nl_timescale(params->Rs(), profile, apsq);
     }
 
-    const auto cs = std::sqrt(params.cpsq());
-    const auto Rs_inv = 1.0 / params.Rs();
+    const auto cs = std::sqrt(params->cpsq());
+    const auto Rs_inv = 1.0 / params->Rs();
 
-    const auto tau_s = params.tau_s();
+    const auto tau_s = params->tau_s();
     const auto tau_fin = tau_s + dtau;
 
     const auto nk = kRs_vals.size();
@@ -856,12 +895,12 @@ PowerSpec zetaKin(const std::vector<double>& kRs_vals, const Hydrodynamics::Flui
 }
 /***************************/
 
-// computes timescale for non-linearities to appear in fluid (used as sound wave duration)
-double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
-    return get_nl_timescale(prof, Hydrodynamics::ApsqSpline(prof));
+// computes shock formation timescale using length scale Ls
+double get_nl_timescale(const double Ls, const Hydrodynamics::FluidProfile& prof) {
+    return get_nl_timescale(Ls, prof, Hydrodynamics::ApsqSpline(prof));
 }
 
-double get_nl_timescale(const Hydrodynamics::FluidProfile& prof, const Hydrodynamics::ApsqSpline& apsq) {
+double get_nl_timescale(const double Ls, const Hydrodynamics::FluidProfile& prof, const Hydrodynamics::ApsqSpline& apsq) {
     // tau_nl ~ Rs / sqrt(Omega_K)
     // Omega_K = avg kinetic energy of sound waves
     const auto Rs = prof.params()->Rs();
@@ -870,7 +909,18 @@ double get_nl_timescale(const Hydrodynamics::FluidProfile& prof, const Hydrodyna
     const auto Ek = Ekin(kRs_vals, prof, apsq);
     const auto Ek_int = simpson_integrate(Ek.K(), Ek.P());
 
-    return std::sqrt(Rs * Rs * Rs / Ek_int);
+    // return std::sqrt(Rs * Rs * Rs / Ek_int);
+    return Ls / std::sqrt(Ek_int / Rs);
+}
+
+// Uses mean bubble separation by default
+double get_nl_timescale(const Hydrodynamics::FluidProfile& prof) {
+    return get_nl_timescale(prof.params()->Rs(), prof);
+}
+
+// autocorrelation time in fluid
+double get_decorrelation_timescale(const double Ls, const double cs) {
+    return Ls / cs;
 }
 
 // approximation used for dtau in arXiv:2308.12943
