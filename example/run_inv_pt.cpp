@@ -19,16 +19,17 @@ int main(int argc, char* argv[]) {
     double cpsq = 1.0 / 3.0;
     double cmsq = cpsq;
 
-    /********** BPs from Fig. 8 arXiv:2406.01596 **********/
+    /********** BPs from Fig. 8/9 arXiv:2406.01596 **********/
     // Note: they use slightly different value for ap/am in detonation/hybrid profiles
+    // vp, vm, alp for hybrid are approx. values from Fig. 9)
 
     // detonation (vp=0.5, vm=0.25, alp=-0.277778)
     // double alN = -0.164931; // approx - they only give alp
     // double vw = 0.25;
 
-    // hybrid (vp=0.55, vm=0.9, alp=-0.100173)
-    // double alN = 
-    // double vw = 
+    // hybrid (vp=0.577, vm=0.95, alp=-0.128)
+    // double alN = -0.1;
+    // double vw = 0.5;
 
     // deflagration (vp=0.75, vm=0.89, alp=-0.12015)
     // double alN = -0.12015;
@@ -52,12 +53,10 @@ int main(int argc, char* argv[]) {
     params.print();
 
     const Hydrodynamics::FluidProfile profile(params, 5000, true);
-    profile.write();
-
-    // profile.write("fluid_profile.csv");
+    profile.write("fp_inv.csv");
 
     #ifdef ENABLE_MATPLOTLIB
-    profile.plot("fp.png", 0.0, 1.0);
+    profile.plot("fp_inv.png");
     #endif
     
 

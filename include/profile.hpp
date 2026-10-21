@@ -534,6 +534,9 @@ class FluidProfile {
     void test_inv_det_residual(const deriv_func& dydv, const size_t n) const;
     double wpwN_from_alp(const double alp) const;
 
+    double inv_hyb_residual(const deriv_func& dydv, const double alp) const;
+    double find_alp_inv_hyb(const deriv_func& dydv) const;
+
     std::vector<prof_type> clean_profiles(const prof_type& v_sol_tmp, const std::vector<state_type>& y_sol_tmp,
                                           const double w_start_val, const double w_end_val,
                                           const double T_start_val, const double T_end_val) const;
