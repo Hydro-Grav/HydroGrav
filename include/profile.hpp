@@ -211,7 +211,8 @@ class FluidProfile {
      * @param vw Wall velocity.
      * @return Array {alpha_min, alpha_max}.
      */
-    std::array<double, 2> get_alp_minmax(double vw) const;
+    std::pair<double, double> get_alp_minmax() const;
+    std::pair<double, double> get_inv_alp_minmax() const;
 
     /**
      * @brief Compute \f$\alpha_+\f$ at the wall from the fluid velocities on each side.

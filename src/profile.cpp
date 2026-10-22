@@ -29,10 +29,10 @@ namespace plt = matplotlibcpp;
 TO DO:
 - update generate_streamplot_data() to include points of interest (fixed pts, detonation/deflag/hybrid regions)
 - fix calc of w profile in generate_streamplot_data()
-- write summary of detonation/deflag/hybrid at top of ctor
 - allocate memory to y_sol_tmp etc (inside solve) -> get rid of .push_back() and change to indexing
 - update get_mode for veff
 - update "continue" to "break" in find_shock_idx? (if (xi_sh <= vw_) continue;) -> i think this will be faster since xi runs backwards and after the first 'continue' the rest will be 'continue' too
+- Check throw in FluidProfile ctor
 */
 
 namespace Hydrodynamics { // calculate bubble profile
@@ -123,20 +123,27 @@ FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t
                 bag_params_ = &dynamic_cast<const PhaseTransition::PTParams_Bag&>(params);
                 mode_ = mode_bag;
 
-                // check alN large enough for shock (deflag/hybrid only)
-                if (mode_ == 0 || mode_ == 1) {
-                    const auto alp_minmax = get_alp_minmax(vw_);
-                    alp_min_ = alp_minmax[0];
-                    alp_max_ = alp_minmax[1];
+                if (mode_ <= 2) { // direct PT
+                    if (mode_ != 2) { // check for valid alN (def/hyb)
+                        const auto alp_minmax = get_alp_minmax();
+                        alp_min_ = alp_minmax.first;
+                        alp_max_ = alp_minmax.second;
 
-                    // alN > alp > alp_min (can't properly constrain from above since we need alp)
-                    if (alN_ <= alp_min_) throw std::runtime_error("alN too small for shock!");
-                }
-
-
-                if (mode_ == 0 || mode_ == 1 || mode_ == 2) { // direct PT
+                        // alN > alp > alp_min (can't properly constrain from above since we need alp)
+                        if (alN_ <= alp_min_) throw std::runtime_error("alN too small for shock!");
+                    }
                     profiles = solve_profile(n);
                 } else { // inverse PT
+                    if (mode_ != 5) { // check for valid alN (inv def/hyb)
+                        const auto alp_minmax = get_inv_alp_minmax();
+                        alp_min_ = alp_minmax.first;
+                        alp_max_ = alp_minmax.second;
+
+                        // TO DO: check if this is necessary (alp=alN for def, but |alN|>|alp| for hyb 
+                        // so it might throw an error for some hybrids that are physically reasonable 
+                        // since alp != alN)
+                        // if (alN_ <= alp_min_) throw std::runtime_error("alN too small for shock!");
+                    }
                     profiles = solve_inverse_profile(n);
                 }
                 
@@ -286,8 +293,8 @@ double FluidProfile::vJ_det(double alp) const {
 }
 
 // TO DO: rename this (or get rid of it) - only applies to deflagration solutions
-std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
-    const auto vm = std::min(std::sqrt(cmsq_), vw); // vw for deflag (vw < cm), cm for hybrid (cp < vw)
+std::pair<double, double> FluidProfile::get_alp_minmax() const {
+    const auto vm = std::min(std::sqrt(cmsq_), vw_); // vw for deflag (vw < cm), cm for hybrid (cp < vw)
     const auto vp_min = 0.0;
     const auto vp_max = vm; // |v+| < |v-|
     
@@ -295,6 +302,19 @@ std::array<double, 2> FluidProfile::get_alp_minmax(double vw) const {
     const auto al_min = alp_from_matching(vp_max, vm);
 
     if (al_min < 0.0) return {0.0, al_max}; // numerical precision issue
+
+    return {al_min, al_max};
+}
+
+std::pair<double, double> FluidProfile::get_inv_alp_minmax() const {
+    const auto vp = std::max(std::sqrt(cpsq_), vw_); // vw for deflag (vw > cp), cp for hybrid (cp > vw)
+    const auto vm_min = vp;
+    const auto vm_max = 1.0;
+
+    const auto al_max = alp_from_matching(vp, vm_min);
+    const auto al_min = alp_from_matching(vp, vm_max);
+
+    if (al_max > 0.0) return {al_min, 0.0}; // numerical precision issue
 
     return {al_min, al_max};
 }
@@ -2000,7 +2020,7 @@ std::vector<prof_type> FluidProfile::solve_inverse_profile(int n) {
 
         // for inv def, alp=alN (not the case for inv hybrids!)
         const auto alp = (mode_ == 3 ) ? alN_ : find_alp_inv_hyb(dydv);
-        if (alp >= 0.0) throw std::runtime_error("Unphysical value of alp for inverse transition (alp >= 0)!");
+        if (alp <= alp_min_ || alp >= alp_max_) throw std::runtime_error("Unphysical valie of alp for inverse transtion (alp < alp_min or alp >= 0)!");
 
         const auto vm = vm_from_matching(vp, alp, 1); // check if sgn=1 or -1 for hyb
         const auto vmUF = mu(vw_, vm);
