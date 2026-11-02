@@ -36,28 +36,41 @@ int main(int argc, char* argv[]) {
     // double vw = 0.75;
     /******************************************************/
     /**************** BPs from Xiao's code ****************/
-    double alN = -0.1;
+    // double alN = -0.1;
     // double vw = 0.3; // detonation
-    double vw = 0.5; // hybrid
+    // double vw = 0.5; // hybrid
     // double vw = 0.8; // deflagration
-    /******************************************************/
-
-    
+    /******************************************************/    
     
     auto beta = PhaseTransition::dflt_PTParams::beta;
     auto Rs = PhaseTransition::dflt_PTParams::Rs;
     auto TN = PhaseTransition::dflt_PTParams::TN;
     auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-    params.print();
+    const std::vector<double> vw_list = {0.25, 0.5, 0.75};
+    const std::vector<double> alN_list = {-0.164931, -0.1, -0.12015};
+    const std::vector<std::string> filenames = {"fp_inv_det", "fp_inv_hyb", "fp_inv_def"};
 
-    const Hydrodynamics::FluidProfile profile(params, 5000, true);
-    profile.write("fp_inv.csv");
+    for (int i = 0; i < vw_list.size(); i++) {
+        const auto vw = vw_list[i];
+        const auto alN = alN_list[i];
+        const auto filename = filenames[i];
+        
+        const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+        const Hydrodynamics::FluidProfile profile(params, 5000, true);
+        profile.write(filename + ".csv");
+        profile.plot(filename + ".png");
+    }
 
-    #ifdef ENABLE_MATPLOTLIB
-    profile.plot("fp_inv.png");
-    #endif
+    // const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+    // params.print();
+
+    // const Hydrodynamics::FluidProfile profile(params, 5000, true);
+    // profile.write("fp_inv.csv");
+
+    // #ifdef ENABLE_MATPLOTLIB
+    // profile.plot("fp_inv.png");
+    // #endif
     
 
     return 0;
