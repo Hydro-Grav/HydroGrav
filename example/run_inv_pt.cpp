@@ -36,8 +36,8 @@ int main(int argc, char* argv[]) {
     // double vw = 0.75;
     /******************************************************/
     /**************** BPs from Xiao's code ****************/
-    // double alN = -0.1;
-    // double vw = 0.3; // detonation
+    double alN = -0.1;
+    double vw = 0.3; // detonation
     // double vw = 0.5; // hybrid
     // double vw = 0.8; // deflagration
     /******************************************************/    
@@ -47,30 +47,46 @@ int main(int argc, char* argv[]) {
     auto TN = PhaseTransition::dflt_PTParams::TN;
     auto nuc_type = PhaseTransition::dflt_PTParams::nuc_type;
 
-    const std::vector<double> vw_list = {0.25, 0.5, 0.75};
-    const std::vector<double> alN_list = {-0.164931, -0.1, -0.12015};
-    const std::vector<std::string> filenames = {"fp_inv_det", "fp_inv_hyb", "fp_inv_def"};
+    /********************** Compare direct and inverse PTs **********************/
+    // const std::vector<double> vw_list = {0.25, 0.5, 0.75};
+    // const std::vector<double> alN_list = {-0.164931, -0.1, -0.12015};
 
-    for (int i = 0; i < vw_list.size(); i++) {
-        const auto vw = vw_list[i];
-        const auto alN = alN_list[i];
-        const auto filename = filenames[i];
+    // const std::vector<std::string> filenames_inv = {"inv_det", "inv_hyb", "inv_def"};
+    // const std::vector<std::string> filenames_dir = {"dir_det", "dir_hyb", "dir_def"};
+
+    // const auto kRs_vals = logspace(-3.0, 3.0, 100);
+
+    // for (int i = 0; i < vw_list.size(); i++) {
+    //     const auto vw = vw_list[i];
+    //     const auto alN = alN_list[i];
         
-        const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-        const Hydrodynamics::FluidProfile profile(params, 5000, true);
-        profile.write(filename + ".csv");
-        profile.plot(filename + ".png");
-    }
+    //     // construct inverse PT fluid profile & GW spectrum
+    //     const PhaseTransition::PTParams_Bag params_inv(vw, -1.0 * std::abs(alN), TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+    //     const Hydrodynamics::FluidProfile profile_inv(params_inv, 5000, true);
+    //     profile_inv.write("fp_" + filenames_inv[i] + ".csv");
 
-    // const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
-    // params.print();
+    //     const auto gw_inv = Spectrum::GWSpec(kRs_vals, params_inv);
+    //     gw_inv.write("gw_" + filenames_inv[i] + ".csv");
 
-    // const Hydrodynamics::FluidProfile profile(params, 5000, true);
-    // profile.write("fp_inv.csv");
+    //     // construct direct PT fluid profile & GW spectrum
+    //     const PhaseTransition::PTParams_Bag params_dir(vw, std::abs(alN), TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+    //     const Hydrodynamics::FluidProfile profile_dir(params_dir, 5000, true);
+    //     profile_dir.write("fp_" + filenames_dir[i] + ".csv");
 
-    // #ifdef ENABLE_MATPLOTLIB
-    // profile.plot("fp_inv.png");
-    // #endif
+    //     const auto gw_dir = Spectrum::GWSpec(kRs_vals, params_dir);
+    //     gw_dir.write("gw_" + filenames_dir[i] + ".csv");
+    // }
+    /****************************************************************************/
+
+    const PhaseTransition::PTParams_Bag params(vw, alN, TN, beta, Rs, nuc_type, un, cpsq, cmsq);
+    params.print();
+
+    const Hydrodynamics::FluidProfile profile(params, 5000, true);
+    profile.write("fp_inv.csv");
+
+    #ifdef ENABLE_MATPLOTLIB
+    profile.plot("fp_inv.png");
+    #endif
     
 
     return 0;
