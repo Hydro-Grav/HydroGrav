@@ -362,3 +362,33 @@ TEST_CASE("LogGridInterpolant", "[loggrid]") {
                         std::invalid_argument);
     }
 }
+
+// ============================================================
+// brent_root
+// ============================================================
+TEST_CASE("brent_root()", "[brent]") {
+    SECTION("finds root of a polynomial") {
+        auto f = [](double x) { return x * x - 2.0; };
+        REQUIRE(brent_root(f, 0.0, 2.0, 1e-12) == Approx(std::sqrt(2.0)).epsilon(1e-10));
+    }
+    SECTION("bracket order does not matter") {
+        auto f = [](double x) { return std::cos(x); };
+        REQUIRE(brent_root(f, 3.0, 0.0, 1e-12) == Approx(M_PI / 2.0).epsilon(1e-10));
+    }
+    SECTION("root at bracket end") {
+        auto f = [](double x) { return x - 1.0; };
+        REQUIRE(brent_root(f, 1.0, 3.0) == Approx(1.0).epsilon(1e-12));
+    }
+    SECTION("throws without sign change") {
+        auto f = [](double x) { return x * x + 1.0; };
+        REQUIRE_THROWS_AS(brent_root(f, -1.0, 1.0), std::invalid_argument);
+    }
+    SECTION("propagates exceptions from f") {
+        int calls = 0;
+        auto f = [&calls](double x) {
+            if (++calls > 3) throw std::runtime_error("boom");
+            return x - 0.3;
+        };
+        REQUIRE_THROWS_AS(brent_root(f, 0.0, 1.0, 1e-14), std::runtime_error);
+    }
+}

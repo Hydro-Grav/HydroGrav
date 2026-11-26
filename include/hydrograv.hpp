@@ -12,6 +12,7 @@
 #include "logger.hpp"
 #include "phasetransition.hpp"
 #include "profile.hpp"
+#include "wallvelocity.hpp"
 #include "ssm.hpp"
 #include "snr.hpp"
 

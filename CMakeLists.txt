@@ -103,6 +103,7 @@ set(HEADERS
   include/physics.hpp
   include/profile.hpp
   include/ssm.hpp
+  include/wallvelocity.hpp
   include/sici.hpp
   include/sici_arrays.hpp
   include/solvers.tpp

@@ -185,6 +185,83 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
 //     return;
 // }
 
+/****************************** Veff matching (free) ******************************/
+std::array<double, 2> veff_matching_eqs_wall(const PhaseTransition::PTParams_Veff& params, double vp, double TpTN, double vm, double TmTN) {
+    if (TmTN < params.TTN_min() || TmTN > params.TTN_max()) {
+        throw std::runtime_error("Tm/TN is called out of bounds for spline!");
+    }
+    if (TpTN < params.TTN_min() || TpTN > params.TTN_max()) {
+        throw std::runtime_error("Tp/TN is called out of bounds for spline!");
+    }
+
+    const auto pp = params.ps_val(TpTN); // p_+, e_+
+    const auto ep = params.es_val(TpTN);
+    const auto pm = params.pb_val(TmTN); // p_-, e_-
+    const auto em = params.eb_val(TmTN);
+
+    // scale residuals to O(1) (prevents issues with newton solver)
+    // NOTE: p(T), e(T) ~ 1e+8 so residual must converge to at least 1e-10!!
+    const auto scale = std::max({std::abs(pp), std::abs(pm), std::abs(ep), std::abs(em)});
+    const auto eq1 = (vp * vm * (em - ep) - (pm - pp)) / scale;
+    const auto eq2 = (vm * (em + pp) - vp * (ep + pm)) / scale;
+
+    return {eq1, eq2};
+}
+
+double jouguet_velocity_veff(const PhaseTransition::PTParams_Veff& params) {
+    const auto cm = std::sqrt(params.cmsq());
+
+    // calculate Jouguet detonation velocity from matching eqs
+    const auto vm = cm; // vJ_det=vp when |vm|=cm
+    const auto TpTN = 1.0;
+
+    const auto vp_min = vm;
+    const auto vp_max = 1.0;
+    const auto TmTN_min = TpTN;
+    const auto TmTN_max = params.TTN_max();
+
+    if (params.TTN_min() > TmTN_min)
+        throw std::runtime_error("TmTN_min lies outside of bounds of EoS, check for bad EoS data!");
+
+    const std::array<double, 2> bounds_min = {vp_min, TmTN_min};
+    const std::array<double, 2> bounds_max = {vp_max, TmTN_max};
+
+    auto matching_helper = [&params, vm, TpTN](const std::array<double, 2>& vp_TmTN) {
+        return veff_matching_eqs_wall(params, vp_TmTN[0], TpTN, vm, vp_TmTN[1]);
+    };
+
+    // rough grid search to find initial guess for {vp, TmTN}
+    const auto vp_TmTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max);
+
+    // solve matching eqs
+    std::array<double, 2> sol;
+    try { // solve using bounded newton's method
+        sol = newton_solve_2d_bounded(matching_helper, vp_TmTN_guess, bounds_min, bounds_max, 1e-12, 100, 1e-12);
+    } catch (std::exception& e) { // nelder-mead minimisation method fallback
+        HG_LOG(Warn) << e.what() << " Solving matching eqs by minimising residuals instead!";
+
+        auto matching_helper2 = [&params, vm, TpTN](const std::array<double, 2>& vp_TmTN) {
+            const auto resi = veff_matching_eqs_wall(params, vp_TmTN[0], TpTN, vm, vp_TmTN[1]);
+            return std::array<double, 2>{resi[0] * resi[0], resi[1] * resi[1]};
+        };
+
+        sol = nelder_mead_minimise_2d(matching_helper2, vp_TmTN_guess[0], vp_TmTN_guess[1], 0.1, 0.01, 1e-12);
+
+        const auto resi = matching_helper({sol[0], sol[1]});
+        if (resi[0] > config::minimiser_tol || resi[1] > config::minimiser_tol) {
+            throw std::runtime_error("Solving matching equations failed in jouguet_velocity_veff (residual too large)!");
+        }
+    }
+
+    const auto vJ_det = sol[0]; // vp
+    if (std::abs(vJ_det) <= cm) throw std::runtime_error("Invalid Jouguet detonation velocity calculated (|vJ_det| <= cm)!");
+
+    const auto TmTN = sol[1];
+    if (TmTN < TpTN) throw std::runtime_error("Invalid temperature for Jouguet detonation solution (TmTN < TpTN)!");
+
+    return vJ_det;
+}
+
 /****************************** FluidProfile class ******************************/
 
     /********************** Notation for fluid parameters **********************/
@@ -202,9 +279,12 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params) {
     /***************************************************************************/
 
 FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, const size_t n, const bool dev_log)
+    : FluidProfile(params, params.vw(), n, dev_log) {}
+
+FluidProfile::FluidProfile(const PhaseTransition::PTParams& params, double vw, size_t n, bool dev_log)
     : params_(&params),
       cpsq_(params.cpsq()), cmsq_(params.cmsq()),
-      vw_(params.vw()), alN_(params.alN()),
+      vw_(vw), alN_(params.alN()),
       alp_min_(std::numeric_limits<double>::quiet_NaN()), 
       alp_max_(std::numeric_limits<double>::quiet_NaN()),
       mode_(),
@@ -714,54 +794,7 @@ int FluidProfile::get_mode_veff(double vw, double cmsq) const {
 
     if (vw < cm) return 0; // deflagration
 
-    // calculate Jouguet detonation velocity from matching eqs
-    const auto vm = cm; // vJ_det=vp when |vm|=cm
-    const auto TpTN = 1.0;
-
-    const auto vp_min = vm;
-    const auto vp_max = 1.0;
-    const auto TmTN_min = TpTN;
-    const auto TmTN_max = veff_params_->TTN_max();
-
-    if (veff_params_->TTN_min() > TmTN_min)
-        throw std::runtime_error("TmTN_min lies outside of bounds of EoS, check for bad EoS data!");
-
-    const std::array<double, 2> bounds_min = {vp_min, TmTN_min};
-    const std::array<double, 2> bounds_max = {vp_max, TmTN_max};
-
-    auto matching_helper = [this, vm, TpTN](const std::array<double, 2>& vp_TmTN) {
-        return matching_eqs_wall(vp_TmTN[0], TpTN, vm, vp_TmTN[1]);
-    };
-
-    // rough grid search to find initial guess for {vp, TmTN}
-    const auto vp_TmTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max);
-    // const auto vp_TmTN_guess = grid_search_2d(matching_helper, bounds_min, bounds_max, 50, 50, true, "get_mode_grid_search.csv");
-
-    // solve matching eqs
-    std::array<double, 2> sol;
-    try { // solve using bounded newton's method
-        sol = newton_solve_2d_bounded(matching_helper, vp_TmTN_guess, bounds_min, bounds_max, 1e-12, 100, 1e-12);
-    } catch (std::exception& e) { // nelder-mead minimisation method fallback
-        HG_LOG(Warn) << e.what() << " Solving matching eqs by minimising residuals instead!";
-        
-        auto matching_helper2 = [this, vm, TpTN](const std::array<double, 2>& vp_TmTN) {
-            const auto resi = matching_eqs_wall(vp_TmTN[0], TpTN, vm, vp_TmTN[1]);
-            return std::array<double, 2>{resi[0] * resi[0], resi[1] * resi[1]};
-        };
-
-        sol = nelder_mead_minimise_2d(matching_helper2, vp_TmTN_guess[0], vp_TmTN_guess[1], 0.1, 0.01, 1e-12);
-
-        const auto resi = matching_helper({sol[0], sol[1]});
-        if (resi[0] > config::minimiser_tol || resi[1] > config::minimiser_tol) {
-            throw std::runtime_error("Solving matching equations failed in get_mode_veff (residual too large)!");
-        }
-    }
-
-    const auto vJ_det = sol[0]; // vp
-    if (abs(vJ_det) <= cm) throw std::runtime_error("Invalid Jouguet detonation velocity calculated (|vJ_det| <= cm)!");
-    
-    const auto TmTN = sol[1];
-    if (TmTN < TpTN) throw std::runtime_error("Invalid temperature for Jouguet detonation solution (TmTN < TpTN)!");
+    const auto vJ_det = jouguet_velocity_veff(*veff_params_);
 
     if (vw < vJ_det) return 1; // hybrid
     return 2; // detonation
@@ -805,26 +838,8 @@ std::array<double, 2> FluidProfile::matching_eqs_shock(double v1, double T1TN, d
     return {eq1, eq2};
 }
 
-std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const {        
-    if (TmTN < veff_params_->TTN_min() || TmTN > veff_params_->TTN_max()) {
-        throw std::runtime_error("Tm/TN is called out of bounds for spline!");
-    }
-    if (TpTN < veff_params_->TTN_min() || TpTN > veff_params_->TTN_max()) {
-        throw std::runtime_error("Tp/TN is called out of bounds for spline!");
-    }
-
-    const auto pp = veff_params_->ps_val(TpTN); // p_+, e_+
-    const auto ep = veff_params_->es_val(TpTN);
-    const auto pm = veff_params_->pb_val(TmTN); // p_-, e_-
-    const auto em = veff_params_->eb_val(TmTN);
-
-    // scale residuals to O(1) (prevents issues with newton solver)
-    // NOTE: p(T), e(T) ~ 1e+8 so residual must converge to at least 1e-10!!
-    const auto scale = std::max({std::abs(pp), std::abs(pm), std::abs(ep), std::abs(em)});
-    const auto eq1 = (vp * vm * (em - ep) - (pm - pp)) / scale;
-    const auto eq2 = (vm * (em + pp) - vp * (ep + pm)) / scale;
-
-    return {eq1, eq2};
+std::array<double, 2> FluidProfile::matching_eqs_wall(double vp, double TpTN, double vm, double TmTN) const {
+    return veff_matching_eqs_wall(*veff_params_, vp, TpTN, vm, TmTN);
 }
 
 // dev
@@ -1539,6 +1554,15 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
         if (TpTN <= 1.0) throw std::runtime_error("solve_profile failed (Tp/TN must be > 1)!");
         if (TpTN <= T_sol_tmp.front()) throw std::runtime_error("solve_profile failed (Tp/TN must be > T1/TN)!");
 
+        // store fluid state either side of the wall
+        wall_state_.vp = std::abs(mu(vw_, std::abs(vpUF)));
+        wall_state_.vm = std::abs(vm);
+        wall_state_.TpTN = TpTN;
+        wall_state_.TmTN = TmTN;
+        wall_state_.wpwN = wpwN;
+        wall_state_.wmwN = wmwN;
+        wall_state_.xi_sh = xi0;
+
         // update sound speed values
         cpsq_ = veff_params_->csq_s(TpTN);
         cmsq_ = veff_params_->csq_b(TmTN);
@@ -1650,6 +1674,15 @@ std::vector<prof_type> FluidProfile::solve_profile_veff(int n) {
 
         // update sound speed values (cp doesn't change since Tp=TN for detonations)
         cmsq_ = veff_params_->csq_b(y0[2]);
+
+        // store fluid state either side of the wall (T+ = TN, v+ = vw for detonations)
+        wall_state_.vp = vw_;
+        wall_state_.vm = std::abs(mu(vw_, std::abs(vmUF)));
+        wall_state_.TpTN = 1.0;
+        wall_state_.TmTN = y0[2];
+        wall_state_.wpwN = 1.0;
+        wall_state_.wmwN = y0[1];
+        wall_state_.xi_sh = std::numeric_limits<double>::quiet_NaN();
 
         HG_LOG(Debug) << "Detonation profile:\n"
                       << "  vm = " << mu(vw_, abs(vmUF)) << ", vmUF=" << vmUF << "\n"

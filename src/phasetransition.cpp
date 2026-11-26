@@ -147,6 +147,20 @@ void PTParams::write_params(std::ostream& os) const {
      << std::setw(35) << "Mean bubble separation:" << "Rs=" << Rs_ << "\n";
 }
 
+void PTParams::set_vw(double vw, bool rescale_lengths) {
+  if (!(vw > 0.0 && vw < 1.0)) {
+    throw std::invalid_argument("PTParams::set_vw: unphysical wall velocity. Must have 0 < vw < 1.");
+  }
+  vw_ = vw;
+
+  if (rescale_lengths) {
+    Rs_ = Rs_approx(vw_, beta_);
+    if (Rbar_ != -1.0) { // -1 is the 'not supplied' sentinel
+      Rbar_ = Rbar_approx(vw_, beta_);
+    }
+  }
+}
+
 // Private:
 bool PTParams::is_valid_model(const std::string& model, const std::vector<std::string>& allowed_models) const {
     return std::find(allowed_models.begin(), allowed_models.end(), model) != allowed_models.end();
@@ -344,8 +358,7 @@ void PTParams_Veff::initialize_from_eos_data(const EquationOfState& eos_data) {
   // Smooth spline needed here to remove numerical noise in eos
   alglib::real_1d_array veff_TTN_array, veff_ps_array, veff_es_array, veff_ws_array, veff_pb_array, veff_eb_array, veff_wb_array;
   alglib::spline1dfitreport rep;
-  // const double smooth_fac = 1e-2;
-  const double smooth_fac = 1e-2;
+  const double smooth_fac = eos_data.smoothing; // default 1e-2 (see EquationOfState::smoothing)
   const int basis_size = 50;
 
   veff_TTN_array.setcontent(n, veff_TTN_vals_.data());
@@ -605,6 +618,31 @@ void PTParams_Veff::plot_csq(const std::string& filename) const {
   plt::save(filename);
 }
 #endif
+
+double PTParams_Veff::alN_munu() const {
+  // template-model alpha at T_N: theta_bar = e - p/cb^2 (Giese, Konstandin, van de Vis 2020)
+  const auto cbsq = csq_b(1.0);
+  const auto theta_s = es_val(1.0) - ps_val(1.0) / cbsq;
+  const auto theta_b = eb_val(1.0) - pb_val(1.0) / cbsq;
+  return (theta_s - theta_b) / (3.0 * ws_val(1.0));
+}
+
+double PTParams_Veff::entropy_consistency(double TTN, bool broken) const {
+  // w = T s and s = dp/dT. With x = T/TN, T dp/dT = x dp/dx, so TN cancels.
+  const auto& p_interp = broken ? veff_pb_interp_ : veff_ps_interp_;
+  const auto w = broken ? wb_val(TTN) : ws_val(TTN);
+
+  double p, dpdx, d2p;
+  alglib::spline1ddiff(p_interp, TTN, p, dpdx, d2p);
+
+  return w / (TTN * dpdx) - 1.0;
+}
+
+std::unique_ptr<PTParams_Veff> PTParams_Veff::with_vw(double vw, bool rescale_lengths) const {
+  auto copy = std::make_unique<PTParams_Veff>(*this);
+  copy->set_vw(vw, rescale_lengths);
+  return copy;
+}
 
 void PTParams_Veff::write_params(std::ostream& os) const {
   PTParams::write_params(os);

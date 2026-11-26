@@ -105,6 +105,7 @@ If the library and examples were successfully built, the examples and tests are 
     ./bin/run_kinetic_spectrum
     ./bin/run_gw_spectrum
     ./bin/run_eos_gw_spectrum
+    ./bin/run_lte_wall_velocity
     ./bin/unit_tests
 
 ## Logging

@@ -14,6 +14,7 @@
 #include <array>
 #include <string>
 #include <variant>
+#include <limits>
 
 #include "ap.h"
 #include "interpolation.h"
@@ -109,6 +110,58 @@ void generate_streamplot_data(const PhaseTransition::PTParams& params, int xi_pt
 void generate_streamplot_data(const PhaseTransition::PTParams& params);
 
 /**
+ * @brief Fluid state immediately either side of the bubble wall.
+ *
+ * Velocities are in the wall frame and given as magnitudes; temperatures and
+ * enthalpies are normalised to their values at nucleation.
+ * Only filled for the Veff equation of state (all NaN for bag/mu-nu).
+ */
+struct WallState {
+    double vp    = std::numeric_limits<double>::quiet_NaN(); ///< \f$|v_+|\f$, fluid speed in front of the wall (symmetric phase).
+    double vm    = std::numeric_limits<double>::quiet_NaN(); ///< \f$|v_-|\f$, fluid speed behind the wall (broken phase).
+    double TpTN  = std::numeric_limits<double>::quiet_NaN(); ///< \f$T_+/T_N\f$.
+    double TmTN  = std::numeric_limits<double>::quiet_NaN(); ///< \f$T_-/T_N\f$.
+    double wpwN  = std::numeric_limits<double>::quiet_NaN(); ///< \f$w_+/w_N\f$.
+    double wmwN  = std::numeric_limits<double>::quiet_NaN(); ///< \f$w_-/w_N\f$.
+    double xi_sh = std::numeric_limits<double>::quiet_NaN(); ///< Shock position (NaN for detonations).
+};
+
+/**
+ * @brief Energy-momentum junction conditions across the wall for a generic (Veff) EoS.
+ *
+ * Imposes \f$w_+\gamma_+^2 v_+ = w_-\gamma_-^2 v_-\f$ and
+ * \f$w_+\gamma_+^2 v_+^2 + p_+ = w_-\gamma_-^2 v_-^2 + p_-\f$ in the combined form
+ * \f$v_+ v_- = (p_+ - p_-)/(e_+ - e_-)\f$, \f$v_+/v_- = (e_- + p_+)/(e_+ + p_-)\f$.
+ * Residuals are scaled to O(1) by the largest of |p|, |e|.
+ *
+ * @param params Veff phase transition parameters.
+ * @param vp     Fluid velocity in the symmetric phase (wall frame).
+ * @param TpTN   Temperature ratio \f$T_+/T_N\f$.
+ * @param vm     Fluid velocity in the broken phase (wall frame).
+ * @param TmTN   Temperature ratio \f$T_-/T_N\f$.
+ * @return Two-component residual vector.
+ *
+ * @throws std::runtime_error if a temperature lies outside the EoS table.
+ */
+std::array<double, 2> veff_matching_eqs_wall(const PhaseTransition::PTParams_Veff& params, double vp, double TpTN, double vm, double TmTN);
+
+/**
+ * @brief Jouguet velocity for a generic (Veff) EoS.
+ *
+ * The wall velocity at which the hybrid branch meets the detonation branch:
+ * \f$v_J = v_+\f$ solving the junction conditions with \f$T_+ = T_N\f$ and
+ * \f$|v_-| = c_-\f$ (evaluated at \f$T_N\f$).
+ *
+ * @param params Veff phase transition parameters.
+ * @return \f$v_J\f$.
+ *
+ * @throws std::runtime_error if the matching equations cannot be solved.
+ */
+double jouguet_velocity_veff(const PhaseTransition::PTParams_Veff& params);
+
+class LTEWallSolver; // defined in wallvelocity.hpp
+
+/**
  * @class FluidProfile
  * @brief Represents the hydrodynamic profile of a bubble wall in a first-order phase transition.
  *
@@ -173,12 +226,30 @@ class FluidProfile {
      * If @c false the profile uses mu-nu shock matching condition as a fallback.
      */
     bool shock_flag() const { return shock_flag_; }
+
+    /**
+     * @brief Fluid state either side of the wall for the solved profile (Veff EoS only).
+     */
+    const WallState& wall_state() const { return wall_state_; }
     
     #ifdef ENABLE_MATPLOTLIB
     void plot(const std::string& filename = "fp.png", double xi_min = 0.0, double xi_max = 1.0) const; // Plots bubble profiles
     #endif
 
   private:
+    friend class LTEWallSolver;
+
+    /**
+     * @brief Construct a profile for a wall velocity that may differ from @c params.vw().
+     *
+     * Used by LTEWallSolver to evaluate trial wall velocities without building
+     * new parameter objects. Kept private: a profile built this way has
+     * @c params()->vw() != the wall velocity it was solved for.
+     */
+    FluidProfile(const PhaseTransition::PTParams& params, double vw, size_t n, bool dev_log);
+
+    WallState wall_state_; ///< Fluid state either side of the wall (Veff EoS only).
+
     const PhaseTransition::PTParams* params_;       ///< Pointer to the phase transition parameters.
     const PhaseTransition::PTParams_Bag* bag_params_ = nullptr;   ///< Downcast pointer for bag EoS (null if Veff).
     const PhaseTransition::PTParams_Veff* veff_params_ = nullptr; ///< Downcast pointer for Veff EoS (null if bag).
@@ -388,8 +459,8 @@ class FluidProfile {
     /**
      * @brief Evaluate the Veff wall-matching equations.
      *
-     * Returns the two-component residual of the junction conditions
-     * \f$(p_+ = p_-,\; T_+ v_+ = T_- v_-)\f$ at the bubble wall.
+     * Returns the two-component residual of the energy-momentum junction
+     * conditions at the bubble wall (see veff_matching_eqs_wall()).
      *
      * @param vp   Fluid velocity in the symmetric phase (wall frame).
      * @param TpTN Temperature ratio \f$T_+/T_N\f$.

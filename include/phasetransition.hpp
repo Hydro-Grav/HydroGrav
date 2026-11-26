@@ -15,6 +15,7 @@
 #include <vector>
 #include <algorithm>
 #include <optional>
+#include <memory>
 
 #include "ap.h"
 #include "interpolation.h"
@@ -279,6 +280,19 @@ class PTParams {
      */
     virtual void write_params(std::ostream& os) const;
 
+    /**
+     * @brief Replace the wall velocity, optionally rescaling the length scales that depend on it.
+     *
+     * Used to build a copy of the parameters carrying a wall velocity that was
+     * solved for (see Hydrodynamics::LTEWallSolver).
+     *
+     * @param vw              New wall velocity, 0 < vw < 1.
+     * @param rescale_lengths If true, set \f$R_* = \f$ Rs_approx(vw, beta) and,
+     *                        when Rbar was supplied (not the -1 sentinel),
+     *                        \f$\bar R = \f$ Rbar_approx(vw, beta).
+     */
+    void set_vw(double vw, bool rescale_lengths);
+
   private:
     bool is_valid_model(const std::string& model, const std::vector<std::string>& allowed_models) const;
 };
@@ -332,6 +346,18 @@ struct EquationOfState
   std::vector<double> pb_vals;
   std::vector<double> es_vals;
   std::vector<double> eb_vals;
+
+  /**
+   * @brief Regularisation (non-linearity penalty) of the smoothing splines fitted to p(T), e(T), w(T).
+   *
+   * Passed to ALGLIB's @c spline1dfit as @c lambdans. The default (1e-2) damps
+   * numerical noise in EoS tables computed from an effective potential, but it
+   * also biases smooth data: for a T^4 table on [0.5, 2] T_N it shifts p(T_N)
+   * by ~20% and spoils w = T dp/dT. Set to 0 for exact or noise-free tables
+   * (e.g. analytic template-model EoS), and especially before computing an
+   * LTE wall velocity, which relies on w = T dp/dT.
+   */
+  double smoothing = 1e-2;
 
   /**
    * @brief Construct an EquationOfState from tabulated data.
@@ -432,6 +458,42 @@ public:
   double pN() const { return pN_; }
   double eN() const { return eN_; }
   double wN() const { return wN_; }
+
+  /**
+   * @brief Strength parameter of the template (mu-nu) model computed from the EoS at T_N.
+   *
+   * \f$\alpha_N = (\bar\theta_s - \bar\theta_b)/(3 w_s)\f$ with
+   * \f$\bar\theta = e - p/c_b^2\f$, all evaluated at \f$T_N\f$
+   * (Giese, Konstandin, van de Vis, arXiv:2004.06995).
+   */
+  double alN_munu() const;
+
+  /**
+   * @brief Enthalpy ratio \f$\Psi_N = w_b(T_N)/w_s(T_N)\f$.
+   *
+   * Together with alN_munu() and the sound speeds this characterises the
+   * LTE wall velocity in the template model (arXiv:2303.10171).
+   */
+  double psiN() const { return wb_val(1.0) / ws_val(1.0); }
+
+  /**
+   * @brief Thermodynamic consistency of the EoS: \f$w/(T\,dp/dT) - 1\f$.
+   *
+   * Vanishes for a consistent EoS (w = Ts with s = dp/dT). The LTE
+   * wall-velocity condition \f$\gamma_+T_+ = \gamma_-T_-\f$ relies on it.
+   *
+   * @param TTN    Temperature ratio T/T_N.
+   * @param broken If true use the broken phase, otherwise the symmetric phase.
+   */
+  double entropy_consistency(double TTN, bool broken) const;
+
+  /**
+   * @brief Copy of these parameters with a different wall velocity.
+   *
+   * @param vw              New wall velocity.
+   * @param rescale_lengths If true, rescale Rs (and Rbar, if supplied) with vw.
+   */
+  std::unique_ptr<PTParams_Veff> with_vw(double vw, bool rescale_lengths = true) const;
 
   #ifdef ENABLE_MATPLOTLIB
   void plot_thermo(const std::string& filename="thermo.png") const; // Plots e(T), p(T), w(T)

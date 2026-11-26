@@ -221,6 +221,24 @@ double golden_section_minimize(std::function<double(double)> f, double a, double
 std::array<double, 2> find_bracket(const std::function<double(double)>& residual_func, double a, double b);
 
 /**
+ * @brief Find a root of a scalar function in a sign-changing bracket using Brent's method.
+ *
+ * Wraps GSL's @c gsl_root_fsolver_brent. Requires @p f(a) and @p f(b) to have
+ * opposite signs (or one of them to vanish).
+ *
+ * @param f        Function whose root is sought.
+ * @param a        Lower end of the bracket.
+ * @param b        Upper end of the bracket.
+ * @param tol      Absolute tolerance on the root location.
+ * @param max_iter Maximum number of iterations.
+ * @return Root of @p f in [a, b].
+ *
+ * @throws std::invalid_argument if [a, b] does not bracket a root.
+ * @throws std::runtime_error if the iteration fails or does not converge.
+ */
+double brent_root(const std::function<double(double)>& f, double a, double b, double tol = 1e-10, int max_iter = 200);
+
+/**
  * @brief Fourth-order Runge–Kutta ODE solver.
  *
  * Integrates the system \f$dy/dx = f(x, y)\f$ from @p x0 to @p xf

@@ -206,6 +206,33 @@ namespace config {
     constexpr double pRs_tolerance = 1e-5; // default = 1e-5
     /** @} */
 
+    /**
+     * @name LTE wall-velocity solver (Hydrodynamics::LTEWallSolver)
+     *
+     * In local thermal equilibrium the wall velocity is fixed by entropy
+     * conservation across the wall, \f$\gamma_+ T_+ = \gamma_- T_-\f$
+     * (Ai, Laurent & van de Vis, arXiv:2303.10171). The solver scans the
+     * residual of that condition over \f$v_w \in [v_{\rm min}, v_J - \delta]\f$
+     * and refines sign changes with Brent's method.
+     * @{
+     */
+    /// Smallest wall velocity included in the scan.
+    constexpr double lte_vw_min = 1e-2; // default = 1e-2
+    /// Distance below the Jouguet velocity at which the scan stops (the shock collapses onto the wall at v_J).
+    constexpr double lte_vJ_margin = 1e-3; // default = 1e-3
+    /// Number of wall velocities sampled in the scan.
+    constexpr int lte_scan_points = 8; // default = 8
+    /// Absolute tolerance on the wall velocity returned by the root finder. Finer values buy nothing:
+    /// the residual is only resolved to ~1e-5 by the inner shooting in FluidProfile.
+    constexpr double lte_root_tol = 1e-5; // default = 1e-5
+    /// Profile integration steps used for each trial wall velocity.
+    constexpr int lte_profile_steps = 1000; // default = 1000
+    /// Maximum allowed |w/(T dp/dT) - 1| before the EoS is flagged as thermodynamically inconsistent.
+    constexpr double lte_entropy_consistency_tol = 1e-2; // default = 1e-2
+    /// Warn when the solved v_w exceeds this fraction of v_J (steady state is questionable there).
+    constexpr double lte_near_vJ_warn = 0.95; // default = 0.95
+    /** @} */
+
 }
 
 #endif // INCLUDE_CONFIG_HPP_H

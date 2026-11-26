@@ -13,6 +13,8 @@
 
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 #include <gsl/gsl_multimin.h>
+#include <gsl/gsl_roots.h>
+#include <gsl/gsl_errno.h>
 #include <gsl/gsl_vector.h>
 
 #include "ap.h"
@@ -370,6 +372,68 @@ std::array<double, 2> find_bracket(const std::function<double(double)>& residual
     double right = std::min(b, xs[S.i1] + PAD_MULT * dx);
 
     return {left, right};
+}
+
+namespace {
+// Adapter so a std::function can be passed through GSL's C callback interface.
+double gsl_function_adapter(double x, void* params) {
+    const auto& f = *static_cast<const std::function<double(double)>*>(params);
+    return f(x);
+}
+} // namespace
+
+double brent_root(const std::function<double(double)>& f, double a, double b, double tol, int max_iter) {
+    if (a > b) std::swap(a, b);
+
+    const double fa = f(a);
+    const double fb = f(b);
+    if (!std::isfinite(fa) || !std::isfinite(fb)) {
+        throw std::invalid_argument("brent_root: function is not finite at the bracket ends");
+    }
+    if (fa == 0.0) return a;
+    if (fb == 0.0) return b;
+    if ((fa > 0.0) == (fb > 0.0)) {
+        throw std::invalid_argument("brent_root: [a, b] does not bracket a root (f(a) and f(b) have the same sign)");
+    }
+
+    gsl_function F;
+    F.function = &gsl_function_adapter;
+    F.params = const_cast<void*>(static_cast<const void*>(&f));
+
+    // RAII owner for the GSL solver so it is freed on every exit path
+    std::unique_ptr<gsl_root_fsolver, decltype(&gsl_root_fsolver_free)> solver(
+        gsl_root_fsolver_alloc(gsl_root_fsolver_brent), &gsl_root_fsolver_free);
+    if (!solver) throw std::runtime_error("brent_root: failed to allocate GSL solver");
+
+    // Disable GSL's default abort-on-error so failures surface as exceptions.
+    // Restored on every exit path, including an exception thrown by f.
+    struct HandlerGuard {
+        gsl_error_handler_t* old = gsl_set_error_handler_off();
+        ~HandlerGuard() { gsl_set_error_handler(old); }
+    } handler_guard;
+
+    int status = gsl_root_fsolver_set(solver.get(), &F, a, b);
+    if (status != GSL_SUCCESS) {
+        throw std::runtime_error(std::string("brent_root: gsl_root_fsolver_set failed: ") + gsl_strerror(status));
+    }
+
+    double root = 0.5 * (a + b);
+    for (int iter = 0; iter < max_iter; ++iter) {
+        status = gsl_root_fsolver_iterate(solver.get());
+        if (status != GSL_SUCCESS) {
+            throw std::runtime_error(std::string("brent_root: iteration failed: ") + gsl_strerror(status));
+        }
+
+        root = gsl_root_fsolver_root(solver.get());
+        const double lo = gsl_root_fsolver_x_lower(solver.get());
+        const double hi = gsl_root_fsolver_x_upper(solver.get());
+
+        if (gsl_root_test_interval(lo, hi, tol, 0.0) == GSL_SUCCESS) {
+            return root;
+        }
+    }
+
+    throw std::runtime_error("brent_root: did not converge within max_iter iterations");
 }
 
 double wasserstein_distance_1d(std::vector<double> u_values, 
